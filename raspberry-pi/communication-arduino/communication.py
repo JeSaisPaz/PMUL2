@@ -5,7 +5,7 @@ import time
 
 # Arguments: Port serie (GPIO sur le raspberry) et bande
 # Note: '/dev/ttyACM0' si par USB
-s = serial.Serial('/dev/ttyS0', 9600)
+s = serial.Serial('/dev/serial0', 9600)
 # Temps de delai pour que la connexion serie soit bien etablie
 time.sleep(2) 
 
@@ -21,7 +21,7 @@ def receive():
     # On verifie que personne n'ecoute a ce port
     if s.in_waiting > 0:
         # On lis au port serie et on nettoie ce que l'Arduino nous a envoye
-        payload = port.readline().decode('utf-8').strip()
+        payload = s.readline().decode('utf-8').strip()
         print(str(payload));
     
 
