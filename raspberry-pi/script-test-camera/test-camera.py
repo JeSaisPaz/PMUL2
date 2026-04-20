@@ -3,6 +3,10 @@ import time
 # Os pour utiliser la commande ls
 import os
 
+import cv2
+
+import numpy as np
+
 # pyzbar pour la lecture des codes QR
 from pyzbar.pyzbar import decode
 # PIL pour utiliser le type d'objet 'Image'
@@ -56,6 +60,44 @@ def filenameRoutine():
         file_name = input("> ")
         return file_name
 
+# fonction pour determiner la couleur d'un bloque
+def imgToColor(img_path):
+    # On ouvre l'image dans CV2
+    img = cv2.imread(img_path)
+    if img is None:
+        return "Fichier image introuvable"
+
+    # On converti l'image BGR (OpenCV) en format HSV
+    # Cele fait sens car uniquement le canal H (teinte) peut etre analyser
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+    # On décode l'image avec pyzbar
+    qr_results = decode(Image.open(img_path))
+    
+    if not qr_results:
+        return "Aucun QR code trouvé pour ancrer la détection"
+
+    obj = qr_results[0] # On récupère le premier QR code détecté
+
+    # On calcul des coordonnées de la zone autours du code QR
+    horizontalQrCoordinates = min(obj.rect.left + obj.rect.width + 3, img.shape[1] - 15)
+    verticalQrCoordinates = min(obj.rect.top + (obj.rect.height // 2), img.shape[0] - 15)
+
+    # Portion de pixels en dehors du code QR (10x10)
+    pixelsOutsideQr = hsv[verticalQrCoordinates:verticalQrCoordinates+10, horizontalQrCoordinates:horizontalQrCoordinates+10]
+    
+    # Moyenne arithmetique du canal H (Uniquement la teinte)
+    averageHue = np.mean(pixelsOutsideQr[:, :, 0])
+
+    # 7. Logique de décision CMJ
+    if 25 <= averageHue < 35:
+        return "Jaune"
+    elif 85 <= averageHue < 105:
+        return "Cyan"
+    elif 140 <= averageHue < 160:
+        return "Magenta"
+    else:
+        return f"Couleur inconnue (H:{int(averageHue)})"
 
 # boucle principale du programme avec le menu et les calls de fonctions
 while(True):
