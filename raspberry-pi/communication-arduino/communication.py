@@ -18,11 +18,11 @@ def send():
     print("Message sent.")
 
 def receive():
-    # On verifie que personne n'ecoute a ce port
-    if s.in_waiting > 0:
-        # On lis au port serie et on nettoie ce que l'Arduino nous a envoye
-        payload = s.readline().decode('utf-8').strip()
-        print(str(payload));
+    print("Waiting for Arduino message...")
+    payload = s.readline()
+    payload.decode('utf-8').strip()
+    if payload:
+        print(f"Received from Arduino: {payload}")
     
 
 
