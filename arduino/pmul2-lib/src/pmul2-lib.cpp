@@ -13,10 +13,10 @@
 #include "Arduino.h"
 #include "pmul2orders-lib.h"
 
-Pmul2orders::Pmul2orders(Stream &serialPort) {
+Pmul2Lib::Pmul2Lib(Stream &serialPort) {
     _serial = &serialPort;
 }
 
- void Pmul2orders::version() {
+ void Pmul2Lib::version() {
     _serial->println("Pmul2orders version: alpha-v0.0.1");
  }

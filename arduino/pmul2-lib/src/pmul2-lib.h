@@ -1,5 +1,5 @@
 /*
- * pmul2orders-lib.cpp
+ * pmul2-lib.cpp
  * Librairie dévloppée dans le cadre du project multidisciplinaire 2,
  * celle-ci permet le management des commandes depuis une librairie
  * externe afin de rentre le code de notre sketch arduino principal
@@ -9,23 +9,24 @@
  * Liscence: MIT (We love open source around here.)
  */
 
-#ifndef pmul2orders-lib_h // protection au cas ou quelqu'un inclut 2 fois
+#ifndef pmul2-lib_h // protection au cas ou quelqu'un inclut 2 fois
+#define pmul2-lib_h
 
-#define pmul2orders-lib_h
+#include "pmul2-colors.h"
+#include "pmul2-orders.h"
+#include ""
 
-class pmul2orders {
+class Pmul2Lib {
     public:
-        // Fonctions et attributs publics
-        Pmul2orders(Stream &serialPort); 
+        // fonctions et attributs publics
+
+        // constructeur
+        Pmul2Lib(Stream &serialPort); 
+        // fonction pour avoir un print de la version de la librairie dans la communication serie
         void version();      
     private:
-        // Fonctions et attributs privés
+        // fonctions et attributs privés
         Stream* _serial;
 };
-
-
-
-
-
 
 #endif
