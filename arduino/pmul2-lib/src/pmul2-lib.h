@@ -1,32 +1,38 @@
 /*
- * pmul2-lib.cpp
- * Librairie dévloppée dans le cadre du project multidisciplinaire 2,
+ * pmul2-lib.h
+ * Librairie développée dans le cadre du projet multidisciplinaire 2,
  * celle-ci permet le management des commandes depuis une librairie
- * externe afin de rentre le code de notre sketch arduino principal
+ * externe afin de rendre le code de notre sketch arduino principal
  * le plus lisible possible.
- * Authors: Louis, B. Adnane, OBT. Loic VC.
+ * Authors: Louis B., Adnane O.B.T., Loic V.C.
  * Date: 20/04/2026
- * Liscence: MIT (We love open source around here.)
+ * License: MIT (We love open source around here.)
  */
 
-#ifndef pmul2-lib_h // protection au cas ou quelqu'un inclut 2 fois
-#define pmul2-lib_h
+#ifndef PMUL2_LIB_H // protection au cas ou quelqu'un inclut 2 fois
+#define PMUL2_LIB_H
 
+#include <Arduino.h>
 #include "pmul2-colors.h"
 #include "pmul2-orders.h"
-#include ""
+#include "pmul2-com.h"
 
 class Pmul2Lib {
     public:
         // fonctions et attributs publics
 
         // constructeur
-        Pmul2Lib(Stream &serialPort); 
+        Pmul2Lib(Stream &serialPort);
         // fonction pour avoir un print de la version de la librairie dans la communication serie
-        void version();      
+        void version();
+        // envoie une mise à jour de commande vers le Raspberry Pi
+        void sendOrder(const Order& order);
+        // lit une couleur détectée envoyée par le Raspberry Pi
+        bool readColor(Color& detected);
     private:
         // fonctions et attributs privés
         Stream* _serial;
+        Pmul2Com _com;
 };
 
 #endif

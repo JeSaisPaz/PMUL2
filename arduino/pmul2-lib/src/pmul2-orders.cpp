@@ -1,21 +1,26 @@
 #include "pmul2-orders.h"
 
 void Order::reset() {
-    blue = 0;
-    yellow = 0;
-    magenta = 0;
+    blueAmount = 0;
+    yellowAmount = 0;
+    magentaAmount = 0;
+    otherColorAmount = 0;
 }
 
 void Order::addBox(Color c) {
-    switch(c) {
+    switch (c) {
         case Color::Blue:
-            blue++; 
+            blueAmount++;
             break;
-        case Color::Yellow: 
-            magenta++; 
+        case Color::Yellow:
+            yellowAmount++;
             break;
-        case Color::magenta:
-            megenta++;
+        case Color::Magenta:
+            magentaAmount++;
+            break;
+        case Color::Other:
+        default:
+            otherColorAmount++;
             break;
     }
 }
