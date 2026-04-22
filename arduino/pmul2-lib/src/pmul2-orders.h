@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include "pmul2-colors.h"
+#include "pmul2-teams.h"
 
 struct Order {
     uint8_t blueAmount = 0;

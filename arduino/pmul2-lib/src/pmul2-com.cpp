@@ -9,6 +9,7 @@ Pmul2Com::sendOrder(const Order& order) {
     _stream.write(order.magenta);
     _stream.write(checksum);
     _stream.write(END_BYTE);*/
+    
 }
 
 Pmul2Com::readOrder(Order& order) {
