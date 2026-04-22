@@ -16,8 +16,8 @@ class Pmul2Com {
         // lire une commande envoyée par le raspberry pi
         bool readOrder(Order& order);
 
-        // lire une couleur détectée envoyée par le raspberry pi
-        bool readColor(Color& color);
+        // lire les informations d'un block envoyée par le raspberry pi
+        bool readBlockInfo(Color& color, Team& team);
 
     private:
         Stream& _stream;

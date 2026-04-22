@@ -27,8 +27,8 @@ class Pmul2Lib {
         void version();
         // envoie une mise à jour de commande vers le Raspberry Pi
         void sendOrder(const Order& order);
-        // lit une couleur détectée envoyée par le Raspberry Pi
-        bool readColor(Color& detected);
+        // lit une information envoyée par le Raspberry Pi
+        bool readInfo(Color& detected);
     private:
         // fonctions et attributs privés
         Stream* _serial;

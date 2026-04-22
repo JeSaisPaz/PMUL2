@@ -7,7 +7,7 @@
  * Authors: Louis B., Adnane O.B.T., Loic V.C.
  * Date: 20/04/2026
  * License: MIT (We love open source around here.)
- * Version: alpha-v0.0.2
+ * Version: beta-v0.0.1
  */
 
 #include <Arduino.h>
@@ -18,7 +18,7 @@ Pmul2Lib::Pmul2Lib(Stream &serialPort) : _com(serialPort) {
 }
 
 void Pmul2Lib::version() {
-    _serial->println("Pmul2Lib version: alpha-v0.0.2");
+    _serial->println("Pmul2Lib version: beta-v0.0.1");
 }
 
 void Pmul2Lib::sendOrder(const Order& order) {

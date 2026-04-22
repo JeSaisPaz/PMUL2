@@ -4,7 +4,6 @@ void Order::reset() {
     blueAmount = 0;
     yellowAmount = 0;
     magentaAmount = 0;
-    otherColorAmount = 0;
 }
 
 void Order::addBox(Color c) {
@@ -17,10 +16,6 @@ void Order::addBox(Color c) {
             break;
         case Color::Magenta:
             magentaAmount++;
-            break;
-        case Color::Other:
-        default:
-            otherColorAmount++;
             break;
     }
 }

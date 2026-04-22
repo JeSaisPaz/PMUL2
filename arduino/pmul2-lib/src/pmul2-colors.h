@@ -7,8 +7,7 @@
 enum class Color : uint8_t {
     Yellow  = 0x01,
     Blue    = 0x02,
-    Magenta = 0x03,
-    Other   = 0xFF
+    Magenta = 0x03
 };
 
 #endif
