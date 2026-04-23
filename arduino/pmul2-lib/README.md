@@ -13,9 +13,9 @@ void setup() {
 
 void loop() {
     // On écoute pour voir si le raspberry détecte les commandes
-    if (objetPmul.readColor(detected)) {
+    if (objetPmul.readInfo(detected)) {
         currentOrder.addBox(detected);
-        objetPmul.sendOrder(currentOrder);
+        objetPmul.sendUpdateOrder(currentOrder);
     }
 }
 ```
