@@ -39,7 +39,7 @@ bool Pmul2Com::readOrder(Order& order, Team& team) {
         return false;
     }
 
-    order.
+    order.teamNumber       = teamNumber;
     order.blueAmount       = blueAmount;
     order.yellowAmount     = yellowAmount;
     order.magentaAmount    = magentaAmount;
