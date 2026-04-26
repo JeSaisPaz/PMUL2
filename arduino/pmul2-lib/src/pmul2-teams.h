@@ -9,6 +9,7 @@ enum class Team : uint8_t {
     Team02      = 0x02,
     Team03      = 0x03,
     Team04      = 0x04,
+    Team05      = 0x05,
     TeamUnknown = 0xFF
 };
 
