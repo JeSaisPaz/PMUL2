@@ -16,6 +16,12 @@ class Pmul2Com {
         // Signale au raspberry que la commande est terminée
         void sendOrderDone();
 
+        // Signale que l'Arduino est occupe
+        void sendBusy();
+        
+        // Signale que l'Arduino est disponible
+        void sendReady();
+
         // lire une commande envoyée par le raspberry pi
         bool readTargetOrder(Order& order);
 
@@ -26,7 +32,8 @@ class Pmul2Com {
         Stream& _stream;
         static const uint8_t START_BYTE          = 0x02; // Debut de trame
         static const uint8_t END_BYTE            = 0x03; // Fin de trame
-        static const uint8_t TARGET_ORDER_PREFIX = 0xFF;
+        static const uint8_t TARGET_ORDER_PREFIX = 0xFF; // Prefix d'une commande que l'ont doit executer
+        static const uint8_t STATUS_PREFIX        = 0xFE; // Prefix d'un status
 };
 
 #endif

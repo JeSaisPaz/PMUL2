@@ -24,6 +24,22 @@ void Pmul2Com::sendOrderDone() {
     _stream.write(END_BYTE);
 }
 
+void Pmul2Com::sendBusy() {
+    // Trame: [START_BYTE][STATUS_PREFIX][I'M BUSY][END_BYTE]
+    _stream.write(START_BYTE);
+    _stream.write(STATUS_PREFIX);
+    _stream.write((uint8_t)0x01);
+    _stream.write(END_BYTE);
+}
+
+void Pmul2Com::sendReady() {
+    // Trame: [START_BYTE][STATUS_PREFIX][I'M READY][END_BYTE]
+    _stream.write(START_BYTE);
+    _stream.write(STATUS_PREFIX);
+    _stream.write((uint8_t)0x00);
+    _stream.write(END_BYTE);
+}
+
 bool Pmul2Com::readTargetOrder(Order& order) {
     // trame: [START_BYTE][team][blue][yellow][magenta][checksum][END_BYTE]
     
