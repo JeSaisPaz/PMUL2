@@ -28,6 +28,8 @@ class Pmul2Lib {
         void version();
         // envoie une mise à jour de commande vers le Raspberry Pi
         void sendOrder(const Order& order);
+        // envoie au Raspberry Pi la commande locale en traitement
+        void sendTargetOrder(const Order& order);
         // envoie que la commande est finie
         void sendOrderDone();
         // envoie que l'arduino est occupé

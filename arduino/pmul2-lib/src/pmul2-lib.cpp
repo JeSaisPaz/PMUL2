@@ -25,6 +25,10 @@ void Pmul2Lib::sendOrder(const Order& order) {
     _com.sendOrderUpdate(order);
 }
 
+void Pmul2Lib::sendTargetOrder(const Order& order) {
+    _com.sendTargetOrder(order);
+}
+
 void Pmul2Lib::sendOrderDone() {
     _com.sendOrderDone();
 }
