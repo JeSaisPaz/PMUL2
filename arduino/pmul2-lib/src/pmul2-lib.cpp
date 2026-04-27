@@ -7,7 +7,7 @@
  * Authors: Louis B., Adnane O.B.T., Loic V.C.
  * Date: 20/04/2026
  * License: MIT (We love open source around here.)
- * Version: beta-v0.0.1
+ * Version: beta-v0.0.2
  */
 
 #include <Arduino.h>
@@ -25,6 +25,14 @@ void Pmul2Lib::sendOrder(const Order& order) {
     _com.sendOrderUpdate(order);
 }
 
-bool Pmul2Lib::readColor(Color& detected) {
-    return _com.readColor(detected);
+void Pmul2Lib::sendOrderDone() {
+    _com.sendOrderDone();
+}
+
+bool Pmul2Lib::readTargetOrder(Order& order) {
+    return _com.readTargetOrder(order);
+}
+
+bool Pmul2Lib::readBlockInfo(Color& color, Team& team) {
+    return _com.readBlockInfo(color, team);
 }

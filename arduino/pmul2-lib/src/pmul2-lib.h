@@ -23,12 +23,18 @@ class Pmul2Lib {
 
         // constructeur
         Pmul2Lib(Stream &serialPort);
+        // Ecriture vers le raspberry
         // fonction pour avoir un print de la version de la librairie dans la communication serie
         void version();
         // envoie une mise à jour de commande vers le Raspberry Pi
         void sendOrder(const Order& order);
+        void sendOrderDone();
+        
+        // Lecture depuis le raspberry
         // lit une information envoyée par le Raspberry Pi
+        bool readTargetOrder(Order& order);
         bool readInfo(Color& detected);
+        
     private:
         // fonctions et attributs privés
         Stream* _serial;
