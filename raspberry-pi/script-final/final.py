@@ -10,12 +10,6 @@ import numpy as np
 from pyzbar.pyzbar import decode
 from picamera2 import Picamera2, Preview
 
-mydb = mysql.connector.connect(
-  host="ip",
-  user="username",
-  password="password"
-)
-
 # Variables utiles
 BEST_TEAM             = 0x01 # nous, bien evidement
 START_BYTE            = 0x02 # debut de trame serie
