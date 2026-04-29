@@ -60,11 +60,7 @@ class Team:
   def from_qr_text(cls, text):
       t = text.strip().lower()
       return {
-          # formats courts (juste le chiffre)
-          "1": cls.TEAM01, "2": cls.TEAM02,
-          "3": cls.TEAM03, "4": cls.TEAM04,
-          "5": cls.TEAM05,
-          # formats longs (Team01, team01, TEAM01, etc. grace au .lower())
+          # Team01, team01, TEAM01, etc. grace au .lower()
           "team01": cls.TEAM01, "team02": cls.TEAM02,
           "team03": cls.TEAM03, "team04": cls.TEAM04,
           "team05": cls.TEAM05,
