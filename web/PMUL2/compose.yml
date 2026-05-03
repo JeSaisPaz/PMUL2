@@ -12,8 +12,8 @@ services:
     ports:
       - "3307:3306"
 
-   environment:
-    - TZ=Europe/Brussels
+    environment:
+      - TZ=Europe/Brussels
 
   phpmyadmin :
     image: phpmyadmin/phpmyadmin:latest
@@ -24,8 +24,8 @@ services:
       - mysql
     ports:
       - "8080:80"
-   environment:
-    - TZ=Europe/Brussels
+    environment:
+      - TZ=Europe/Brussels
 
 volumes:
   db_pmul2_data:
