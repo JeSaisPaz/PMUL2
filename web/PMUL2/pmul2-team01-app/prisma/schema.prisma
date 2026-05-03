@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model ITEM {
+  id                Int                @id @default(autoincrement())
+  color             String?            @db.VarChar(45)
+  team              String?            @db.VarChar(45)
+  status            ITEM_status
+  STOCK_id          Int?
+  STOCK             STOCK?             @relation(fields: [STOCK_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ITEM_STOCK1")
+  READ_CYCLES       READ_CYCLES?
+  SELECTION_HISTORY SELECTION_HISTORY?
+
+  @@index([STOCK_id], map: "fk_ITEM_STOCK1_idx")
+}
+
+model ORDER {
+  id          Int           @id @default(autoincrement())
+  status      ORDER_status
+  createdAt   DateTime      @db.Timestamp(0)
+  updatedAt   DateTime?     @db.Timestamp(0)
+  completedAt DateTime?     @db.Timestamp(0)
+  ORDER_LINES ORDER_LINES[]
+}
+
+model ORDER_LINES {
+  id               Int   @default(autoincrement())
+  quantity         Int
+  quantityReceived Int?
+  ORDER_id         Int
+  STOCK_id         Int
+  ORDER            ORDER @relation(fields: [ORDER_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ORDER_LINES_ORDER1")
+  STOCK            STOCK @relation(fields: [STOCK_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ORDER_LINES_STOCK1")
+
+  @@id([id, ORDER_id])
+  @@index([ORDER_id], map: "fk_ORDER_LINES_ORDER1_idx")
+  @@index([STOCK_id], map: "fk_ORDER_LINES_STOCK1_idx")
+}
+
+model READ_CYCLES {
+  id        Int       @default(autoincrement())
+  scannedAt DateTime? @db.Timestamp(0)
+  ITEM_id   Int       @unique
+  ITEM      ITEM      @relation(fields: [ITEM_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_READ_CYCLES_ITEM1")
+
+  @@id([id, ITEM_id])
+  @@index([ITEM_id], map: "fk_READ_CYCLES_ITEM1_idx")
+}
+
+model SELECTION_HISTORY {
+  id              Int                        @default(autoincrement())
+  decision        SELECTION_HISTORY_decision
+  status          SELECTION_HISTORY_status
+  decisionTakenAt DateTime?                  @db.Timestamp(0)
+  statusUpdatedAt DateTime?                  @db.Timestamp(0)
+  ITEM_id         Int                        @unique
+  ITEM            ITEM                       @relation(fields: [ITEM_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_SELECTION_HISTORY_ITEM1")
+
+  @@id([id, ITEM_id])
+  @@index([ITEM_id], map: "fk_SELECTION_HISTORY_ITEM1_idx")
+}
+
+model STOCK {
+  id          Int           @id @default(autoincrement())
+  color       String?       @unique(map: "color_UNIQUE") @db.VarChar(45)
+  quantity    Int?
+  ITEM        ITEM[]
+  ORDER_LINES ORDER_LINES[]
+}
+
+enum ORDER_status {
+  IN_PROGRESS @map("IN PROGRESS")
+  COMPLETED
+  CANCELLED
+}
+
+enum SELECTION_HISTORY_decision {
+  PASS
+  ORDER
+  STOCK
+}
+
+enum SELECTION_HISTORY_status {
+  IN_PROGRESS @map("IN PROGRESS")
+  CONFIRMED
+  FAILED
+}
+
+enum ITEM_status {
+  AVAILABLE
+  ORDERED
+  IN_PROCESS @map("IN PROCESS")
+  EXTERNAL
+}

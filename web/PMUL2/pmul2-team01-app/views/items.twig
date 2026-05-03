@@ -1,0 +1,44 @@
+{% extends "layout.twig" %}
+
+{% block body %}
+<div class="container py-4">
+
+  <h1>{{title}}</h1>
+
+  <table class="table table-bordered mt-3">
+    <thead>
+      <tr>
+        <th>Scanné le</th>
+        <th>Item ID</th>
+        <th>Couleur</th>
+        <th>Équipe</th>
+        <th>Statut item</th>
+        <th>Décision</th>
+        <th>Statut décision</th>
+        <th>Décision prise le</th>
+        <th>Statut mis à jour le</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+        <tr>
+          <td>{{ item.READ_CYCLES.scannedAt | date('d/m/Y H:i') }}</td>
+          <td>{{ item.id }}</td>
+          <td>{{ item.color }}</td>
+          <td>{{ item.team }}</td>
+          <td>{{ item.status }}</td>
+          <td>{{ item.SELECTION_HISTORY.decision }}</td>
+          <td>{{ item.SELECTION_HISTORY.status }}</td>
+          <td>{{ item.SELECTION_HISTORY.decisionTakenAt | date('d/m/Y H:i') }}</td>
+          <td>{{ item.SELECTION_HISTORY.statusUpdatedAt | date('d/m/Y H:i') }}</td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="9">Aucun résultat</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+</div>
+{% endblock %}
