@@ -12,6 +12,9 @@ services:
     ports:
       - "3307:3306"
 
+   environment:
+    - TZ=Europe/Brussels
+
   phpmyadmin :
     image: phpmyadmin/phpmyadmin:latest
     container_name: pmul2_phpmyadmin
@@ -21,6 +24,8 @@ services:
       - mysql
     ports:
       - "8080:80"
+   environment:
+    - TZ=Europe/Brussels
 
 volumes:
   db_pmul2_data:
