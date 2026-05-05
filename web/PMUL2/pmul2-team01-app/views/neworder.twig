@@ -1,0 +1,38 @@
+{% extends "layout.twig" %}
+
+{% block body %}
+  <h1>{{title}}</h1>
+  <div class="table-responsive">
+    <form action="/orders" method="POST">
+      <table class="table table-hover table-striped">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Color</th>
+            <th>Quantity available</th>
+            <th>Quantity to request</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for stock in warehouse %}
+            <tr>
+              <td>
+                <button type="button" class="btn btn-sm btn-outline-secondary px-2 py-0 expand-btn"
+
+                >></button>
+              </td>
+              <td>{{ stock.color }}</td>
+              <td>{{ stock.quantity }}</td>
+              <td></td>
+            </tr>
+          {% else %}
+            <tr>
+              <td class="text-center" colspan="9">Aucun résultat</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </form>
+  </div>
+  {{error}}
+{% endblock %}

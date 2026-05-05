@@ -1,6 +1,41 @@
-{% extends 'layout.twig' %}
+{% extends "layout.twig" %}
 
 {% block body %}
   <h1>{{title}}</h1>
-  <p>Welcome to {{title}}</p>
+  <div class="table-responsive">
+    <table class="table table-hover table-striped">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Created at</th>
+          <th>ID</th>
+          <th>Status</th>
+          <th>Updated at</th>
+          <th>Completed at</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+          <tr>
+            <td></td>
+            <td>{{ order.createdAt | date('d/m/Y H:i')}}</td>
+            <td>{{ order.id }}</td>
+            <td>{{ order.status }}</td>
+            <td>{{ order.updatedAt | date('d/m/Y H:i') }}</td>
+            {% if order.completedAt %}
+              <td>{{ order.completedAt | date('d/m/Y H:i') }}</td>
+            {% else %}
+              <td>---<td>
+            {% endif %}
+            
+          </tr>
+        {% else %}
+          <tr>
+            <td class="text-center" colspan="9">Aucun résultat</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{error}}
 {% endblock %}

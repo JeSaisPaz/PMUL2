@@ -1,8 +1,21 @@
+
+/*Pour que le footer soit en bas de l'écran*/
 body {
-  padding: 50px;
-  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+  /*active le flex sur le body*/
+  display: flex;
+  /* empile les enfants verticalement (nav, main, footer) */           
+  flex-direction: column;
+  min-height: 100vh;
+}
+main {
+  /* le main prend tout l'espace restant, pousse le footer en bas */
+  flex: 1;
 }
 
-a {
-  color: #00B7FF;
+
+/*meilleur scroll bar*/
+* {
+  /*scrollbar fine*/
+  scrollbar-width: thin;
+  scrollbar-color: rgba(64, 60, 70, 0.35) transparent;
 }

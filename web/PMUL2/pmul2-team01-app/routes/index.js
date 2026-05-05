@@ -19,22 +19,81 @@ const adapter = new PrismaMariaDb({
 const prisma = new PrismaClient({ adapter });
 
 router.get('/', function(req, res, next) {
-  res.render('homepage', { title: 'Homepage' });
+  res.render('dashboard', { title: 'Dashboard' });
 });
 
-router.get('/orders', function(req, res, next) {
-  res.render('orders', { title: 'Orders' });
+router.get('/orders', async function(req, res, next) {
+  try{
+    const orders = await prisma.oRDER.findMany({
+      include: {
+        ORDER_LINES: {
+          include: {
+            COLOR: true
+          }
+        }
+      }
+    });
+    res.render('orders', { 
+      title: 'Orders',
+      orders
+    });
+
+  } catch(error){
+    console.error("DB error :", error.message);
+    res.render('orders', { 
+      title: 'Orders',
+      error: error.message,
+      orders: []
+    });
+  }
 });
 
-router.get('/items', async (req, res) => {
-    const items = await prisma.ITEM.findMany({
-    include: {
-      READ_CYCLES: true,
-      SELECTION_HISTORY: true,
-    },
-  });
+router.get('/neworder', async function(req, res, next) {
+  try{
+    const warehouse = await prisma.cOLOR.findMany({
+      include: {
+        ITEM: {
+          where: {status: 'AVAILABLE'}
+        }
+      }
+    });
+    res.render('neworder', { 
+      title: 'Place an order',
+      warehouse
+    });
 
-    res.render('items', { title: 'Items', items});
+  } catch(error){
+    console.error("DB error :", error.message);
+    res.render('neworder', { 
+      title: 'Place an order',
+      error: error.message,
+      warehouse: []
+    });
+  }
+});
+
+router.get('/items', async function (req, res) {
+  try{
+    const items = await prisma.iTEM.findMany({
+      include: {
+        READ_CYCLES: true,
+        SELECTION_HISTORY: true,
+        COLOR: true,
+      },
+    });
+    res.render('items', { 
+      title: 'Items',
+      items
+    });
+
+  } catch(error){
+    console.error("DB error :", error.message);
+    res.render('items', { 
+      title: 'Items',
+      error: error.message, 
+      items: []
+    });
+  }
 });
 
 module.exports = router;
