@@ -33,6 +33,15 @@ void Pmul2Lib::sendOrderDone() {
     _com.sendOrderDone();
 }
 
+void Pmul2Lib::sendBusy() {
+    _com.sendBusy();
+}
+
+void Pmul2Lib::sendReady() {
+    _com.sendReady();
+}
+
+
 bool Pmul2Lib::readTargetOrder(Order& order) {
     return _com.readTargetOrder(order);
 }

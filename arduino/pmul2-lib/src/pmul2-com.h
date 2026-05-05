@@ -13,6 +13,9 @@ class Pmul2Com {
         // envoyer une update sur la commande vers le raspberry pi
         void sendOrderUpdate(const Order& order);
 
+        // envoyer une commande cible vers le raspberry pi (avec prefix 0xFF)
+        void sendTargetOrder(const Order& order);
+
         // Signale au raspberry que la commande est terminée
         void sendOrderDone();
 

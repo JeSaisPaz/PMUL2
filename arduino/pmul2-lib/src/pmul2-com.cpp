@@ -3,7 +3,7 @@
 Pmul2Com::Pmul2Com(Stream& stream) : _stream(stream) {}
 
 void Pmul2Com::sendOrderUpdate(const Order& order) {
-    uint8_t checksum = (order.teamNumber + order.blueAmount + order.yellowAmount + order.magentaAmount) & 0xFF;
+    uint8_t checksum = (order.teamId + order.blueAmount + order.yellowAmount + order.magentaAmount) & 0xFF;
     _stream.write(START_BYTE);
     _stream.write(order.teamId);
     _stream.write(order.blueAmount);
@@ -21,6 +21,19 @@ void Pmul2Com::sendOrderDone() {
     _stream.write((uint8_t)0x00);
     _stream.write((uint8_t)0x00);
     _stream.write((uint8_t)0x00);
+    _stream.write(END_BYTE);
+}
+
+void Pmul2Com::sendTargetOrder(const Order& order) {
+    // Trame: [START_BYTE][TARGET_ORDER_PREFIX][teamId][blueAmount][yellowAmount][magentaAmount][checksum][END_BYTE]
+    uint8_t checksum = (order.teamId + order.blueAmount + order.yellowAmount + order.magentaAmount) & 0xFF;
+    _stream.write(START_BYTE);
+    _stream.write(TARGET_ORDER_PREFIX);
+    _stream.write(order.teamId);
+    _stream.write(order.blueAmount);
+    _stream.write(order.yellowAmount);
+    _stream.write(order.magentaAmount);
+    _stream.write(checksum);
     _stream.write(END_BYTE);
 }
 

@@ -40,7 +40,8 @@ class Pmul2Lib {
         // Lecture depuis le raspberry
         // lit une information envoyée par le Raspberry Pi
         bool readTargetOrder(Order& order);
-        bool readInfo(Color& detected);
+        // lit l'information d'un block
+        bool readBlockInfo(Color& color, Team& team);
         
     private:
         // fonctions et attributs privés
