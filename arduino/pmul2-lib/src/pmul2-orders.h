@@ -17,6 +17,11 @@ struct Order {
     void reset();
     // permet d'ajouter une boite au compteur, prends en argument la couleur (objet couleur pmul2)
     void addBox(Color c);
+    
+    // Donne un statut sur la completion de la commande en comparaison avec la commande désirée
+    bool isComplete(Order target) const {
+        return blueAmount == target.blueAmount && yellowAmount == target.yellowAmount && magentaAmount == target.magentaAmount;
+    }
 
     // Overload de l'opérateur d'égalité pour faciliter les comparaisons entre commandes
     bool operator==(const Order& other) const {

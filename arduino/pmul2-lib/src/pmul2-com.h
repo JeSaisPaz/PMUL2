@@ -5,6 +5,12 @@
 #include "pmul2-colors.h"
 #include "pmul2-orders.h"
 
+enum class FrameType : uint8_t {
+    NONE         = 0x00,
+    TARGET_ORDER = 0x01,
+    BLOCK_INFO   = 0x02
+};
+
 class Pmul2Com {
     public:
         // constructeur
@@ -12,6 +18,9 @@ class Pmul2Com {
 
         // envoyer une update sur la commande vers le raspberry pi
         void sendOrderUpdate(const Order& order);
+
+        // envoyer une commande cible vers le raspberry pi (avec prefix 0xFF)
+        void sendTargetOrder(const Order& order);
 
         // Signale au raspberry que la commande est terminée
         void sendOrderDone();
@@ -27,6 +36,9 @@ class Pmul2Com {
 
         // lire les informations d'un block envoyée par le raspberry pi
         bool readBlockInfo(Color& color, Team& team);
+
+        // dispatcheur: lit n'importe quelle trame entrante et retourne son type
+        FrameType readFrame(Order& order, Color& color, Team& team);
 
     private:
         Stream& _stream;

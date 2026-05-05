@@ -33,10 +33,23 @@ void Pmul2Lib::sendOrderDone() {
     _com.sendOrderDone();
 }
 
+void Pmul2Lib::sendBusy() {
+    _com.sendBusy();
+}
+
+void Pmul2Lib::sendReady() {
+    _com.sendReady();
+}
+
+
 bool Pmul2Lib::readTargetOrder(Order& order) {
     return _com.readTargetOrder(order);
 }
 
 bool Pmul2Lib::readBlockInfo(Color& color, Team& team) {
     return _com.readBlockInfo(color, team);
+}
+
+FrameType Pmul2Lib::readFrame(Order& order, Color& color, Team& team) {
+    return _com.readFrame(order, color, team);
 }

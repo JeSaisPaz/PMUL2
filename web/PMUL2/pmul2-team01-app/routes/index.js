@@ -6,6 +6,7 @@ const { PrismaClient } = require("../generated/prisma");
 
 require("dotenv").config();
 const { PrismaMariaDb } = require ("@prisma/adapter-mariadb");
+//Temporaire
 const adapter = new PrismaMariaDb({
   host: "192.168.1.167",
   user: "team01",
