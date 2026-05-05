@@ -151,3 +151,105 @@ bool Pmul2Com::readBlockInfo(Color& color, Team& team) {
 
     return true;
 }
+
+Pmul2Com::FrameType Pmul2Com::readFrame(Order& order, Color& color, Team& team) {
+    // trame la plus petite = BlockInfo (4 bytes)
+    if (_stream.available() < 4) {
+        return FrameType::NONE;
+    }
+
+    if (_stream.read() != START_BYTE) {
+        return FrameType::NONE;
+    }
+
+    // on peek le 2e byte pour savoir quel type de trame on a
+    int peeked = _stream.peek();
+    if (peeked == -1) {
+        return FrameType::NONE;
+    }
+    uint8_t discriminator = (uint8_t)peeked;
+
+    if (discriminator == TARGET_ORDER_PREFIX) {
+        // trame: [START][0xFF][team][blue][yellow][magenta][checksum][END] = 8 bytes
+        // on a deja lu START, il reste 7 bytes
+        if (_stream.available() < 7) {
+            return FrameType::NONE;
+        }
+
+        _stream.read(); // consomme le discriminator
+        uint8_t teamId            = _stream.read();
+        uint8_t blueTarget        = _stream.read();
+        uint8_t yellowTarget      = _stream.read();
+        uint8_t magentaTarget     = _stream.read();
+        uint8_t receivedChecksum  = _stream.read();
+        uint8_t endByte           = _stream.read();
+
+        if (endByte != END_BYTE) {
+            return FrameType::NONE;
+        }
+
+        uint8_t calculatedChecksum = (teamId + blueTarget + yellowTarget + magentaTarget) & 0xFF;
+
+        if (receivedChecksum != calculatedChecksum) {
+            return FrameType::NONE;
+        }
+
+        order.teamId        = teamId;
+        order.blueAmount    = blueTarget;
+        order.yellowAmount  = yellowTarget;
+        order.magentaAmount = magentaTarget;
+
+        return FrameType::TARGET_ORDER;
+    }
+
+    // c'est un BlockInfo: [START][color][team][END] = 4 bytes
+    // on a deja lu START, il reste 3 bytes
+    if (_stream.available() < 3) {
+        return FrameType::NONE;
+    }
+
+    _stream.read(); // consomme le discriminator (= color)
+    uint8_t rawTeam = _stream.read();
+    uint8_t endByte = _stream.read();
+
+    if (endByte != END_BYTE) {
+        return FrameType::NONE;
+    }
+
+    switch (discriminator) {
+        case static_cast<uint8_t>(Color::Yellow):
+            color = Color::Yellow;
+            break;
+        case static_cast<uint8_t>(Color::Blue):
+            color = Color::Blue;
+            break;
+        case static_cast<uint8_t>(Color::Magenta):
+            color = Color::Magenta;
+            break;
+        default:
+            return FrameType::NONE;
+    }
+
+    switch (rawTeam) {
+    case static_cast<uint8_t>(Team::Team01):
+        team = Team::Team01;
+        break;
+    case static_cast<uint8_t>(Team::Team02):
+        team = Team::Team02;
+        break;
+    case static_cast<uint8_t>(Team::Team03):
+        team = Team::Team03;
+        break;
+    case static_cast<uint8_t>(Team::Team04):
+        team = Team::Team04;
+        break;
+    case static_cast<uint8_t>(Team::Team05):
+        team = Team::Team05;
+        break;
+    default:
+        team = Team::TeamUnknown;
+        break;
+    }
+
+    return FrameType::BLOCK_INFO;
+}

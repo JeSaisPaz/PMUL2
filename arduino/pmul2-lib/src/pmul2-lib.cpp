@@ -49,3 +49,7 @@ bool Pmul2Lib::readTargetOrder(Order& order) {
 bool Pmul2Lib::readBlockInfo(Color& color, Team& team) {
     return _com.readBlockInfo(color, team);
 }
+
+FrameType Pmul2Lib::readFrame(Order& order, Color& color, Team& team) {
+    return _com.readFrame(order, color, team);
+}

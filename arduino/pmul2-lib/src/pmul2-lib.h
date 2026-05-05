@@ -42,6 +42,8 @@ class Pmul2Lib {
         bool readTargetOrder(Order& order);
         // lit l'information d'un block
         bool readBlockInfo(Color& color, Team& team);
+        // dispatcheur: lit n'importe quelle trame entrante et la route vers le bon type
+        FrameType readFrame(Order& order, Color& color, Team& team);
         
     private:
         // fonctions et attributs privés
