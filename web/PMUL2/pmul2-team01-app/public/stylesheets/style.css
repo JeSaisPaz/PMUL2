@@ -6,6 +6,9 @@ body {
   /* empile les enfants verticalement (nav, main, footer) */           
   flex-direction: column;
   min-height: 100vh;
+
+  /* pour éviter de sélectionner le texte en double-cliquant */
+  user-select: none;
 }
 main {
   /* le main prend tout l'espace restant, pousse le footer en bas */

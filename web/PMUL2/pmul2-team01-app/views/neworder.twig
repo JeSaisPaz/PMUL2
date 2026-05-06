@@ -34,5 +34,7 @@
       </table>
     </form>
   </div>
-  {{error}}
+  {% if error %}
+    <div class="alert alert-danger mt-3">{{error}}</div>
+  {% endif %}
 {% endblock %}

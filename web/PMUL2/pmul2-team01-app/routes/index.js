@@ -32,7 +32,10 @@ router.get('/orders', async function(req, res, next) {
             COLOR: true
           }
         }
-      }
+      },
+      orderBy: {
+      createdAt: 'desc'
+    }
     });
     res.render('orders', { 
       title: 'Orders',

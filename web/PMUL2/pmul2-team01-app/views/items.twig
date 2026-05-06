@@ -3,8 +3,8 @@
 {% block body %}
   <h1>{{title}}</h1>
   <div class="table-responsive">
-    <table class="table table-hover table-striped">
-      <thead>
+    <table class="table table-hover table-light">
+      <thead class="table table-active">
         <tr>
           <th>Scanned on</th>
           <th>ID</th>
@@ -21,7 +21,7 @@
         {% for item in items %}
           <tr>
             <td>{{ item.READ_CYCLES.scannedAt | date('d/m/Y H:i') }}</td>
-            <td>{{ item.id }}</td>
+            <td class="fw-bold text-body">#{{ item.id }}</td>
             <td>{{ item.COLOR.color }}</td>
             <td>{{ item.team }}</td>
             <td>{{ item.status }}</td>
@@ -38,5 +38,7 @@
       </tbody>
     </table>
   <div>
-  {{error}}
+  {% if error %}
+    <div class="alert alert-danger mt-3">{{error}}</div>
+  {% endif %}
 {% endblock %}
