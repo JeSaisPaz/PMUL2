@@ -21,23 +21,6 @@ router.get('/health', (req, res) => {
     });
 });
 
-router.patch('/orders/:orderId/lines/:colorId/receive', async (req, res)=> {
-    const {orderId, colorId} = req.params
-    const {quantityReceived} = req.body
-
-    try {
-        if(!quantityRecevied || quantityReceived < 0) {
-            return res.status(400).json({
-                message: "La quantité recue ne peut pas etre inférieure a 0"
-            });
-        }
-
-        
-        
-    } catch catch(e) {
-        
-    }
-});
 
 router.post()
 
