@@ -8,97 +8,117 @@ datasource db {
 }
 
 model ITEM {
-  id                Int                       @default(autoincrement()) @unique
-  team              String?                   @db.VarChar(45)
-  status            ITEM_status
+  id                Int                       @id @default(autoincrement())
+  team              String                    @db.VarChar(10)
+  status            ITEM_STATUS
+  decision          DECISION
+  decisionStatus    DECISION_STATUS
   COLOR_id          Int
+  READ_CYCLE_id     Int                       @unique
+  
+  COLOR             COLOR                     @relation(fields: [COLOR_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  READ_CYCLE        READ_CYCLE                @relation(fields: [READ_CYCLE_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  SELECTION_HISTORY SELECTION_HISTORY[]
+  ITEM_HISTORY      ITEM_HISTORY[]
 
-  COLOR             COLOR?                    @relation(fields: [COLOR_id], references: [id])
-  READ_CYCLES       READ_CYCLES?
-  SELECTION_HISTORY SELECTION_HISTORY?
+  @@index([COLOR_id])
+  @@index([READ_CYCLE_id])
+}
 
-  @@id([id, COLOR_id])
+model ITEM_HISTORY {
+  id                Int                       @id @default(autoincrement())
+  status            ITEM_STATUS
+  createdAt         DateTime                  @default(now()) @db.Timestamp(0)
+  ITEM_id           Int
+
+  ITEM              ITEM                      @relation(fields: [ITEM_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([ITEM_id])
+}
+
+model SELECTION_HISTORY {
+  id              Int                        @id @default(autoincrement())                        
+  status          DECISION_STATUS            @default(IN_PROCESS)
+  createdAt       DateTime                   @default(now()) @db.Timestamp(0)
+  ITEM_id         Int
+
+  ITEM            ITEM                       @relation(fields: [ITEM_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([ITEM_id])
 }
 
 model ORDER {
   id                Int                       @id @default(autoincrement())
-  status            ORDER_status
-  createdAt         DateTime                  @db.Timestamp(0)
-  updatedAt         DateTime?                 @db.Timestamp(0)
+  status            ORDER_STATUS
+  createdAt         DateTime                  @default(now()) @db.Timestamp(0)
+  updatedAt         DateTime                  @updatedAt @db.Timestamp(0)
   completedAt       DateTime?                 @db.Timestamp(0)
 
-  ORDER_LINES ORDER_LINES[]
+  ORDER_LINE        ORDER_LINE[]
 }
 
-model ORDER_LINES {
+model ORDER_LINE {
   id               Int                       @default(autoincrement())
   quantity         Int
-  quantityReceived Int?
+  quantityReceived Int                       @default(0)
   ORDER_id         Int
   COLOR_id         Int
 
-  ORDER            ORDER                     @relation(fields: [ORDER_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ORDER_LINES_ORDER1")
-  COLOR            COLOR                     @relation(fields: [COLOR_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ORDER_LINES_COLOR1")
+  ORDER            ORDER                     @relation(fields: [ORDER_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  COLOR            COLOR                     @relation(fields: [COLOR_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@id([id, ORDER_id])
-  @@index([ORDER_id], map: "fk_ORDER_LINES_ORDER1_idx")
-  @@index([COLOR_id], map: "fk_ORDER_LINES_COLOR1_idx")
+  @@index([ORDER_id])
+  @@index([COLOR_id])
 }
 
-model READ_CYCLES {
-  id              Int                        @default(autoincrement())
-  scannedAt       DateTime?                  @db.Timestamp(0)
-  ITEM_id         Int                        @unique
-  ITEM            ITEM                       @relation(fields: [ITEM_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_READ_CYCLES_ITEM1")
+model READ_CYCLE {
+  id              Int                        @id @default(autoincrement())
+  scannedAt       DateTime                   @default(now()) @db.Timestamp(0)
+  qrValue         String                     @db.VarChar(45)
+  hue             Int
+  saturation      Int
+  value           Int
 
-  @@id([id, ITEM_id])
-  @@index([ITEM_id], map: "fk_READ_CYCLES_ITEM1_idx")
-}
-
-model SELECTION_HISTORY {
-  id              Int                        @default(autoincrement())
-  decision        SELECTION_HISTORY_decision
-  status          SELECTION_HISTORY_status
-  decisionTakenAt DateTime?                  @db.Timestamp(0)
-  statusUpdatedAt DateTime?                  @db.Timestamp(0)
-  ITEM_id         Int                        @unique
-
-  ITEM            ITEM                       @relation(fields: [ITEM_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_SELECTION_HISTORY_ITEM1")
-
-  @@id([id, ITEM_id])
-  @@index([ITEM_id], map: "fk_SELECTION_HISTORY_ITEM1_idx")
+  ITEM            ITEM?
 }
 
 model COLOR {
-  id              Int                        @id @default(autoincrement())
-  color           String?                    @unique(map: "color_UNIQUE") @db.VarChar(45)
+  id              Int                         @id @default(autoincrement())
+  name            String                      @unique @db.VarChar(10)
+  hueMin          Int
+  hueMax          Int
+  saturationMin   Int
+  saturationMax   Int
+  valueMin        Int
+  valueMax        Int
+  hex             String                      @unique @db.Char(7)
   
   ITEM            ITEM[]
-  ORDER_LINES     ORDER_LINES[]
-
+  ORDER_LINES     ORDER_LINE[]
 }
 
-enum ORDER_status {
-  IN_PROGRESS                                @map("IN PROGRESS")
+enum ORDER_STATUS {
+  IN_PROCESS
   COMPLETED
   CANCELLED
 }
 
-enum SELECTION_HISTORY_decision {
+enum DECISION {
   PASS
   ORDER
   STOCK
 }
 
-enum SELECTION_HISTORY_status {
-  IN_PROGRESS                                @map("IN PROGRESS")
+enum DECISION_STATUS {
+  IN_PROCESS
   CONFIRMED
   FAILED
 }
 
-enum ITEM_status {
+enum ITEM_STATUS {
   AVAILABLE
   ORDERED
-  IN_PROCESS                                 @map("IN PROCESS")
+  IN_PROCESS
   EXTERNAL
 }
