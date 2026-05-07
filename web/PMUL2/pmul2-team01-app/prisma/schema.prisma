@@ -15,9 +15,11 @@ model ITEM {
   decisionStatus    DECISION_STATUS
   COLOR_id          Int
   READ_CYCLE_id     Int                       @unique
+  ORDER_LINE_id     Int?
   
   COLOR             COLOR                     @relation(fields: [COLOR_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   READ_CYCLE        READ_CYCLE                @relation(fields: [READ_CYCLE_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ORDER_LINE        ORDER_LINE?                @relation(fields: [ORDER_LINE_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   SELECTION_HISTORY SELECTION_HISTORY[]
   ITEM_HISTORY      ITEM_HISTORY[]
 
@@ -58,7 +60,7 @@ model ORDER {
 }
 
 model ORDER_LINE {
-  id               Int                       @default(autoincrement())
+  id               Int                       @id @default(autoincrement())
   quantity         Int
   quantityReceived Int                       @default(0)
   ORDER_id         Int
@@ -66,8 +68,8 @@ model ORDER_LINE {
 
   ORDER            ORDER                     @relation(fields: [ORDER_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   COLOR            COLOR                     @relation(fields: [COLOR_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ITEM             ITEM[]
 
-  @@id([id, ORDER_id])
   @@index([ORDER_id])
   @@index([COLOR_id])
 }
