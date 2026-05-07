@@ -11,8 +11,6 @@ model ITEM {
   id                Int                       @id @default(autoincrement())
   team              String                    @db.VarChar(10)
   status            ITEM_STATUS
-  decision          DECISION
-  decisionStatus    DECISION_STATUS
   COLOR_id          Int
   READ_CYCLE_id     Int                       @unique
   ORDER_LINE_id     Int?
