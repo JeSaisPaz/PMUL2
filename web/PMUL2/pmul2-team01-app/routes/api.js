@@ -51,13 +51,44 @@ router.delete('/orders/:id/delete', async function (req, res) {
     }
 });
 
-router.patch('/orders/:id/cancel', async function (req, res) {
+router.post('/neworder', async function (req, res) {
+    try{
+        const { lines } = req.body
+        const order = await prisma.oRDER.create({
+            data: {
+                ORDER_LINE: {
+                    create: await Promise.all(lines.map(async (line) => {
+                        const color = await prisma.cOLOR.findUnique({ 
+                            where: { name: line.colorName } 
+                        })
+                        return { quantity: line.quantity, COLOR_id: color.id }
+                    }))
+                }
+            }
+        })
+        res.json(order)
+    }catch(error){
+        console.error("ERREUR DB :", error.message);
+        res.status(500).json({ error: "Creation error" });
+    }
+})
+
+router.patch('/orders/:id/status', async function (req, res) {
     try {
+        const validStatus = ['IN_PROCESS','COMPLETED','CANCELLED']
+        if(!validStatus.includes(req.body.status)){
+            return res.status(400).json({error : "Invalid status"})
+        }
+
         await prisma.oRDER.update({ 
             where: { id: parseInt(req.params.id) },
-            data: {status: ORDER_STATUS.CANCELLED}
+            data: {
+                status: req.body.status,
+                completedAt: req.body.status === 'COMPLETED' ? new Date() : null
+            }
         });
         res.sendStatus(204);
+        console.log("Status updated");
     } catch (error) {
         console.error("ERREUR DB :", error.message);
         res.status(500).json({ error: "Status update error" });
@@ -147,6 +178,19 @@ router.delete('/items/:id/delete', async function (req, res) {
         res.status(500).json({ error: "Deletion error" });
     }
 });
+
+
+router.get('/colors', async function (req, res)  {
+    try{
+        const colors = await prisma.cOLOR.findMany({
+        select: { name: true, hex: true }
+        })
+        res.json(colors)
+    }catch(error){
+        console.error("ERREUR DB :", error.message);
+        res.status(500).json({ error: error.message });
+    }
+})
 
 
 
