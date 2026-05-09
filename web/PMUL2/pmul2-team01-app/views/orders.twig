@@ -1,70 +1,62 @@
 {% extends "layout.twig" %}
 
 {% block body %}
-  <h1>{{title}}</h1>
-  
-  <div class="table-responsive" x-data="{ selectedOrder: null }">
-    <table class="table table-light table-hover align-middle">
-      <thead class="table table-active">
-        <tr>
-          <th>Created at</th>
-          <th>ID</th>
-          <th>Status</th>
-          <th>Updated at</th>
-          <th>Completed at</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for order in orders %}
-          <tr @click="selectedOrder = (selectedOrder === {{ order.id }} ? null : {{ order.id }})">
-            <td>{{ order.createdAt | date('d/m/Y H:i')}}</td>
-            <td class="fw-bold text-body">#{{ order.id }}</td>
-            <td>
-              {% if order.status == 'COMPLETED' %}
-                  <span class="badge rounded-pill bg-success">{{ order.status }}</span>
-              {% elseif order.status == 'CANCELLED' %}
-                  <span class="badge rounded-pill bg-danger">{{ order.status }}</span>
-              {% elseif order.status == 'IN_PROGRESS' %}
-                  <span class="badge rounded-pill bg-primary">{{ order.status }}</span>
-              {% endif %}
-            </td>
-            <td>{{ order.updatedAt | date('d/m/Y H:i') }}</td>
-            <td>{{ order.completedAt ? order.completedAt | date('d/m/Y H:i') : '---' }}</td>
-          </tr>
-
-          {# ORDER_LINES (lignes caché) #}
-          <tr x-show="selectedOrder === {{ order.id }}">
-            <td colspan="5">
-                <table class="table table-light">
-                    <thead class="table table-default">
-                        <tr>
-                            <th>Color</th>
-                            <th>Quantity</th>
-                            <th>Received</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for line in order.ORDER_LINES %}
-                        <tr>
-                            <td>{{ line.COLOR.color }}</td>
-                            <td>{{ line.quantity }}</td>
-                            <td>{{ line.quantityReceived | default(0) }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </td>
-          </tr>
-        {% else %}
-          <tr>
-            <td class="text-center" colspan="5">Aucun résultat</td>
-          </tr>
-        {% endfor %}
-      </tbody>
+<div class="table-responsive">
+    <h1>{{title}}</h1>
+    <table id="ordersTable" class="table table-striped border">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Created at</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
     </table>
-  </div>
+</div>
 
-  {% if error %}
-    <div class="alert alert-danger mt-3">{{error}}</div>
-  {% endif %}
+<script>
+$(document).ready(function() {
+    // On stocke l'instance de la table dans une variable
+    const table = $('#ordersTable').DataTable({
+        ajax: { 
+            url: '/api/orders', 
+            dataSrc: '' 
+        },
+        autoWidth: false,
+        columns: [
+            { 
+                data: 'id',
+                render: (id) => `<a href="/orders/${id}" class="fw-bold">#${id}</a>`
+            },
+            { 
+                data: 'createdAt', 
+                render: (d) => d ? new Date(d).toLocaleString('fr-FR') : '---' 
+            },
+            { 
+                data: 'status',
+                render: (s) => `<span class="badge bg-primary">${s}</span>`
+            },
+            {
+                data: 'id',
+                render: (id) => `<button class="btn btn-sm btn-danger" onclick="deleteOrder(${id})">Delete</button>`
+            }
+        ],
+        order: [[0, 'desc']]
+    });
+
+    // update toutes les 5sec
+    setInterval(() => {
+        table.ajax.reload(null, false); 
+    }, 5000);
+});
+
+async function deleteOrder(id) {
+    if (confirm('Delete order #' + id + ' ?')) {
+        await fetch(`/api/orders/${id}`, { method: 'DELETE' });
+        $('#ordersTable').DataTable().ajax.reload(null, false);
+    }
+}
+</script>
 {% endblock %}

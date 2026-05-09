@@ -23,33 +23,15 @@ router.get('/', function(req, res, next) {
   res.render('dashboard', { title: 'Dashboard' });
 });
 
-router.get('/orders', async function(req, res, next) {
-  try{
-    const orders = await prisma.oRDER.findMany({
-      include: {
-        ORDER_LINES: {
-          include: {
-            COLOR: true
-          }
-        }
-      },
-      orderBy: {
-      createdAt: 'desc'
-    }
-    });
-    res.render('orders', { 
-      title: 'Orders',
-      orders
-    });
+router.get('/orders', function(req, res, next) {
+    res.render('orders', { title: 'Orders' });
+});
 
-  } catch(error){
-    console.error("DB error :", error.message);
-    res.render('orders', { 
-      title: 'Orders',
-      error: error.message,
-      orders: []
+router.get('/orders/:id', function(req, res) {
+    res.render('orderDetails', { 
+        title: "Commande #" + req.params.id,
+        id: req.params.id 
     });
-  }
 });
 
 router.get('/neworder', async function(req, res, next) {
@@ -88,6 +70,13 @@ router.get('/items', async function (req, res) {
     res.render('items', { 
       title: 'Items',
       items
+    });
+
+    router.get('/items/:id', function(req, res) {
+      res.render('itemTracking', { 
+        title: "Item #" + req.params.id,
+        id: req.params.id 
+      });
     });
 
   } catch(error){

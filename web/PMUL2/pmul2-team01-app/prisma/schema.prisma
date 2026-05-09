@@ -61,7 +61,6 @@ model ORDER {
 model ORDER_LINE {
   id               Int                        @id @default(autoincrement())
   quantity         Int
-  quantityReceived Int                        @default(0)
   ORDER_id         Int
   COLOR_id         Int
 
