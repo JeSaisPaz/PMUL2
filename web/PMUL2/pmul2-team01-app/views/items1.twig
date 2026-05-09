@@ -1,0 +1,44 @@
+{% extends "layout.twig" %}
+
+{% block body %}
+  <h1>{{title}}</h1>
+  <div class="table-responsive">
+    <table class="table table-hover table-light">
+      <thead class="table table-active">
+        <tr>
+          <th>Scanned on</th>
+          <th>ID</th>
+          <th>Color</th>
+          <th>Team</th>
+          <th>Status</th>
+          <th>Decision</th>
+          <th>Decision status</th>
+          <th>Decided at</th>
+          <th>Updated at</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+          <tr>
+            <td>{{ item.READ_CYCLES.scannedAt | date('d/m/Y H:i') }}</td>
+            <td class="fw-bold text-body">#{{ item.id }}</td>
+            <td>{{ item.COLOR.color }}</td>
+            <td>{{ item.team }}</td>
+            <td>{{ item.status }}</td>
+            <td>{{ item.SELECTION_HISTORY.decision }}</td>
+            <td>{{ item.SELECTION_HISTORY.status }}</td>
+            <td>{{ item.SELECTION_HISTORY.decisionTakenAt | date('d/m/Y H:i') }}</td>
+            <td>{{ item.SELECTION_HISTORY.statusUpdatedAt | date('d/m/Y H:i') }}</td>
+          </tr>
+        {% else %}
+          <tr>
+            <td class="text-center" colspan="9">Aucun résultat</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  <div>
+  {% if error %}
+    <div class="alert alert-danger mt-3">{{error}}</div>
+  {% endif %}
+{% endblock %}

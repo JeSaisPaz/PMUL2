@@ -24,69 +24,29 @@ router.get('/', function(req, res, next) {
 });
 
 router.get('/orders', function(req, res, next) {
-    res.render('orders', { title: 'Orders' });
+  res.render('orders', { title: 'Orders' });
 });
 
 router.get('/orders/:id', function(req, res) {
-    res.render('orderDetails', { 
-        title: "Commande #" + req.params.id,
-        id: req.params.id 
-    });
+  res.render('orderDetails', { 
+      title: "Commande #" + req.params.id,
+      id: req.params.id 
+  });
 });
 
-router.get('/neworder', async function(req, res, next) {
-  try{
-    const warehouse = await prisma.cOLOR.findMany({
-      include: {
-        ITEM: {
-          where: {status: 'AVAILABLE'}
-        }
-      }
-    });
-    res.render('neworder', { 
-      title: 'Place an order',
-      warehouse
-    });
-
-  } catch(error){
-    console.error("DB error :", error.message);
-    res.render('neworder', { 
-      title: 'Place an order',
-      error: error.message,
-      warehouse: []
-    });
-  }
+router.get('/neworder', function(req, res, next) {
+  res.render('neworder', { title: 'Place an order' });
 });
 
-router.get('/items', async function (req, res) {
-  try{
-    const items = await prisma.iTEM.findMany({
-      include: {
-        READ_CYCLES: true,
-        SELECTION_HISTORY: true,
-        COLOR: true,
-      },
-    });
-    res.render('items', { 
-      title: 'Items',
-      items
-    });
+router.get('/items/:id', function(req, res) {
+  res.render('itemTracking', { 
+    title: "Item #" + req.params.id,
+    id: req.params.id 
+  });
+});
 
-    router.get('/items/:id', function(req, res) {
-      res.render('itemTracking', { 
-        title: "Item #" + req.params.id,
-        id: req.params.id 
-      });
-    });
-
-  } catch(error){
-    console.error("DB error :", error.message);
-    res.render('items', { 
-      title: 'Items',
-      error: error.message, 
-      items: []
-    });
-  }
+router.get('/items', function (req, res) {
+  res.render('items', { title: 'Items' });
 });
 
 module.exports = router;

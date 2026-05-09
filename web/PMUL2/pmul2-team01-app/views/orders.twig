@@ -1,13 +1,18 @@
 {% extends "layout.twig" %}
 
 {% block body %}
-<div class="table-responsive">
-    <h1>{{title}}</h1>
+<div class="table-responsive p-3">
+    <div class="d-flex justify-content-between mb-3">
+        <h1>{{title}}</h1>
+        <a href="/neworder" class="btn btn-outline-secondary">Place an order</a>
+    </div>
     <table id="ordersTable" class="table table-striped border">
         <thead>
             <tr>
-                <th>ID</th>
                 <th>Created at</th>
+                <th>ID</th>
+                <th>Updated at</th>
+                <th>Completed at</th>
                 <th>Status</th>
                 <th>Actions</th>
             </tr>
@@ -27,20 +32,39 @@ $(document).ready(function() {
         autoWidth: false,
         columns: [
             { 
+                data: 'createdAt', 
+                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '---' 
+            },
+            { 
                 data: 'id',
                 render: (id) => `<a href="/orders/${id}" class="fw-bold">#${id}</a>`
             },
             { 
-                data: 'createdAt', 
-                render: (d) => d ? new Date(d).toLocaleString('fr-FR') : '---' 
+                data: 'updatedAt', 
+                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '---' 
             },
             { 
+                data: 'completedAt', 
+                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '---' 
+            },
+            {
                 data: 'status',
-                render: (s) => `<span class="badge bg-primary">${s}</span>`
+                render: (status) => {
+                    const classes = {
+                        'COMPLETED':  'bg-success',
+                        'CANCELLED':  'bg-danger',
+                        'IN_PROCESS': 'bg-info'
+                    }
+                    const badge = classes[status] ?? 'bg-secondary'
+                    return `<span class="badge rounded-pill ${badge}">${status}</span>`
+                }
             },
             {
                 data: 'id',
-                render: (id) => `<button class="btn btn-sm btn-danger" onclick="deleteOrder(${id})">Delete</button>`
+                render: (id) => `<div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-danger" onclick="deleteOrder(${id})">Delete</button>
+                                    <button class="btn btn-sm btn-danger" onclick="cancelOrder(${id})">Cancel</button>
+                                 </div>`
             }
         ],
         order: [[0, 'desc']]
@@ -54,7 +78,14 @@ $(document).ready(function() {
 
 async function deleteOrder(id) {
     if (confirm('Delete order #' + id + ' ?')) {
-        await fetch(`/api/orders/${id}`, { method: 'DELETE' });
+        await fetch(`/api/orders/${id}/delete`, { method: 'DELETE' });
+        $('#ordersTable').DataTable().ajax.reload(null, false);
+    }
+}
+
+async function cancelOrder(id) {
+    if (confirm('Cancel order #' + id + ' ?')) {
+        await fetch(`/api/orders/${id}/cancel`, { method: 'PATCH' });
         $('#ordersTable').DataTable().ajax.reload(null, false);
     }
 }

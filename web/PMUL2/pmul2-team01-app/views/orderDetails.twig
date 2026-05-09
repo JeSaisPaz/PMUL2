@@ -1,70 +1,70 @@
 {% extends "layout.twig" %}
 
 {% block body %}
-<div class="container mt-4" x-data="orderDetails">
-    <a href="/orders" class="btn btn-outline-secondary mb-3">← Return</a>
-    
-    <template x-if="order">
-        <div>
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2>Order #<span x-text="order.id"></span></h2>
-                <span class="badge fs-5" 
-                      :class="order.status === 'COMPLETED' ? 'bg-success' : 'bg-info'" 
-                      x-text="order.status">
-                </span>
-            </div>
-
-            <table class="table table-striped table-hover align-middle">
-                <thead>
-                    <tr>
-                        <th>Color</th>
-                        <th class="text-center">Received / Requested</th>
-                        <th>Assigned items (Tracking)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template x-for="line in order.ORDER_LINE" :key="line.id">
-                        <tr>
-                            <td class="fw-bold text-nowrap">
-                                <div class="d-flex align-items-center">
-                                    <span 
-                                        class="p-2 border rounded-circle me-2" 
-                                        :style="{ backgroundColor: line.COLOR.hex }">
-                                    </span>
-                                    <span x-text="line.COLOR.name"></span>
-                                </div>
-                            </td>
-                            <td class="text-center">
-                                <span class="badge rounded-pill" 
-                                      :class="line.ITEM.length >= line.quantity ? 'bg-success' : 'bg-warning text-dark'">
-                                    <span x-text="line.ITEM.length"></span> / <span x-text="line.quantity"></span>
-                                </span>
-                            </td>
-                            <td>
-                                <!-- Liens vers la future page de tracking d'item -->
-                                <div class="d-flex flex-wrap gap-1">
-                                    <template x-for="item in line.ITEM" :key="item.id">
-                                        <a :href="'/items/' + item.id" 
-                                           class="btn btn-sm btn-outline-primary" 
-                                           title="Follow this item">
-                                            #<span x-text="item.id"></span>
-                                        </a>
-                                    </template>
-                                    <span x-show="line.ITEM.length === 0" class="text-muted small">En attente de réception...</span>
-                                </div>
-                            </td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
+<div class="table-responsive p-3" x-data="orderDetails">
+    <div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1>Order #<span x-text="order.id"></span></h1>
+            <span class="badge fs-5" x-text="order.status" 
+                    :class="{
+                    'bg-success' : order.status === 'COMPLETED',
+                    'bg-danger' : order.status === 'CANCELLED',
+                    'bg-info' : order.status === 'IN_PROCESS'
+                    }">
+            </span>
         </div>
-    </template>
+
+        <table class="table table-striped table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Color</th>
+                    <th class="text-center">Received / Requested</th>
+                    <th>Assigned items (Tracking)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="line in order.ORDER_LINE" :key="line.id">
+                    <tr>
+                        <td class="fw-bold">
+                            <div class="d-flex align-items-center">
+                                <span 
+                                    class="p-2 border rounded-circle me-2" 
+                                    :style="{ backgroundColor: line.COLOR.hex }">
+                                </span>
+                                <span x-text="line.COLOR.name"></span>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge rounded-pill" 
+                                    :class="line.ITEM.length == line.quantity ? 'bg-success' : 'bg-warning text-dark'">
+                                <span x-text="line.ITEM.length"></span> / <span x-text="line.quantity"></span>
+                            </span>
+                        </td>
+                        <td>
+                            <!-- Liens vers la future page de tracking d'item -->
+                            <div class="d-flex flex-wrap gap-1">
+                                <template x-for="item in line.ITEM" :key="item.id">
+                                    <a :href="'/items/' + item.id" 
+                                        class="btn btn-sm btn-outline-primary" 
+                                        title="Follow this item">
+                                        #<span x-text="item.id"></span>
+                                    </a>
+                                </template>
+                                <span x-show="line.ITEM.length === 0" class="text-muted small">Empty</span>
+                            </div>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
 
     <!-- Loader -->
     <div x-show="!order" class="text-center mt-5">
         <div class="spinner-border text-primary" role="status"></div>
         <p>Loading...</p>
     </div>
+    <a href="/orders" class="btn btn-outline-secondary mb-3">← Return</a>
 </div>
 
 <script>
