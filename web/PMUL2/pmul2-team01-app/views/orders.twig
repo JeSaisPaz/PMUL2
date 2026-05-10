@@ -70,10 +70,10 @@ $(document).ready(function() {
         order: [[0, 'desc']]
     });
 
-    // update toutes les 5sec
-    setInterval(() => {
+    // update a chaque event de la db
+    socket.on('db_event', function() {
         table.ajax.reload(null, false); 
-    }, 5000);
+    });
 });
 
 async function deleteOrder(id) {

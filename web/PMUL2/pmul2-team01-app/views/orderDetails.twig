@@ -95,10 +95,10 @@ document.addEventListener('alpine:init', () => {
 
         async init() {
             await this.fetchDetails();
-            // update toutes les 5sec
-            setInterval(async () => {
-                await this.fetchDetails();
-            }, 5000);
+            // update aux event de la db
+            socket.on('db_event', () => {
+                this.fetchDetails();
+            });
         }
     }));
 });
