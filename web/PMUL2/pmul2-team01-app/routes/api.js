@@ -63,11 +63,9 @@ router.post('/neworder', async function (req, res) {
         const order = await prisma.oRDER.create({
             data: {
                 ORDER_LINE: {
-                    create: await Promise.all(lines.map(async (line) => {
-                        const color = await prisma.cOLOR.findUnique({ 
-                            where: { name: line.colorName } 
-                        })
-                        return { quantity: line.quantity, COLOR_id: color.id }
+                    create: lines.map(line => ({
+                        quantity: line.quantity, 
+                        COLOR_id: line.id
                     }))
                 }
             }
@@ -160,7 +158,7 @@ router.get('/orders/:id/details', async function (req, res) {
     }
 });
 
-//Avoir tout les items
+//Avoir tout les items OK
 router.get('/items', async function (req, res) {
     try {
         const items = await prisma.iTEM.findMany({
@@ -216,11 +214,15 @@ router.delete('/items/:id/delete', async function (req, res) {
     }
 });
 
-//Avoir toutes les couleurs (hex + name)
+//Avoir toutes les couleurs (hex + name) OK
 router.get('/colors', async function (req, res)  {
     try{
         const colors = await prisma.cOLOR.findMany({
-        select: { name: true, hex: true }
+        select: { 
+            name: true, 
+            hex: true,
+            id: true
+        }
         })
         res.json(colors)
     }catch(error){
@@ -229,6 +231,23 @@ router.get('/colors', async function (req, res)  {
     }
 })
 
-
+//Scan En cours de dev
+router.post('/scan', async function (req, res)  {
+    try{
+        const { scan } = req.body
+        const readCycle = await prisma.READ_CYCLE.create({
+            data: {
+                qrValue: scan.qrValue,
+                hue: scan.hue,
+                saturation: scan.saturation,
+                value: scan.value
+            }
+        })
+        res.sendStatus(204);
+    }catch(error){
+        console.error("ERREUR DB :", error.message);
+        res.status(500).json({ error: error.message });
+    }
+})
 
 module.exports = router;
