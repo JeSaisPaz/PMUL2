@@ -112,6 +112,11 @@ router.patch('/orders/:id/cancel', async function (req, res) {
                 }
             }),
 
+            prisma.oRDER_LINE.updateMany({
+                where: { ORDER_id: order.id },
+                data: { status: ORDER_STATUS.CANCELLED }
+            }),
+
             //on crée un historique cancelled pour chaques item de la commande
             prisma.iTEM_HISTORY.createMany({
                 data: allItems.map(item => ({
@@ -201,6 +206,24 @@ router.get('/items', async function (req, res) {
     }
 });
 
+//Créer un item en cours de dev
+router.post('/newitem', async function (req, res) {
+    try{
+        const { item } = req.body
+        const item = await prisma.iTEM.create({
+            data: {
+                team: item.team,
+                COLOR_id: item.colorId
+            },
+            ITEM_HISTORY: {create: {}}
+        })
+        res.sendStatus(204);
+    }catch(error){
+        console.error("ERREUR DB :", error.message);
+        res.status(500).json({ error: "Creation error" });
+    }
+});
+
 //Delete un item OK
 router.delete('/items/:id/delete', async function (req, res) {
     try {
@@ -231,8 +254,21 @@ router.get('/colors', async function (req, res)  {
     }
 })
 
+//avoir tout les scans
+router.get('/scans', async function (req, res) {
+    const scans = await prisma.rEAD_CYCLE.findMany({
+        include: {
+            ITEM: {
+                include: { COLOR: true }
+            }
+        },
+        orderBy: { scannedAt: 'desc' }
+    })
+    res.json(scans)
+})
+
 //Scan OK
-router.post('/scan', async function (req, res)  {
+router.post('/scans', async function (req, res)  {
     try{
         //création d'un READ_CYCLE
         const { scan } = req.body

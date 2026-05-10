@@ -49,4 +49,8 @@ router.get('/items', function (req, res) {
   res.render('items', { title: 'Items' });
 });
 
+router.get('/scans', function(req, res, next) {
+  res.render('scans', { title: 'Scans' });
+});
+
 module.exports = router;

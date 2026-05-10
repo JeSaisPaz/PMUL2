@@ -1,0 +1,83 @@
+{% extends "layout.twig" %}
+
+{% block body %}
+<div class="table-responsive p-3">
+    <div class="d-flex justify-content-between mb-3">
+        <h1>{{title}}</h1>
+    </div>
+    <table id="scansTable" class="table table-striped border">
+        <thead>
+            <tr>
+                <th>Scanned at</th>
+                <th>ID</th>
+                <th>QR Value</th>
+                <th>Hue</th>
+                <th>Saturation</th>
+                <th>Value</th>
+                <th>Item</th>
+                <th>Decision</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+$(document).ready(function() {
+    const table = $('#scansTable').DataTable({
+        ajax: { 
+            url: '/api/scans', 
+            dataSrc: '' 
+        },
+        autoWidth: false,
+        columns: [
+            { 
+                data: 'scannedAt', 
+                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '---' 
+            },
+            { 
+                data: 'id',
+                render: (id) => `<span class="fw-bold text-body">#${id}</span>`
+            },
+            { 
+                data: 'qrValue'
+            },
+            { 
+                data: 'hue'
+            },
+            { 
+                data: 'saturation'
+            },
+            { 
+                data: 'value'
+            },
+            {
+                data: 'ITEM',
+                render: (item) => {
+                    if (!item) return '<span class="badge bg-secondary">NONE</span>'
+                    return `<a href="/items/${item.id}" class="badge rounded-pill bg-primary"">#${item.id}</a>`
+                }
+            },
+            {
+                data: 'ITEM',
+                render: (item) => {
+                    if (!item) return '<span class="badge bg-secondary">NONE</span>'
+                    const classes = {
+                        'ORDER': 'bg-info',
+                        'STOCK': 'bg-primary',
+                        'PASS':  'bg-warning'
+                    }
+                    const badge = classes[item.decision] ?? 'bg-secondary'
+                    return `<span class="badge rounded-pill ${badge}">${item.decision}</span>`
+                }
+            }
+        ],
+        order: [[0, 'desc']]
+    });
+
+    setInterval(() => {
+        table.ajax.reload(null, false); 
+    }, 5000);
+});
+</script>
+{% endblock %}

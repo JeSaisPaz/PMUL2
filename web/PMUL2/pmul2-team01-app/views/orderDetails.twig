@@ -55,8 +55,7 @@
                             <div class="d-flex flex-wrap gap-1">
                                 <template x-for="item in line.ITEM" :key="item.id">
                                     <a :href="'/items/' + item.id" 
-                                        class="btn btn-sm btn-outline-primary" 
-                                        title="Follow this item">
+                                        class="btn btn-sm btn-outline-primary">
                                         #<span x-text="item.id"></span>
                                     </a>
                                 </template>
@@ -83,6 +82,7 @@ document.addEventListener('alpine:init', () => {
         order: null,
 
         async fetchDetails() {
+            //on extrait l'id de l'url
             const id = window.location.pathname.split('/').pop();
             try {
                 const response = await fetch(`/api/orders/${id}/details`);

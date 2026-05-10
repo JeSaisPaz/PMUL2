@@ -13,11 +13,11 @@ model ITEM {
   decision          DECISION
   orderedAt         DateTime?                 @db.Timestamp(0)
   COLOR_id          Int
-  READ_CYCLE_id     Int                       @unique
+  READ_CYCLE_id     Int?                       @unique
   ORDER_LINE_id     Int?
   
   COLOR             COLOR                     @relation(fields: [COLOR_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  READ_CYCLE        READ_CYCLE                @relation(fields: [READ_CYCLE_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  READ_CYCLE        READ_CYCLE?                @relation(fields: [READ_CYCLE_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   ORDER_LINE        ORDER_LINE?               @relation(fields: [ORDER_LINE_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   SELECTION_HISTORY SELECTION_HISTORY[]
   ITEM_HISTORY      ITEM_HISTORY[]
