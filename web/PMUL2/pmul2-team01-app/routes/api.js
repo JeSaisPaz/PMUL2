@@ -53,6 +53,11 @@ module.exports = function (io) {
     router.post('/neworder', async function (req, res) {
         try {
             const { lines } = req.body;
+            // On verifie que line est bien un array sinon: TypeError: lines.map is not a function !!!
+            if (!Array.isArray(lines) || lines.length === 0) {
+                return res.status(400).json({ error: "Order must contain at least one line." });
+            }
+
             await prisma.oRDER.create({
                 data: {
                     ORDER_LINE: {
@@ -63,7 +68,7 @@ module.exports = function (io) {
                     }
                 }
             });
-            notifyClients(); // Trigger Update
+            notifyClients();
             res.sendStatus(204);
         } catch (error) {
             res.status(500).json({ error: "Creation error" });
@@ -92,7 +97,7 @@ module.exports = function (io) {
                 })
             ]);
 
-            notifyClients(); // Trigger Update
+            notifyClients();
             res.sendStatus(204);
         } catch (error) {
             res.status(500).json(error.message);
@@ -138,7 +143,7 @@ module.exports = function (io) {
     router.delete('/items/:id/delete', async function (req, res) {
         try {
             await prisma.iTEM.delete({ where: { id: parseInt(req.params.id) } });
-            notifyClients(); // Trigger Update
+            notifyClients();
             res.sendStatus(204);
         } catch (error) {
             res.status(500).json({ error: "Deletion error" });
@@ -236,7 +241,7 @@ module.exports = function (io) {
                     }
                 }
             }
-            notifyClients(); // Trigger refresh for everything (scans, items, orders)
+            notifyClients();
             res.sendStatus(204);
         } catch (error) {
             res.status(500).json({ error: error.message });
