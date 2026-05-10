@@ -59,9 +59,10 @@ $(document).ready(function() {
                 render: (history) => {
                     const badges = {
                         'AVAILABLE':  'bg-success',
-                        'EXTERNAL':  'bg-danger',
+                        'EXTERNAL':  'bg-warning',
                         'IN_PROCESS': 'bg-info',
                         'ORDERED':  'bg-primary',
+                        'CANCELLED':  'bg-danger',
                     }
                     const badge = badges[history[0].status] ?? 'bg-secondary'
                     return `<span class="badge rounded-pill ${badge}">${history[0].status}</span>`

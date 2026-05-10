@@ -85,10 +85,8 @@ async function deleteOrder(id) {
 
 async function cancelOrder(id) {
     if (confirm('Cancel order #' + id + ' ?')) {
-        await fetch(`/api/orders/${id}/status`, { 
+        await fetch(`/api/orders/${id}/cancel`, { 
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({status : 'CANCELLED'})
         });
         $('#ordersTable').DataTable().ajax.reload(null, false);
     }

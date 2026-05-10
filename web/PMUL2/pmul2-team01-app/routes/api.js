@@ -2,7 +2,7 @@ var express = require('express');
 var router = express.Router();
 
 
-const { PrismaClient, ORDER_STATUS } = require("../generated/prisma");
+const { PrismaClient, ORDER_STATUS, ITEM_STATUS } = require("../generated/prisma");
 
 
 const { PrismaMariaDb } = require ("@prisma/adapter-mariadb");
@@ -19,6 +19,7 @@ const adapter = new PrismaMariaDb({
 
 const prisma = new PrismaClient({ adapter });
 
+// /health OK
 router.get('/health', (req, res) => {
     return res.status(200).json({
         status: "UP",
@@ -27,8 +28,9 @@ router.get('/health', (req, res) => {
 });
 
 // Initialisation du socket pour l'update du front en fonction de la db
-const http = require('http').createServer(app);
+//const http = require('http').createServer(app);
 
+//Avoir toutes les commandes OK
 router.get('/orders', async function (req, res) {
     try {
         const orders = await prisma.oRDER.findMany({
@@ -41,6 +43,7 @@ router.get('/orders', async function (req, res) {
     }
 });
 
+//Delete une commande OK
 router.delete('/orders/:id/delete', async function (req, res) {
     try {
         await prisma.oRDER.delete({ 
@@ -53,6 +56,7 @@ router.delete('/orders/:id/delete', async function (req, res) {
     }
 });
 
+//Créer une commande OK
 router.post('/neworder', async function (req, res) {
     try{
         const { lines } = req.body
@@ -75,31 +79,60 @@ router.post('/neworder', async function (req, res) {
     }
 })
 
-router.patch('/orders/:id/status', async function (req, res) {
+//Cancel order OK
+router.patch('/orders/:id/cancel', async function (req, res) {
     try {
-        const validStatus = ['IN_PROCESS','COMPLETED','CANCELLED']
-        if(!validStatus.includes(req.body.status)){
-            return res.status(400).json({error : "Invalid status"})
+        const order = await prisma.oRDER.findUnique({
+            where: { id: parseInt(req.params.id) },
+            include: {
+                ORDER_LINE: {
+                    include: { ITEM: true }
+                }
+            }
+        })
+        if (!order) {
+            return res.status(404).json({ error: "Order not found" })
         }
 
-        await prisma.oRDER.update({ 
-            where: { id: parseInt(req.params.id) },
-            data: {
-                status: req.body.status,
-                completedAt: req.body.status === 'COMPLETED' ? new Date() : null
-            }
-        });
+        if (order.status === "COMPLETED") {
+            return res.status(400).json({ error: "Impossible to cancel a COMPLETED order" })
+        }
+
+        if (order.status === "CANCELLED") {
+            return res.status(400).json({ error: "Order already CANCELLED" })
+        }
+
+        //on récupère chaque item de chaque lignes dans un seul tableau
+        const allItems = order.ORDER_LINE.flatMap(line => line.ITEM);
+
+        //transaction pour garantir l'integrité des données, si une requête échoue on annule c'est TOR
+        await prisma.$transaction([
+            prisma.oRDER.update({ 
+                where: { id: order.id },
+                data: {
+                    status: ORDER_STATUS.CANCELLED
+                }
+            }),
+
+            //on crée un historique cancelled pour chaques item de la commande
+            prisma.iTEM_HISTORY.createMany({
+                data: allItems.map(item => ({
+                    ITEM_id: item.id,
+                    status: ITEM_STATUS.CANCELLED,
+                }))
+            })  
+        ])
         res.sendStatus(204);
-        console.log("Status updated");
     } catch (error) {
         console.error("ERREUR DB :", error.message);
-        res.status(500).json({ error: "Status update error" });
+        res.status(500).json(error.message);
     }
 });
 
+//Avoir des details sur une commande OK
 router.get('/orders/:id/details', async function (req, res) {
-    const id = parseInt(req.params.id);
     try {
+        const id = parseInt(req.params.id);
         const order = await prisma.oRDER.findUnique({
             where: { id: id },
             include: {
@@ -127,6 +160,7 @@ router.get('/orders/:id/details', async function (req, res) {
     }
 });
 
+//Avoir tout les items
 router.get('/items', async function (req, res) {
     try {
         const items = await prisma.iTEM.findMany({
@@ -169,6 +203,7 @@ router.get('/items', async function (req, res) {
     }
 });
 
+//Delete un item OK
 router.delete('/items/:id/delete', async function (req, res) {
     try {
         await prisma.iTEM.delete({ 
@@ -181,7 +216,7 @@ router.delete('/items/:id/delete', async function (req, res) {
     }
 });
 
-
+//Avoir toutes les couleurs (hex + name)
 router.get('/colors', async function (req, res)  {
     try{
         const colors = await prisma.cOLOR.findMany({
