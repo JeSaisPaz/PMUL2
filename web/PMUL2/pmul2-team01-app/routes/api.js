@@ -70,7 +70,7 @@ router.post('/neworder', async function (req, res) {
                 }
             }
         })
-        res.json(order)
+        res.sendStatus(204);
     }catch(error){
         console.error("ERREUR DB :", error.message);
         res.status(500).json({ error: "Creation error" });
