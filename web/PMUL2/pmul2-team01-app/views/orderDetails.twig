@@ -19,6 +19,7 @@
                 <tr>
                     <th>Color</th>
                     <th class="text-center">Received / Requested</th>
+                    <th>Status</th>
                     <th>Assigned items (Tracking)</th>
                 </tr>
             </thead>
@@ -38,6 +39,15 @@
                             <span class="badge rounded-pill" 
                                     :class="line.ITEM.length == line.quantity ? 'bg-success' : 'bg-warning text-dark'">
                                 <span x-text="line.ITEM.length"></span> / <span x-text="line.quantity"></span>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge rounded-pill" x-text="line.status" 
+                                :class="{
+                                'bg-success' : line.status === 'COMPLETED',
+                                'bg-danger' : line.status === 'CANCELLED',
+                                'bg-info' : line.status === 'IN_PROCESS'
+                                }">
                             </span>
                         </td>
                         <td>

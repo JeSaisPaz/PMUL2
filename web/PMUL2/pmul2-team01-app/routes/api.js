@@ -2,7 +2,7 @@ var express = require('express');
 var router = express.Router();
 
 
-const { PrismaClient, ORDER_STATUS, ITEM_STATUS, DECISION } = require("../generated/prisma");
+const { PrismaClient, ORDER_STATUS, ITEM_STATUS, DECISION, TEAM } = require("../generated/prisma");
 
 
 const { PrismaMariaDb } = require ("@prisma/adapter-mariadb");
@@ -231,12 +231,12 @@ router.get('/colors', async function (req, res)  {
     }
 })
 
-//Scan En cours de dev
+//Scan OK
 router.post('/scan', async function (req, res)  {
     try{
         //création d'un READ_CYCLE
         const { scan } = req.body
-        const readCycle = await prisma.READ_CYCLE.create({
+        const readCycle = await prisma.rEAD_CYCLE.create({
             data: {
                 qrValue: scan.qrValue,
                 hue: scan.hue,
@@ -246,8 +246,7 @@ router.post('/scan', async function (req, res)  {
         })
 
         //Vérifie si le qr Value est valide
-        const TEAM = ["TEAM01","TEAM02","TEAM03","TEAM04","TEAM05"]
-        if(TEAM.includes(scan.qrValue)){
+        if(Object.values(TEAM).includes(scan.qrValue)){
 
             //Vérifie si la couleur existe en vérifiant les ranges
             const validColor = await prisma.cOLOR.findFirst({
@@ -263,13 +262,16 @@ router.post('/scan', async function (req, res)  {
 
             if(validColor){
                 //Vérifie si l'objet appartient a notre team 
-                if(scan.qrValue == "TEAM01"){
+                if(scan.qrValue === TEAM.TEAM01){
                     //récupère la première order line ayant besoin de cette couleur
                     const orderLineInNeed = await prisma.oRDER_LINE.findFirst({
                         where: {
                             COLOR_id: validColor.id,
-                            ORDER: { status: "IN_PROCESS" }
-                        }
+                            ORDER: { status: ORDER_STATUS.IN_PROCESS },
+                            status: ORDER_STATUS.IN_PROCESS
+                        },
+                        //on ajoute item pour calculer le nombre d'item à la mise à jour du status de la commande
+                        include: { ITEM: true }
                     })
                     //création d'un item avec decision order ou stock selon le besoin
                     await prisma.iTEM.create({
@@ -283,13 +285,38 @@ router.post('/scan', async function (req, res)  {
                             SELECTION_HISTORY: {create: {}}
                         }
                     })
-                    
-                    //vérifie si le status de la commande doit etre mis à jour
+            
                     if(orderLineInNeed){
-                        
+
+                        //on mets à jour le status de chaque lignes de la commande 
+                        await prisma.oRDER_LINE.update({
+                            where: { id: orderLineInNeed.id },
+                            data: { 
+                                status: orderLineInNeed.ITEM.length + 1 >= orderLineInNeed.quantity ? ORDER_STATUS.COMPLETED : ORDER_STATUS.IN_PROCESS
+                            }
+                        })
+
+                        // on compte le nombre de lignes encore en cours
+                        const pendingLines = await prisma.oRDER_LINE.count({
+                            where: { 
+                                ORDER_id: orderLineInNeed.ORDER_id,
+                                status: ORDER_STATUS.IN_PROCESS
+                            }
+                        })
+
+                        //si aucune lignes est IN_PROCESS alors on mets le status à COMPLETED
+                        if (pendingLines === 0) {
+                            await prisma.oRDER.update({
+                                where: { id: orderLineInNeed.ORDER_id },
+                                data: { 
+                                    status: ORDER_STATUS.COMPLETED, 
+                                    completedAt: new Date() 
+                                }
+                            })
+                        }
                     }
                 }else{
-                    //crée un item avec decision pass car pas notre team 
+                    //crée un item avec decision pass car c'est pas notre team 
                     await prisma.iTEM.create({
                         data: {
                             team: scan.qrValue,
