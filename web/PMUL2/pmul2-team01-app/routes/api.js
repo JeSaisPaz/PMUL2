@@ -2,7 +2,7 @@ var express = require('express');
 var router = express.Router();
 
 
-const { PrismaClient, ORDER_STATUS, ITEM_STATUS } = require("../generated/prisma");
+const { PrismaClient, ORDER_STATUS, ITEM_STATUS, DECISION } = require("../generated/prisma");
 
 
 const { PrismaMariaDb } = require ("@prisma/adapter-mariadb");
@@ -234,6 +234,7 @@ router.get('/colors', async function (req, res)  {
 //Scan En cours de dev
 router.post('/scan', async function (req, res)  {
     try{
+        //création d'un READ_CYCLE
         const { scan } = req.body
         const readCycle = await prisma.READ_CYCLE.create({
             data: {
@@ -243,6 +244,66 @@ router.post('/scan', async function (req, res)  {
                 value: scan.value
             }
         })
+
+        //Vérifie si le qr Value est valide
+        const TEAM = ["TEAM01","TEAM02","TEAM03","TEAM04","TEAM05"]
+        if(TEAM.includes(scan.qrValue)){
+
+            //Vérifie si la couleur existe en vérifiant les ranges
+            const validColor = await prisma.cOLOR.findFirst({
+                where: {
+                    hueMin:        { lte: scan.hue },
+                    hueMax:        { gte: scan.hue },
+                    saturationMin: { lte: scan.saturation },
+                    saturationMax: { gte: scan.saturation },
+                    valueMin:      { lte: scan.value },
+                    valueMax:      { gte: scan.value },
+                }
+            })
+
+            if(validColor){
+                //Vérifie si l'objet appartient a notre team 
+                if(scan.qrValue == "TEAM01"){
+                    //récupère la première order line ayant besoin de cette couleur
+                    const orderLineInNeed = await prisma.oRDER_LINE.findFirst({
+                        where: {
+                            COLOR_id: validColor.id,
+                            ORDER: { status: "IN_PROCESS" }
+                        }
+                    })
+                    //création d'un item avec decision order ou stock selon le besoin
+                    await prisma.iTEM.create({
+                        data: {
+                            team: scan.qrValue,
+                            decision: orderLineInNeed ? "ORDER" : "STOCK",
+                            COLOR_id: validColor.id,
+                            READ_CYCLE_id: readCycle.id,
+                            ORDER_LINE_id: orderLineInNeed ? orderLineInNeed.id : null,
+                            ITEM_HISTORY: {create: {}},
+                            SELECTION_HISTORY: {create: {}}
+                        }
+                    })
+                    
+                    //vérifie si le status de la commande doit etre mis à jour
+                    if(orderLineInNeed){
+                        
+                    }
+                }else{
+                    //crée un item avec decision pass car pas notre team 
+                    await prisma.iTEM.create({
+                        data: {
+                            team: scan.qrValue,
+                            decision: DECISION.PASS,
+                            COLOR_id: validColor.id,
+                            READ_CYCLE_id: readCycle.id,
+                            ITEM_HISTORY: {create: {}},
+                            SELECTION_HISTORY: {create: {}}
+                        }
+                    })
+                }
+            }
+        }
+
         res.sendStatus(204);
     }catch(error){
         console.error("ERREUR DB :", error.message);

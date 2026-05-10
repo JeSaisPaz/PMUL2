@@ -28,7 +28,7 @@ model ITEM {
 
 model ITEM_HISTORY {
   id                Int                       @id @default(autoincrement())
-  status            ITEM_STATUS
+  status            ITEM_STATUS               @default(IN_PROCESS)
   createdAt         DateTime                  @default(now()) @db.Timestamp(0)
   ITEM_id           Int
 
@@ -75,7 +75,7 @@ model ORDER_LINE {
 model READ_CYCLE {
   id              Int                         @id @default(autoincrement())
   scannedAt       DateTime                    @default(now()) @db.Timestamp(0)
-  qrValue         String                      @db.VarChar(45)
+  qrValue         String                      @db.VarChar(255)
   hue             Int
   saturation      Int
   value           Int
