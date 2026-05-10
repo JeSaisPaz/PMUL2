@@ -5,9 +5,15 @@ var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 
 var indexRouter = require('./routes/index');
-var apiRouter = require('./routes/api');
+
 
 var app = express();
+
+// setup pour les websockets live update
+
+var server = http.createServer(app);
+var io = socketIo(server);
+var apiRouter = require('./routes/api')(io);
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -38,4 +44,4 @@ app.use(function(err, req, res, next) {
   res.render('error');
 });
 
-module.exports = app;
+module.exports = {app: app, server: server};

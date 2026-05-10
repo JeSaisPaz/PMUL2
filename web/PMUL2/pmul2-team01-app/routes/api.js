@@ -26,6 +26,8 @@ router.get('/health', (req, res) => {
     });
 });
 
+// Initialisation du socket pour l'update du front en fonction de la db
+const http = require('http').createServer(app);
 
 router.get('/orders', async function (req, res) {
     try {
