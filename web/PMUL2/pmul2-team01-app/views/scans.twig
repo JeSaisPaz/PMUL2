@@ -55,7 +55,7 @@ $(document).ready(function() {
                 data: 'ITEM',
                 render: (item) => {
                     if (!item) return '<span class="badge bg-secondary">NONE</span>'
-                    return `<a href="/items/${item.id}" class="badge rounded-pill bg-primary"">#${item.id}</a>`
+                    return `<a href="/items/${item.id}" class="btn btn-sm btn-outline-primary">#${item.id}</a>`
                 }
             },
             {

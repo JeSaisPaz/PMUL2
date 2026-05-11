@@ -92,14 +92,11 @@ $(document).ready(function() {
     });
 
     // update du front a chaque event de la db donc pas besoin de l'event d'update
-    const socket = io();
     socket.on('db_event', function() {
         table.ajax.reload(null, false); 
     });
 
 });
-
-const socket = io();
 
 async function deleteItem(id) {
     if (confirm('Delete item #' + id + ' ?')) {
