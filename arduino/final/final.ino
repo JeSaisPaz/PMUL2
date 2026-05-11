@@ -16,7 +16,9 @@ int totalArticlesTries = 0;
 Pmul2Lib objetPmul(Serial1);
 Order targetOrder;
 Order currentOrder;
-Color detected;
+Color detectedBlockColor;
+Team   detectedBlockTeam = Team::TeamUnknown;
+bool   currentBlockForOrder = false;
 
 // 0=Attente, 1=Scan, 2=Aiguillage, 3=Sortie
 byte etapeActu = 0;
@@ -106,6 +108,18 @@ void loop() {
   switch(etapeActu) {
     // Etape Attente
     case 0:
+      if (objetPmul.readTargetOrder(targetOrder)) {
+        currentOrder.teamId = targetOrder.teamId;
+        currentOrder.reset();
+        Serial.print("Nouvelle commande: Team ");
+        Serial.print(targetOrder.teamId);
+        Serial.print(" Cible B=");
+        Serial.print(targetOrder.blueAmount);
+        Serial.print(" Y=");
+        Serial.print(targetOrder.yellowAmount);
+        Serial.print(" M=");
+        Serial.println(targetOrder.magentaAmount);
+      }
       if (etatsIR[0]) {
         servoScan.write(90);
         etapeActu = 1;
@@ -114,13 +128,20 @@ void loop() {
 
     // Etape Scan
     case 1:
-      if (objetPmul.readTargetOrder(targetOrder)){
-        if (targetOrder.teamId != 0 && targetOrder.teamId != 0xFF){
+      if (objetPmul.readBlockInfo(detectedBlockColor, detectedBlockTeam)){
+        Serial.print("Block detecte: Couleur=");
+        Serial.print(static_cast<int>(detectedBlockColor));
+        Serial.print(" Team=");
+        Serial.println(static_cast<int>(detectedBlockTeam));
+
+        if (detectedBlockTeam != Team::TeamUnknown){
           servoCommande.write(45);
-          Serial.println("Décision: Commande");
+          Serial.println("Decision: Commande");
+          currentBlockForOrder = true;
         } else {
           servoStock.write(45);
-          Serial.println("Décision: Stock");
+          Serial.println("Decision: Stock");
+          currentBlockForOrder = false;
         }
         tempsDepart = tempsActuel;
         etapeActu = 2;
@@ -138,11 +159,28 @@ void loop() {
     // Etape Sortie & Reset
     case 3:
       if(etatsIR[2] || etatsIR[3] || etatsIR[4]){
-        objetPmul.sendOrderDone();
+        if (currentBlockForOrder && targetOrder.teamId != 0xFF) {
+          currentOrder.addBox(detectedBlockColor);
+          totalArticlesTries++;
+
+          Serial.print("Progres: B=");
+          Serial.print(currentOrder.blueAmount);
+          Serial.print(" Y=");
+          Serial.print(currentOrder.yellowAmount);
+          Serial.print(" M=");
+          Serial.println(currentOrder.magentaAmount);
+
+          if (currentOrder.isComplete(targetOrder)) {
+            objetPmul.sendOrderDone();
+            Serial.println(">>> COMMANDE TERMINEE <<<");
+            currentOrder.reset();
+          } else {
+            objetPmul.sendOrder(currentOrder);
+          }
+        }
 
         servoStock.write(0);
         servoCommande.write(0);
-
         etapeActu = 0;
       }
       break;
