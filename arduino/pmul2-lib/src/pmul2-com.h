@@ -5,14 +5,13 @@
 #include "pmul2-colors.h"
 #include "pmul2-orders.h"
 
-enum class FrameType : uint8_t {
-    NONE         = 0x00,
-    TARGET_ORDER = 0x01,
-    BLOCK_INFO   = 0x02
-};
-
 class Pmul2Com {
     public:
+        enum class FrameType : uint8_t {
+            NONE         = 0x00,
+            TARGET_ORDER = 0x01,
+            BLOCK_INFO   = 0x02
+        };
         // constructeur
         explicit Pmul2Com(Stream& stream);
 

@@ -1,31 +1,61 @@
 #include <Servo.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 #include "pmul2-lib.h"
 
-Pmul2Lib objetPmul(Serial);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+byte btn1 = 2;
+byte btn2 = 3;
+
+volatile bool systemOn = true;
+volatile byte modeAffichage = 0;
+int totalArticlesTries = 0;
+
+// Utilise Seriall1 pour la com avec Rasberry Pi pins 18 et 19 de Mega
+Pmul2Lib objetPmul(Serial1);
 Order targetOrder;
 Order currentOrder;
 Color detected;
-Team teamDeteced;
 
-// Capteurs IR
-byte ir1 = 8;
-byte ir2 = 7; 
-byte ir3 = 6;
-byte ir4 = 5;
-byte ir5 = 4;
+// 0=Attente, 1=Scan, 2=Aiguillage, 3=Sortie
+byte etapeActu = 0;
 
-byte pinsIR[] = {ir1, ir2, ir3, ir4, ir5};
-byte derniersEtats[] = {2, 2, 2, 2, 2}; 
-unsigned long dernierMoment[] = {0, 0, 0, 0, 0};
-byte intervalleDebounce = 50;
+// Capteurs IR1 à 5
+byte pinsIR[] = {8, 7, 6, 5, 4}; // IR1=Scan, IR2=Intermédiaire, IR3/IR4/IR5=Confirmation
+bool etatsIR[] = {0, 0, 0, 0, 0}; 
 
 // Servo Moteur
 Servo servoScan;
 Servo servoStock;
 Servo servoCommande;
 
+unsigned long tempsActuel = 0;
+unsigned long tempsDepart = 0;
+long attenteServo = 500;
+
+void basculeSystem(){
+  systemOn = !systemOn;
+}
+
+void basculeAffichage(){
+  modeAffichage = (modeAffichage+1)%2;
+}
+
 void setup() {
   Serial.begin(9600);
+  Serial1.begin(9600);
+
+  lcd.init();
+  lcd.backlight();
+  lcd.print("Systeme Pret");
+
+  pinMode(btn1, INPUT_PULLUP);
+  pinMode(btn2, INPUT_PULLUP);
+
+  attachInterrupt(digitalPinToInterrupt(btn1), basculeSystem, FALLING);
+  attachInterrupt(digitalPinToInterrupt(btn2), basculeAffichage, FALLING);
+
   for (byte i = 0; i < 5; i++) {
     pinMode(pinsIR[i], INPUT_PULLUP);
   }
@@ -34,6 +64,7 @@ void setup() {
   servoStock.attach(10);
   servoCommande.attach(9);
 
+  // Position Initiale
   servoScan.write(0);
   servoStock.write(0);
   servoCommande.write(0);
@@ -42,63 +73,97 @@ void setup() {
 }
 
 void loop() {
-  unsigned long tempsActuel = millis();
+  updateLCD();
 
-  for (byte i = 0; i < 5; i++) {
-    byte lecture = digitalRead(pinsIR[i]);
-    byte etatObjet;
-
-    if (lecture == LOW) {
-      etatObjet = 1;
-    } else {
-      etatObjet = 0;
-    }
-
-    if (etatObjet != derniersEtats[i]) {
-      if (tempsActuel - dernierMoment[i] > intervalleDebounce) {
-        
-        Serial.print("Etat Objet: ");
-        Serial.print(etatObjet);
-        
-        if (i == 0) Serial.println(" (ir1: SCAN)");
-        else if (i == 1) 
-            Serial.println(" (ir2: PASSAGE)");
-        else if (i == 2) 
-            Serial.println(" (ir3: STOCK)");
-        else if (i == 3) 
-            Serial.println(" (ir4: COMMANDE)");
-        else if (i == 4) 
-            Serial.println(" (ir5: TEAM)");
-
-        derniersEtats[i] = etatObjet;
-        dernierMoment[i] = tempsActuel;
-      }
-    }
-  }
-
-  if (derniersEtats[0] == 1) {
-    servoScan.write(90);
-  } 
-  
-  if(objetPmul.readTargetOrder(targetOrder)){
-    if (currentOrder.isComplete(targetOrder)) { 
-        servoCommande.write(45);
-        delay(500);
-        servoScan.write(0);
-    } else {
-        servoStock.write(45);
-        delay(500);
-        servoScan.write(0);
-    }
-  }
-
-  if (derniersEtats[2] == 1 || derniersEtats[3] == 1 || derniersEtats[4] == 1){
-    objetPmul.sendOrderDone();
-    delay(300);
+  if(!systemOn){
+    servoScan.write(0);
     servoStock.write(0);
     servoCommande.write(0);
-    derniersEtats[2] = 0;
-    derniersEtats[3] = 0;
-    derniersEtats[4] = 0;
+    etapeActu = 0;
+    return;
+  }
+
+  tempsActuel = millis(); // On prend l'heure actuelle
+
+// Partie 1: Capteurs IR (Test)
+
+  for (byte i = 0; i < 5; i++) {
+    bool lecture = (digitalRead(pinsIR[i]) == LOW);
+
+    // Test monitor pour IRi
+    if (lecture != etatsIR[i]){
+      etatsIR[i] = lecture;
+
+      // Message formaté : "IRx: 1" ou "IRx: 0"
+      Serial.print("IR");
+      Serial.print(i + 1);
+      Serial.print(": ");
+      Serial.println(etatsIR[i] ? "1" : "0");
+    }
+  }
+// Partie 2: Servos Moteurs
+
+  switch(etapeActu) {
+    // Etape Attente
+    case 0:
+      if (etatsIR[0]) {
+        servoScan.write(90);
+        etapeActu = 1;
+      }
+      break;
+
+    // Etape Scan
+    case 1:
+      if (objetPmul.readTargetOrder(targetOrder)){
+        if (targetOrder.teamId != 0 && targetOrder.teamId != 0xFF){
+          servoCommande.write(45);
+          Serial.println("Décision: Commande");
+        } else {
+          servoStock.write(45);
+          Serial.println("Décision: Stock");
+        }
+        tempsDepart = tempsActuel;
+        etapeActu = 2;
+      }
+      break;
+
+    // Etape Aiguillage
+    case 2:
+      if ((tempsActuel - tempsDepart >= attenteServo) && (etatsIR[1] == 0)){
+        servoScan.write(0);
+        etapeActu = 3;
+      }
+      break;
+      
+    // Etape Sortie & Reset
+    case 3:
+      if(etatsIR[2] || etatsIR[3] || etatsIR[4]){
+        objetPmul.sendOrderDone();
+
+        servoStock.write(0);
+        servoCommande.write(0);
+
+        etapeActu = 0;
+      }
+      break;
+  }
+}
+
+void updateLCD(){
+  static unsigned long dernierRefresh = 0;
+  if(millis()-dernierRefresh < 500)
+    return;
+  dernierRefresh = millis();
+
+  lcd.setCursor(0,0);
+  if(!systemOn){
+    lcd.print("MODE:MAINTENANCE");
+    lcd.setCursor(0,1);
+    lcd.print("SYSTEME ARRETE");
+  } else{
+    lcd.print("Total Tries: ");
+    lcd.setCursor(0,1);
+    lcd.print(totalArticlesTries);
+    lcd.print(" articles");
   }
 }
