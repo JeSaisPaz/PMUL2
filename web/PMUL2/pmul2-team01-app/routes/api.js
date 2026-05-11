@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 
-const { PrismaClient, ORDER_STATUS, ITEM_STATUS, DECISION, TEAM } = require("../generated/prisma");
+const { PrismaClient, ORDER_STATUS, ITEM_STATUS, DECISION, TEAM, DECISION_STATUS } = require("../generated/prisma");
 const { PrismaMariaDb } = require("@prisma/adapter-mariadb");
 
 const adapter = new PrismaMariaDb({
@@ -17,7 +17,6 @@ const prisma = new PrismaClient({ adapter });
 
 module.exports = function (io) {
 
-    // Helper to notify all connected clients
     const notifyClients = () => io.emit('db_event');
 
     router.get('/health', (req, res) => {
@@ -40,20 +39,25 @@ module.exports = function (io) {
 
     router.delete('/orders/:id/delete', async function (req, res) {
         try {
-            await prisma.oRDER.delete({
-                where: { id: parseInt(req.params.id) }
+            const order = await prisma.oRDER.findUnique({
+                where: { id: parseInt(req.params.id) },
             });
+
+            if (!order) return res.status(404).json({ error: "Order not found" });
+            if (order.status === ORDER_STATUS.IN_PROCESS) {
+                return res.status(400).json({ error: "Order cannot be deleted" });
+            }
+            await prisma.oRDER.delete({ where: { id: order.id } });
             notifyClients();
             res.sendStatus(204);
         } catch (error) {
-            res.status(500).json({ error: "Deletion error" });
+            res.status(500).json({ error: error.message });
         }
     });
 
     router.post('/neworder', async function (req, res) {
         try {
             const { lines } = req.body;
-            // On verifie que line est bien un array sinon: TypeError: lines.map is not a function !!!
             if (!Array.isArray(lines) || lines.length === 0) {
                 return res.status(400).json({ error: "Order must contain at least one line." });
             }
@@ -71,7 +75,7 @@ module.exports = function (io) {
             notifyClients();
             res.sendStatus(204);
         } catch (error) {
-            res.status(500).json({ error: "Creation error" });
+            res.status(500).json({ error: error.message });
         }
     });
 
@@ -83,7 +87,7 @@ module.exports = function (io) {
             });
 
             if (!order) return res.status(404).json({ error: "Order not found" });
-            if (order.status === "COMPLETED" || order.status === "CANCELLED") {
+            if (order.status === ORDER_STATUS.COMPLETED || order.status === ORDER_STATUS.CANCELLED) {
                 return res.status(400).json({ error: "Order status cannot be changed" });
             }
 
@@ -92,6 +96,10 @@ module.exports = function (io) {
             await prisma.$transaction([
                 prisma.oRDER.update({ where: { id: order.id }, data: { status: ORDER_STATUS.CANCELLED } }),
                 prisma.oRDER_LINE.updateMany({ where: { ORDER_id: order.id }, data: { status: ORDER_STATUS.CANCELLED } }),
+                prisma.iTEM.updateMany({
+                    where: { id: { in: allItems.map(i => i.id) } },
+                    data: { status: ITEM_STATUS.CANCELLED }
+                }),
                 prisma.iTEM_HISTORY.createMany({
                     data: allItems.map(item => ({ ITEM_id: item.id, status: ITEM_STATUS.CANCELLED }))
                 })
@@ -108,17 +116,30 @@ module.exports = function (io) {
         try {
             const id = parseInt(req.params.id);
             const order = await prisma.oRDER.findUnique({
-                where: { id: id },
+                where: { id },
                 include: {
                     ORDER_LINE: {
                         include: {
                             COLOR: { select: { name: true, hex: true } },
-                            ITEM: { select: { id: true } }
+                            ITEM: { select: { id: true, status: true } }
                         }
                     }
                 }
             });
-            res.json(order);
+
+            if (!order) return res.status(404).json({ error: "Order not found" });
+
+            const result = {
+                ...order,
+                ORDER_LINE: order.ORDER_LINE.map(line => ({
+                    ...line,
+                    orderedCount:   line.ITEM.filter(i => i.status === ITEM_STATUS.ORDERED).length,
+                    inProcessCount: line.ITEM.filter(i => i.status === ITEM_STATUS.IN_PROCESS).length,
+                    cancelledCount: line.ITEM.filter(i => i.status === ITEM_STATUS.CANCELLED).length,
+                }))
+            };
+
+            res.json(result);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -130,8 +151,6 @@ module.exports = function (io) {
                 include: {
                     COLOR: { select: { name: true, hex: true } },
                     READ_CYCLE: { select: { scannedAt: true } },
-                    ITEM_HISTORY: { orderBy: { createdAt: 'desc' }, take: 1, select: { status: true } },
-                    SELECTION_HISTORY: { orderBy: { createdAt: 'desc' }, take: 1, select: { status: true } }
                 }
             });
             res.json(items);
@@ -142,11 +161,110 @@ module.exports = function (io) {
 
     router.delete('/items/:id/delete', async function (req, res) {
         try {
-            await prisma.iTEM.delete({ where: { id: parseInt(req.params.id) } });
+            const item = await prisma.iTEM.findUnique({
+                where: { id: parseInt(req.params.id) },
+                include: { ORDER_LINE: { select: { status: true } } }
+            });
+            if (!item) return res.status(404).json({ error: "Item not found" });
+
+            if (item.status === ITEM_STATUS.IN_PROCESS || item.ORDER_LINE?.status === ORDER_STATUS.IN_PROCESS || item.ORDER_LINE?.status === ORDER_STATUS.COMPLETED) {
+                return res.status(400).json({ error: "Item cannot be deleted" });
+            }
+
+            await prisma.iTEM.delete({ where: { id: item.id } });
             notifyClients();
             res.sendStatus(204);
         } catch (error) {
-            res.status(500).json({ error: "Deletion error" });
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    router.patch('/items/:id/status', async function (req, res) {
+        try {
+            const { status } = req.body;
+
+            const item = await prisma.iTEM.findUnique({
+                where: { id: parseInt(req.params.id) },
+                include: {
+                    ORDER_LINE: { include: { ORDER: true } }
+                }
+            });
+
+            if (!item) return res.status(404).json({ error: "Item not found" });
+            if (!Object.values(DECISION_STATUS).includes(status.status)) {
+                return res.status(400).json({ error: "Invalid status" });
+            }
+            if (item.decisionStatus !== DECISION_STATUS.IN_PROCESS || item.status !== ITEM_STATUS.IN_PROCESS) {
+                return res.status(400).json({ error: "Item is not in a processable state" });
+            }
+
+            if (item.decision === DECISION.PASS) {
+                const newStatus = status.status === DECISION_STATUS.CONFIRMED ? ITEM_STATUS.EXTERNAL : ITEM_STATUS.CANCELLED;
+                await prisma.$transaction([
+                    prisma.iTEM.update({ where: { id: item.id }, data: { status: newStatus, decisionStatus: status.status } }),
+                    prisma.iTEM_HISTORY.create({ data: { ITEM_id: item.id, status: newStatus } }),
+                    prisma.sELECTION_HISTORY.create({ data: { ITEM_id: item.id, status: status.status } })
+                ]);
+            }
+
+            else if (item.decision === DECISION.STOCK) {
+                const newStatus = status.status === DECISION_STATUS.CONFIRMED ? ITEM_STATUS.AVAILABLE : ITEM_STATUS.CANCELLED;
+                await prisma.$transaction([
+                    prisma.iTEM.update({ where: { id: item.id }, data: { status: newStatus, decisionStatus: status.status } }),
+                    prisma.iTEM_HISTORY.create({ data: { ITEM_id: item.id, status: newStatus } }),
+                    prisma.sELECTION_HISTORY.create({ data: { ITEM_id: item.id, status: status.status } })
+                ]);
+            }
+
+            else if (item.decision === DECISION.ORDER) {
+                const newStatus = status.status === DECISION_STATUS.CONFIRMED ? ITEM_STATUS.ORDERED : ITEM_STATUS.CANCELLED;
+
+                if (item.ORDER_LINE?.ORDER.status !== ORDER_STATUS.CANCELLED) {
+                    await prisma.$transaction([
+                        prisma.iTEM.update({ where: { id: item.id }, data: { status: newStatus, decisionStatus: status.status } }),
+                        prisma.iTEM_HISTORY.create({ data: { ITEM_id: item.id, status: newStatus } }),
+                        prisma.sELECTION_HISTORY.create({ data: { ITEM_id: item.id, status: status.status } })
+                    ]);
+
+                    const currentLine = await prisma.oRDER_LINE.findUnique({
+                        where: { id: item.ORDER_LINE_id },
+                        include: {
+                            ITEM: { where: { status: ITEM_STATUS.ORDERED } },
+                            ORDER: true
+                        }
+                    });
+
+                    const countOrdered = currentLine.ITEM.length;
+
+                    if (countOrdered >= currentLine.quantity) {
+                        await prisma.oRDER_LINE.update({
+                            where: { id: currentLine.id },
+                            data: { status: ORDER_STATUS.COMPLETED }
+                        });
+
+                        const pendingLines = await prisma.oRDER_LINE.count({
+                            where: { ORDER_id: currentLine.ORDER_id, status: ORDER_STATUS.IN_PROCESS }
+                        });
+
+                        if (pendingLines === 0) {
+                            await prisma.oRDER.update({
+                                where: { id: currentLine.ORDER_id },
+                                data: { status: ORDER_STATUS.COMPLETED, completedAt: new Date() }
+                            });
+                        }
+                    }
+                } else {
+                    await prisma.$transaction([
+                        prisma.iTEM.update({ where: { id: item.id }, data: { status: newStatus, decisionStatus: status.status } }),
+                        prisma.sELECTION_HISTORY.create({ data: { ITEM_id: item.id, status: status.status } })
+                    ]);
+                }
+            }
+
+            notifyClients();
+            res.sendStatus(204);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
         }
     });
 
@@ -162,11 +280,25 @@ module.exports = function (io) {
     });
 
     router.get('/scans', async function (req, res) {
-        const scans = await prisma.rEAD_CYCLE.findMany({
-            include: { ITEM: { include: { COLOR: true } } },
-            orderBy: { scannedAt: 'desc' }
-        });
-        res.json(scans);
+        try {
+            const scans = await prisma.rEAD_CYCLE.findMany({
+                include: { ITEM: { include: { COLOR: true } } },
+                orderBy: { scannedAt: 'desc' }
+            });
+            res.json(scans);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    router.delete('/scans/:id/delete', async function (req, res) {
+        try {
+            await prisma.rEAD_CYCLE.delete({ where: { id: parseInt(req.params.id) } });
+            notifyClients();
+            res.sendStatus(204);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
     });
 
     router.post('/scans', async function (req, res) {
@@ -187,46 +319,36 @@ module.exports = function (io) {
 
                 if (validColor) {
                     if (scan.qrValue === TEAM.TEAM01) {
-                        const orderLineInNeed = await prisma.oRDER_LINE.findFirst({
+                        const orderLines = await prisma.oRDER_LINE.findMany({
                             where: {
                                 COLOR_id: validColor.id,
                                 ORDER: { status: ORDER_STATUS.IN_PROCESS },
-                                status: ORDER_STATUS.IN_PROCESS
+                                status: ORDER_STATUS.IN_PROCESS,
                             },
-                            include: { ITEM: true }
+                            orderBy: { ORDER: { createdAt: 'asc' } },
+                            include: {
+                                ITEM: {
+                                    where: {
+                                        status: { in: [ITEM_STATUS.ORDERED, ITEM_STATUS.IN_PROCESS] }
+                                    }
+                                }
+                            }
                         });
+
+                        const orderLineInNeed = orderLines.find(line => line.ITEM.length < line.quantity) ?? null;
+                        const hasRoom = orderLineInNeed !== null;
 
                         await prisma.iTEM.create({
                             data: {
                                 team: scan.qrValue,
-                                decision: orderLineInNeed ? "ORDER" : "STOCK",
+                                decision: hasRoom ? DECISION.ORDER : DECISION.STOCK,
                                 COLOR_id: validColor.id,
                                 READ_CYCLE_id: readCycle.id,
-                                ORDER_LINE_id: orderLineInNeed ? orderLineInNeed.id : null,
+                                ORDER_LINE_id: hasRoom ? orderLineInNeed.id : null,
                                 ITEM_HISTORY: { create: {} },
                                 SELECTION_HISTORY: { create: {} }
                             }
                         });
-
-                        if (orderLineInNeed) {
-                            await prisma.oRDER_LINE.update({
-                                where: { id: orderLineInNeed.id },
-                                data: {
-                                    status: orderLineInNeed.ITEM.length + 1 >= orderLineInNeed.quantity ? ORDER_STATUS.COMPLETED : ORDER_STATUS.IN_PROCESS
-                                }
-                            });
-
-                            const pendingLines = await prisma.oRDER_LINE.count({
-                                where: { ORDER_id: orderLineInNeed.ORDER_id, status: ORDER_STATUS.IN_PROCESS }
-                            });
-
-                            if (pendingLines === 0) {
-                                await prisma.oRDER.update({
-                                    where: { id: orderLineInNeed.ORDER_id },
-                                    data: { status: ORDER_STATUS.COMPLETED, completedAt: new Date() }
-                                });
-                            }
-                        }
                     } else {
                         await prisma.iTEM.create({
                             data: {
@@ -241,6 +363,7 @@ module.exports = function (io) {
                     }
                 }
             }
+
             notifyClients();
             res.sendStatus(204);
         } catch (error) {

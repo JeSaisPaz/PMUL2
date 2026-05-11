@@ -16,6 +16,7 @@
                 <th>Value</th>
                 <th>Item</th>
                 <th>Decision</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody></tbody>
@@ -40,7 +41,8 @@ $(document).ready(function() {
                 render: (id) => `<span class="fw-bold text-body">#${id}</span>`
             },
             { 
-                data: 'qrValue'
+                data: 'qrValue',
+                render: (data) => data && data.length > 10 ? 'Too long' : (data ?? '---')
             },
             { 
                 data: 'hue'
@@ -70,6 +72,10 @@ $(document).ready(function() {
                     const badge = classes[item.decision] ?? 'bg-secondary'
                     return `<span class="badge rounded-pill ${badge}">${item.decision}</span>`
                 }
+            },
+            {
+                data: 'id',
+                render: (id) => `<button class="btn btn-sm btn-danger" onclick="deleteScan(${id})">Delete</button>`
             }
         ],
         order: [[0, 'desc']]
@@ -79,5 +85,11 @@ $(document).ready(function() {
         table.ajax.reload(null, false); 
     });
 });
+
+async function deleteScan(id) {
+    if (confirm('Delete scan #' + id + ' ?')) {
+        await fetch(`/api/scans/${id}/delete`, { method: 'DELETE' });
+    }
+}
 </script>
 {% endblock %}

@@ -1,7 +1,7 @@
 {% extends "layout.twig" %}
 
 {% block body %}
-<div class="table-responsive p-3" x-data="orderDetails">
+<div class="table-responsive p-3" x-data="orderDetails({{id}})">
     <div>
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h1>Order #<span x-text="order.id"></span></h1>
@@ -20,7 +20,9 @@
                     <th>Color</th>
                     <th class="text-center">Received / Requested</th>
                     <th>Status</th>
-                    <th>Assigned items (Tracking)</th>
+                    <th>Pending</th>
+                    <th>Received</th>
+                    <th>Cancelled</th>
                 </tr>
             </thead>
             <tbody>
@@ -28,38 +30,47 @@
                     <tr>
                         <td class="fw-bold">
                             <div class="d-flex align-items-center">
-                                <span 
-                                    class="p-2 border rounded-circle me-2" 
-                                    :style="{ backgroundColor: line.COLOR.hex }">
-                                </span>
+                                <span class="p-2 border rounded-circle me-2" :style="{ backgroundColor: line.COLOR.hex }"></span>
                                 <span x-text="line.COLOR.name"></span>
                             </div>
                         </td>
                         <td class="text-center">
                             <span class="badge rounded-pill" 
-                                    :class="line.ITEM.length == line.quantity ? 'bg-success' : 'bg-warning text-dark'">
-                                <span x-text="line.ITEM.length"></span> / <span x-text="line.quantity"></span>
+                                :class="line.orderedCount >= line.quantity ? 'bg-success' : 'bg-warning text-dark'">
+                                <span x-text="line.orderedCount"></span> / <span x-text="line.quantity"></span>
                             </span>
                         </td>
                         <td>
                             <span class="badge rounded-pill" x-text="line.status" 
                                 :class="{
-                                'bg-success' : line.status === 'COMPLETED',
-                                'bg-danger' : line.status === 'CANCELLED',
-                                'bg-info' : line.status === 'IN_PROCESS'
+                                    'bg-success' : line.status === 'COMPLETED',
+                                    'bg-danger'  : line.status === 'CANCELLED',
+                                    'bg-info'    : line.status === 'IN_PROCESS'
                                 }">
                             </span>
                         </td>
                         <td>
-                            <!-- Liens vers la future page de tracking d'item -->
                             <div class="d-flex flex-wrap gap-1">
-                                <template x-for="item in line.ITEM" :key="item.id">
-                                    <a :href="'/items/' + item.id" 
-                                        class="btn btn-sm btn-outline-primary">
-                                        #<span x-text="item.id"></span>
-                                    </a>
+                                <template x-for="item in line.ITEM.filter(i => i.status === 'IN_PROCESS')" :key="item.id">
+                                    <a :href="'/items/' + item.id" class="btn btn-sm btn-outline-info">#<span x-text="item.id"></span></a>
                                 </template>
-                                <span x-show="line.ITEM.length === 0" class="text-muted small">Empty</span>
+                                <span x-show="line.inProcessCount === 0" class="text-muted small">—</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-1">
+                                <template x-for="item in line.ITEM.filter(i => i.status === 'ORDERED')" :key="item.id">
+                                    <a :href="'/items/' + item.id" class="btn btn-sm btn-outline-success">#<span x-text="item.id"></span></a>
+                                </template>
+                                <span x-show="line.orderedCount === 0" class="text-muted small">—</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-1">
+                                <template x-for="item in line.ITEM.filter(i => i.status === 'CANCELLED')" :key="item.id">
+                                    <a :href="'/items/' + item.id" class="btn btn-sm btn-outline-danger">#<span x-text="item.id"></span></a>
+                                </template>
+                                <span x-show="line.ITEM.filter(i => i.status === 'CANCELLED').length === 0" class="text-muted small">—</span>
                             </div>
                         </td>
                     </tr>
@@ -73,23 +84,31 @@
         <div class="spinner-border text-primary" role="status"></div>
         <p>Loading...</p>
     </div>
-    <a href="/orders" class="btn btn-outline-secondary mb-3">← Return</a>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <a href="/orders" class="btn">← Return</a>
+        <button x-show="order.status == 'IN_PROCESS'" class="btn btn-danger" @click="cancelOrder()">Cancel</button>
+    </div>
 </div>
 
 <script>
 document.addEventListener('alpine:init', () => {
-    Alpine.data('orderDetails', () => ({
+    Alpine.data('orderDetails', (orderId) => ({
         order: null,
 
         async fetchDetails() {
-            //on extrait l'id de l'url
-            const id = window.location.pathname.split('/').pop();
             try {
-                const response = await fetch(`/api/orders/${id}/details`);
-                if (!response.ok) throw new Error("Erreur réseau");
+                const response = await fetch(`/api/orders/${orderId}/details`);
+                if (!response.ok) throw new Error("Error : ${response.status}");
                 this.order = await response.json();
-            } catch (e) {
-                console.error("Erreur lors du rafraîchissement :", e);
+            } catch (error) {
+                console.error("Reload error : ", error);
+            }
+        },
+        async cancelOrder() {
+            if (confirm('Cancel order #' + this.order.id + ' ?')) {
+                await fetch(`/api/orders/${this.order.id}/cancel`, { 
+                    method: 'PATCH',
+                });
             }
         },
 

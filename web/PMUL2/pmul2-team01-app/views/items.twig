@@ -55,8 +55,8 @@ $(document).ready(function() {
                 data: 'team'
             },
             {
-                data: 'ITEM_HISTORY',
-                render: (history) => {
+                data: 'status',
+                render: (status) => {
                     const badges = {
                         'AVAILABLE':  'bg-success',
                         'EXTERNAL':  'bg-warning',
@@ -64,23 +64,23 @@ $(document).ready(function() {
                         'ORDERED':  'bg-primary',
                         'CANCELLED':  'bg-danger',
                     }
-                    const badge = badges[history[0].status] ?? 'bg-secondary'
-                    return `<span class="badge rounded-pill ${badge}">${history[0].status}</span>`
+                    const badge = badges[status] ?? 'bg-secondary'
+                    return `<span class="badge rounded-pill ${badge}">${status}</span>`
                 }
             },
             { 
                 data: 'decision'
             },
             {
-                data: 'SELECTION_HISTORY',
-                render: (history) => {
+                data: 'decisionStatus',
+                render: (status) => {
                     const badges = {
                         'CONFIRMED':  'bg-success',
                         'FAILED':  'bg-danger',
                         'IN_PROCESS': 'bg-info',
                     }
-                    const badge = badges[history[0].status] ?? 'bg-secondary'
-                    return `<span class="badge rounded-pill ${badge}">${history[0].status}</span>`
+                    const badge = badges[status] ?? 'bg-secondary'
+                    return `<span class="badge rounded-pill ${badge}">${status}</span>`
                 }
             },
             {

@@ -12,6 +12,8 @@ model ITEM {
   team              TEAM
   decision          DECISION
   orderedAt         DateTime?                 @db.Timestamp(0)
+  status            ITEM_STATUS               @default(IN_PROCESS)
+  decisionStatus    DECISION_STATUS           @default(IN_PROCESS)
   COLOR_id          Int
   READ_CYCLE_id     Int?                       @unique
   ORDER_LINE_id     Int?
@@ -76,7 +78,7 @@ model ORDER_LINE {
 model READ_CYCLE {
   id              Int                         @id @default(autoincrement())
   scannedAt       DateTime                    @default(now()) @db.Timestamp(0)
-  qrValue         String                      @db.VarChar(255)
+  qrValue         String                      @db.Text
   hue             Int
   saturation      Int
   value           Int
