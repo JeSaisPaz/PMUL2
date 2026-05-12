@@ -13,7 +13,7 @@ services:
       - nt-pmul2
 
   phpmyadmin :
-    image: phpmyadmin/phpmyadmin:latest
+    image: arm64v8/phpmyadmin:latest
     container_name: pmul2_phpmyadmin
     restart: always
     env_file:
