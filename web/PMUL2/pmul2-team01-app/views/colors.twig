@@ -1,0 +1,69 @@
+{% extends "layout.twig" %}
+
+{% block body %}
+<div class="table-responsive p-3">
+    <div class="d-flex justify-content-between mb-3">
+        <h1>{{title}}</h1>
+    </div>
+    <table id="colorsTable" class="table table-striped border">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Colors</th>
+                <th>Hex Code</th>
+                <th>Hue Range</th>
+                <th>Saturation Range</th>
+                <th>Value Range</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+$(document).ready(function() {
+    const table = $('#colorsTable').DataTable({
+        ajax: { 
+            url: '/api/colors', 
+            dataSrc: '' 
+        },
+        autoWidth: false,
+        columns: [
+            { 
+                data: 'id',
+                render: (id) => `<span class="fw-bold text-body">#${id}</span>`
+            },
+            {
+                render: (data, type, row) => {
+                    return `<div class="d-flex align-items-center">
+                                <span class="p-2 border rounded-circle me-2" style="background-color: ${row.hex};"></span>
+                                <span">${row.name}</span>
+                            </div>`
+                }
+            },
+            { 
+                data: 'hex',
+                render: (hex) => `<code>${hex}</code>`
+            },
+            { 
+                //hue
+                render: (data, type, row) => `${row.hueMin} - ${row.hueMax}`
+            },
+            { 
+                //saturation
+                render: (data, type, row) => `${row.saturationMin} - ${row.saturationMax}`
+            },
+            { 
+                //value
+                render: (data, type, row) => `${row.valueMin} - ${row.valueMax}`
+            }
+        ],
+        order: [[0, 'asc']]
+    });
+
+    socket.on('db_event', function() {
+        table.ajax.reload(null, false); 
+    });
+});
+</script>
+{% endblock %}

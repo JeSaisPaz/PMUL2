@@ -2,14 +2,15 @@ var express = require('express');
 var router = express.Router();
 
 const { PrismaClient, ORDER_STATUS, ITEM_STATUS, DECISION, TEAM, DECISION_STATUS } = require("../generated/prisma");
-const { PrismaMariaDb } = require("@prisma/adapter-mariadb");
 
+require("dotenv").config();
+const { PrismaMariaDb } = require("@prisma/adapter-mariadb");
 const adapter = new PrismaMariaDb({
-    host: "192.168.1.167",
-    user: "team01",
-    password: "team01-thebestone",
-    database: "team01-database",
-    port: 3307,
+    host: "mysql",
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD,
+    database: process.env.MYSQL_DATABASE,
+    port: 3306,
     connectionLimit: 5,
 });
 
@@ -225,7 +226,6 @@ module.exports = function (io) {
                         prisma.iTEM_HISTORY.create({ data: { ITEM_id: item.id, status: newStatus } }),
                         prisma.sELECTION_HISTORY.create({ data: { ITEM_id: item.id, status: status.status } })
                     ]);
-
                     const currentLine = await prisma.oRDER_LINE.findUnique({
                         where: { id: item.ORDER_LINE_id },
                         include: {
@@ -270,9 +270,7 @@ module.exports = function (io) {
 
     router.get('/colors', async function (req, res) {
         try {
-            const colors = await prisma.cOLOR.findMany({
-                select: { name: true, hex: true, id: true }
-            });
+            const colors = await prisma.cOLOR.findMany();
             res.json(colors);
         } catch (error) {
             res.status(500).json({ error: error.message });
