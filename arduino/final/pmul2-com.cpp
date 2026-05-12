@@ -90,8 +90,9 @@ void Pmul2Com::sendScanNeeded() {
 }
 
 void Pmul2Com::sendPong() {
-    // Packet ID 0x00: reponse au ping de diag
-    _transfer.sendData(0, PID_PING);
+    // Packet ID 0x00: reponse au ping de diag (1 byte, pas 0 sinon rejete)
+    _transfer.packet.txBuff[0] = 0x01;
+    _transfer.sendData(1, PID_PING);
 }
 
 // --- Lecture de donnees depuis le Raspberry Pi ---

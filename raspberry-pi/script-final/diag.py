@@ -32,8 +32,8 @@ if port:
         time.sleep(3)  # le MEGA met ~2s a booter apres reset USB
         st = SerialTransfer(s)
 
-        # envoie le ping (PID_PING, payload vide)
-        st.send(SerialTransfer.PID_PING, b"")
+        # envoie le ping (PID_PING, 1 byte — 0 bytes est rejete par SerialTransfer)
+        st.send(SerialTransfer.PID_PING, b"\x01")
 
         # attend la reponse (max 4 sec, retry toutes les 1.5s)
         ok = False
