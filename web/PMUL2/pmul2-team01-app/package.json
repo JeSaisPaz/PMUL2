@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "node ./bin/www",
-    "dev": "nodemon -e js, twig ./bin/www"
+    "dev": "nodemon -L -e js, twig ./bin/www"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.8.0",

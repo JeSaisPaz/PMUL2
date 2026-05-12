@@ -4,16 +4,12 @@ services:
     container_name: pmul2_db
     volumes:
       - db_pmul2_data:/var/lib/mysql
-
     env_file:
       - db_pmul2.env
-
-    #port ouvert temporaire le temps de faire des test (pull diagram EER)
-    ports:
-      - "3307:3306"
-
     environment:
       - TZ=Europe/Brussels
+    networks:
+      - nt-pmul2
 
   phpmyadmin :
     image: phpmyadmin/phpmyadmin:latest
@@ -26,6 +22,30 @@ services:
       - "8080:80"
     environment:
       - TZ=Europe/Brussels
+    networks:
+      - nt-pmul2
+
+  app:
+    image: node:latest
+    container_name: pmul2_app
+    user: node
+    working_dir: /home/node/app
+    volumes:
+      - ./pmul2-team01-app:/home/node/app
+      #- /home/node/app/node_modules       #volume anonyme pour node module
+    command: ["bash", "./boot.sh"]
+    expose:
+      - 3000
+    ports:
+      - "3000:3000"
+    env_file:
+      - db_pmul2.env
+    networks:
+      - nt-pmul2
+
+networks:
+  nt-pmul2:
+    driver: bridge
 
 volumes:
   db_pmul2_data:
