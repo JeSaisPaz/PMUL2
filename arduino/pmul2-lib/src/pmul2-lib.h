@@ -38,6 +38,10 @@ class Pmul2Lib {
         void sendReady();
         // envoie qu'un bloc est en position de scan
         void sendScanNeeded();
+        // diag: repond pong a un ping
+        void sendPong();
+        // diag: si un ping est dans le buffer, renvoie un pong
+        bool handlePing();
         
         // Lecture depuis le raspberry
         // lit une information envoyée par le Raspberry Pi

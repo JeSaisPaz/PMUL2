@@ -77,6 +77,9 @@ void setup() {
 void loop() {
   updateLCD();
 
+  // diag: toujours ecouter les pings
+  objetPmul.handlePing();
+
   if(!systemOn){
     servoScan.write(0);
     servoStock.write(0);

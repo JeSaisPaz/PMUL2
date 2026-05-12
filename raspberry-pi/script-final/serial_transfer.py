@@ -11,6 +11,7 @@ class SerialTransfer:
     MAX_PACKET_SIZE = 0xFE  # 254 bytes max de payload
 
     # IDs des packets (miroir de pmul2-com.h)
+    PID_PING         = 0x00  # diag: ping/pong
     PID_TARGET_ORDER = 0x01  # Commande a executer
     PID_BLOCK_INFO   = 0x02  # Info d'un block scanne
     PID_ORDER_UPDATE = 0x03  # Mise a jour de la progression
