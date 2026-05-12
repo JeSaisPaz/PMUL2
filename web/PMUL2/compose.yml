@@ -2,6 +2,7 @@ services:
   mysql:
     image: mysql:latest
     container_name: pmul2_db
+    restart: always
     volumes:
       - db_pmul2_data:/var/lib/mysql
     env_file:
@@ -14,6 +15,7 @@ services:
   phpmyadmin :
     image: phpmyadmin/phpmyadmin:latest
     container_name: pmul2_phpmyadmin
+    restart: always
     env_file:
       - db_pmul2.env
     depends_on: 
@@ -29,6 +31,7 @@ services:
     image: node:latest
     container_name: pmul2_app
     user: node
+    restart: always
     working_dir: /home/node/app
     volumes:
       - ./pmul2-team01-app:/home/node/app
