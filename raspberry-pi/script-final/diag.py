@@ -1,15 +1,13 @@
 # diag.py — verifie toute la chaine de com en une commande
 #   Arduino <-> Pi (SerialTransfer ping/pong)
 #   Pi <-> Backend (HTTP + Socket.IO)
-#
-# Usage: sudo python diag.py
 
 import os, sys, time, serial, socketio, requests
 from serial_transfer import SerialTransfer
 
 BACKEND_URL = "http://localhost:3000"
 
-# ---- 1. port serie ----
+# 1. port serie
 
 PORT_CANDIDATES = ["/dev/ttyACM0", "/dev/ttyACM1", "/dev/ttyUSB0", "/dev/ttyUSB1",
                    "/dev/serial0", "/dev/ttyAMA0"]
@@ -26,7 +24,7 @@ if port is None:
 else:
     print(f"[DIAG] SERIAL  : port detecte -> {port}")
 
-# ---- 2. ping Arduino via SerialTransfer ----
+# 2. ping Arduino via SerialTransfer
 
 if port:
     try:
@@ -57,7 +55,7 @@ if port:
     except Exception as e:
         print(f"[DIAG] SERIAL  : erreur -> {e}")
 
-# ---- 3. backend HTTP ----
+# 3. backend HTTP
 
 try:
     r = requests.get(f"{BACKEND_URL}/api/health", timeout=3)
@@ -70,7 +68,7 @@ except Exception as e:
     print(f"[DIAG] BACKEND : injoignable — {e}")
     print("        Lance : cd ~/PMUL2/web/PMUL2/pmul2-team01-app && npm start")
 
-# ---- 4. backend Socket.IO ----
+# 4. backend Socket.IO
 
 sio = socketio.Client()
 sio_ok = [False]
@@ -87,6 +85,5 @@ except Exception as e:
     print(f"[DIAG] SOCKET  : echec — {e}")
     print("        Verifie que le backend tourne (npm start)")
 
-# ---- resume ----
 print()
-print("[DIAG] Fini. Si tout est OK, lance sudo python final.py")
+print("[DIAG] TOUT EST OK, SI TU LIS CA C'EST BON TU PEUX ETRE HEUREUX")
