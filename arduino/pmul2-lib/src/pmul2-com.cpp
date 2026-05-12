@@ -158,9 +158,15 @@ Pmul2Com::FrameType Pmul2Com::readFrame(Order& order, Color& color, Team& team) 
         return FrameType::NONE;
     }
 
-    if (_stream.read() != START_BYTE) {
+    // on regarde le START_BYTE sans le consommer pour pas le perdre
+    // si le reste de la trame est pas encore arrive
+    if (_stream.peek() != START_BYTE) {
+        _stream.read(); // on jette le byte foireux pour pas rester bloque
         return FrameType::NONE;
     }
+
+    // START_BYTE confirme, on le consomme pour pouvoir peek le discriminateur
+    _stream.read();
 
     // on peek le 2e byte pour savoir quel type de trame on a
     int peeked = _stream.peek();
@@ -200,6 +206,14 @@ Pmul2Com::FrameType Pmul2Com::readFrame(Order& order, Color& color, Team& team) 
         order.magentaAmount = magentaTarget;
 
         return FrameType::TARGET_ORDER;
+    }
+
+    // le discriminateur d'un BlockInfo doit etre une couleur valide
+    // on verifie AVANT de consommer plus de bytes pour eviter de corrompre le stream
+    if (discriminator != static_cast<uint8_t>(Color::Yellow) &&
+        discriminator != static_cast<uint8_t>(Color::Blue) &&
+        discriminator != static_cast<uint8_t>(Color::Magenta)) {
+        return FrameType::NONE;
     }
 
     // c'est un BlockInfo: [START][color][team][END] = 4 bytes
