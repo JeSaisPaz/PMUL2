@@ -89,6 +89,11 @@ void Pmul2Com::sendScanNeeded() {
     _transfer.sendData(1, PID_STATUS);
 }
 
+void Pmul2Com::sendPong() {
+    // Packet ID 0x00: reponse au ping de diag
+    _transfer.sendData(0, PID_PING);
+}
+
 // --- Lecture de donnees depuis le Raspberry Pi ---
 
 bool Pmul2Com::readTargetOrder(Order& order) {
@@ -218,4 +223,14 @@ Pmul2Com::FrameType Pmul2Com::readFrame(Order& order, Color& color, Team& team) 
             _consumePacket();
             return FrameType::NONE;
     }
+}
+
+bool Pmul2Com::handlePing() {
+    _poll();
+    if (_packetReady && _lastPacketID == PID_PING) {
+        _consumePacket();
+        sendPong();
+        return true;
+    }
+    return false;
 }

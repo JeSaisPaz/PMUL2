@@ -15,6 +15,7 @@ class Pmul2Com {
         };
 
         // IDs des packets pour SerialTransfer
+        static const uint8_t PID_PING         = 0x00; // diag: ping/pong
         static const uint8_t PID_TARGET_ORDER = 0x01; // Commande a executer
         static const uint8_t PID_BLOCK_INFO   = 0x02; // Info d'un block scanne
         static const uint8_t PID_ORDER_UPDATE = 0x03; // Mise a jour de la progression
@@ -41,6 +42,9 @@ class Pmul2Com {
         // Signale au Pi qu'un bloc est en position de scan (IR1 declenche)
         void sendScanNeeded();
 
+        // diag: repond pong a un ping
+        void sendPong();
+
         // lire une commande envoyee par le raspberry pi
         bool readTargetOrder(Order& order);
 
@@ -49,6 +53,9 @@ class Pmul2Com {
 
         // dispatcheur: lit n'importe quelle trame entrante et retourne son type
         FrameType readFrame(Order& order, Color& color, Team& team);
+
+        // diag: si un ping est dans le buffer, renvoie un pong
+        bool handlePing();
 
     private:
         Stream& _stream;
