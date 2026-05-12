@@ -16,7 +16,7 @@ const adapter = new PrismaMariaDb({
 
 const prisma = new PrismaClient({ adapter });
 
-module.exports = function (io) {
+module.exports = function (io, piBridge) {
 
     const notifyClients = () => io.emit('db_event');
 
@@ -63,7 +63,7 @@ module.exports = function (io) {
                 return res.status(400).json({ error: "Order must contain at least one line." });
             }
 
-            await prisma.oRDER.create({
+            var newOrder = await prisma.oRDER.create({
                 data: {
                     ORDER_LINE: {
                         create: lines.map(line => ({
@@ -74,6 +74,7 @@ module.exports = function (io) {
                 }
             });
             notifyClients();
+            piBridge.trySendOrder(newOrder.id); // on balance la commande au Pi (ou dans sa file d'attente)
             res.sendStatus(204);
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -107,6 +108,7 @@ module.exports = function (io) {
             ]);
 
             notifyClients();
+            piBridge.trySendOrder(); // si la commande annulee bloquait la file
             res.sendStatus(204);
         } catch (error) {
             res.status(500).json(error.message);

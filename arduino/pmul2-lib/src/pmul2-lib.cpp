@@ -41,6 +41,10 @@ void Pmul2Lib::sendReady() {
     _com.sendReady();
 }
 
+void Pmul2Lib::sendScanNeeded() {
+    _com.sendScanNeeded();
+}
+
 
 bool Pmul2Lib::readTargetOrder(Order& order) {
     return _com.readTargetOrder(order);

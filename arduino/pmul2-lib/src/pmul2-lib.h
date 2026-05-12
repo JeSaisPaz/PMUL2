@@ -36,6 +36,8 @@ class Pmul2Lib {
         void sendBusy();
         // envoie que l'arduino est disponible
         void sendReady();
+        // envoie qu'un bloc est en position de scan
+        void sendScanNeeded();
         
         // Lecture depuis le raspberry
         // lit une information envoyée par le Raspberry Pi

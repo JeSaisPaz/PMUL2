@@ -12,8 +12,8 @@ volatile bool systemOn = true;
 volatile byte modeAffichage = 0;
 int totalArticlesTries = 0;
 
-// Utilise Seriall1 pour la com avec Rasberry Pi pins 18 et 19 de Mega
-Pmul2Lib objetPmul(Serial1);
+// Com Raspberry Pi via USB (Serial = port USB natif du MEGA)
+Pmul2Lib objetPmul(Serial);
 Order targetOrder;
 Order currentOrder;
 Color detectedBlockColor;
@@ -45,8 +45,8 @@ void basculeAffichage(){
 }
 
 void setup() {
-  Serial.begin(9600);
-  Serial1.begin(9600);
+  Serial.begin(9600);   // protocole SerialTransfer vers Raspberry Pi
+  Serial1.begin(9600);  // debug (pins 18/19, optionnel)
 
   lcd.init();
   lcd.backlight();
@@ -71,7 +71,7 @@ void setup() {
   servoStock.write(0);
   servoCommande.write(0);
 
-  Serial.println("--- Processus en Marche ---");
+  Serial1.println("--- Processus en Marche ---");
 }
 
 void loop() {
@@ -97,10 +97,10 @@ void loop() {
       etatsIR[i] = lecture;
 
       // Message formaté : "IRx: 1" ou "IRx: 0"
-      Serial.print("IR");
-      Serial.print(i + 1);
-      Serial.print(": ");
-      Serial.println(etatsIR[i] ? "1" : "0");
+      Serial1.print("IR");
+      Serial1.print(i + 1);
+      Serial1.print(": ");
+      Serial1.println(etatsIR[i] ? "1" : "0");
     }
   }
 // Partie 2: Servos Moteurs
@@ -111,14 +111,14 @@ void loop() {
       if (objetPmul.readTargetOrder(targetOrder)) {
         currentOrder.teamId = targetOrder.teamId;
         currentOrder.reset();
-        Serial.print("Nouvelle commande: Team ");
-        Serial.print(targetOrder.teamId);
-        Serial.print(" Cible B=");
-        Serial.print(targetOrder.blueAmount);
-        Serial.print(" Y=");
-        Serial.print(targetOrder.yellowAmount);
-        Serial.print(" M=");
-        Serial.println(targetOrder.magentaAmount);
+        Serial1.print("Nouvelle commande: Team ");
+        Serial1.print(targetOrder.teamId);
+        Serial1.print(" Cible B=");
+        Serial1.print(targetOrder.blueAmount);
+        Serial1.print(" Y=");
+        Serial1.print(targetOrder.yellowAmount);
+        Serial1.print(" M=");
+        Serial1.println(targetOrder.magentaAmount);
       }
       if (etatsIR[0]) {
         servoScan.write(90);
@@ -127,25 +127,32 @@ void loop() {
       break;
 
     // Etape Scan
-    case 1:
+    case 1: {
+      static bool scanRequested = false;
+      if (!scanRequested) {
+        objetPmul.sendScanNeeded(); // dit au Pi de scanner maintenant
+        scanRequested = true;
+      }
       if (objetPmul.readBlockInfo(detectedBlockColor, detectedBlockTeam)){
-        Serial.print("Block detecte: Couleur=");
-        Serial.print(static_cast<int>(detectedBlockColor));
-        Serial.print(" Team=");
-        Serial.println(static_cast<int>(detectedBlockTeam));
+        scanRequested = false;
+        Serial1.print("Block detecte: Couleur=");
+        Serial1.print(static_cast<int>(detectedBlockColor));
+        Serial1.print(" Team=");
+        Serial1.println(static_cast<int>(detectedBlockTeam));
 
         if (detectedBlockTeam != Team::TeamUnknown){
           servoCommande.write(45);
-          Serial.println("Decision: Commande");
+          Serial1.println("Decision: Commande");
           currentBlockForOrder = true;
         } else {
           servoStock.write(45);
-          Serial.println("Decision: Stock");
+          Serial1.println("Decision: Stock");
           currentBlockForOrder = false;
         }
         tempsDepart = tempsActuel;
         etapeActu = 2;
       }
+      }  // fin du bloc case 1
       break;
 
     // Etape Aiguillage
@@ -163,16 +170,16 @@ void loop() {
           currentOrder.addBox(detectedBlockColor);
           totalArticlesTries++;
 
-          Serial.print("Progres: B=");
-          Serial.print(currentOrder.blueAmount);
-          Serial.print(" Y=");
-          Serial.print(currentOrder.yellowAmount);
-          Serial.print(" M=");
-          Serial.println(currentOrder.magentaAmount);
+          Serial1.print("Progres: B=");
+          Serial1.print(currentOrder.blueAmount);
+          Serial1.print(" Y=");
+          Serial1.print(currentOrder.yellowAmount);
+          Serial1.print(" M=");
+          Serial1.println(currentOrder.magentaAmount);
 
           if (currentOrder.isComplete(targetOrder)) {
             objetPmul.sendOrderDone();
-            Serial.println(">>> COMMANDE TERMINEE <<<");
+            Serial1.println(">>> COMMANDE TERMINEE <<<");
             currentOrder.reset();
           } else {
             objetPmul.sendOrder(currentOrder);

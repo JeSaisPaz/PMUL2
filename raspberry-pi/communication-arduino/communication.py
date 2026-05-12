@@ -4,8 +4,8 @@ import serial
 import time
 
 # Arguments: Port serie (GPIO sur le raspberry) et bande
-# Note: '/dev/ttyACM0' si par USB
-s = serial.Serial('/dev/serial0', 9600)
+# Note: '/dev/ttyACM0' si par USB (verifier avec: ls /dev/tty*)
+s = serial.Serial('/dev/ttyACM0', 9600)
 # Temps de delai pour que la connexion serie soit bien etablie
 time.sleep(2) 
 
