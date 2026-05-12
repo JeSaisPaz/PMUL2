@@ -19,7 +19,8 @@ from serial_transfer import SerialTransfer
 
 # --- config a adapter selon le setup ---
 BAUD         = 9600
-PORT         = "/dev/ttyACM0"   # USB (verifier avec: ls /dev/tty*)
+# essaye d'abord l'USB, puis /dev/serial0, puis /dev/ttyAMA0
+PORT_CANDIDATES = ["/dev/ttyACM0", "/dev/ttyACM1", "/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/serial0", "/dev/ttyAMA0"]
 BACKEND_URL  = "http://localhost:3000"
 
 # --- les memes valeurs que dans pmul2-colors.h ---
@@ -48,8 +49,23 @@ class Team:
 
 COLOR_NAMES = {Color.YELLOW: "Jaune", Color.BLUE: "Bleu", Color.MAGENTA: "Magenta"}
 
-# --- init serie + SerialTransfer ---
-s = serial.Serial(PORT, BAUD)
+# --- init serie + SerialTransfer (auto-detect du port) ---
+import os
+
+port = None
+for candidate in PORT_CANDIDATES:
+    if os.path.exists(candidate):
+        port = candidate
+        break
+
+if port is None:
+    print("[!] Aucun port serie trouve. Essayes:")
+    print("    ls /dev/ttyACM* /dev/ttyUSB* /dev/ttyAMA* /dev/serial*")
+    print("    dmesg | grep -i tty | tail -10")
+    sys.exit(1)
+
+print(f"[SERIAL] Connexion sur {port}")
+s = serial.Serial(port, BAUD)
 time.sleep(2)  # on laisse le temps a la connexion de s'etablir
 st = SerialTransfer(s)
 
