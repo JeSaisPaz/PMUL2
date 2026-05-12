@@ -18,9 +18,28 @@ if not PORT:
     sys.exit(1)
 
 print(f"Port: {PORT}")
-print("Ouverture... (attend 4s pour boot Arduino)")
+print("Ouverture...")
 s = serial.Serial(PORT, 9600, timeout=0.5)
-time.sleep(4)
+
+# attend le 'R' de ready du boot Arduino (evite de parler au bootloader)
+print("Attente du signal READY de l'Arduino...")
+t0 = time.time()
+ready = False
+while time.time() - t0 < 10:
+    if s.in_waiting:
+        b = s.read(1)
+        if b == b'R':
+            ready = True
+            print("Arduino pret !")
+            break
+        # jette tout autre byte (bruit bootloader)
+    time.sleep(0.1)
+
+if not ready:
+    print("Arduino n'a pas envoye 'R' — branche ? flash ?")
+    s.close()
+    sys.exit(1)
+
 st = SerialTransfer(s)
 
 print("Envoi ping...")

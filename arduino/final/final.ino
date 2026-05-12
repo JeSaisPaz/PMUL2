@@ -72,6 +72,9 @@ void setup() {
   servoCommande.write(0);
 
   Serial1.println("--- Processus en Marche ---");
+
+  // dit au Pi qu'on est pret (un seul byte pour pas polluer le stream)
+  Serial.write('R');
 }
 
 void loop() {
