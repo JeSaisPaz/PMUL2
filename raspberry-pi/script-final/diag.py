@@ -29,21 +29,25 @@ else:
 if port:
     try:
         s = serial.Serial(port, 9600, timeout=1)
-        time.sleep(1)
+        time.sleep(3)  # le MEGA met ~2s a booter apres reset USB
         st = SerialTransfer(s)
 
         # envoie le ping (PID_PING, payload vide)
         st.send(SerialTransfer.PID_PING, b"")
 
-        # attend la reponse (max 2 sec)
-        t0 = time.time()
+        # attend la reponse (max 4 sec, retry toutes les 1.5s)
         ok = False
-        while time.time() - t0 < 2:
-            result = st.available()
-            if result and result[0] == SerialTransfer.PID_PING:
-                ok = True
+        for attempt in range(3):
+            st.send(SerialTransfer.PID_PING, b"")
+            t0 = time.time()
+            while time.time() - t0 < 1.5:
+                result = st.available()
+                if result and result[0] == SerialTransfer.PID_PING:
+                    ok = True
+                    break
+                time.sleep(0.05)
+            if ok:
                 break
-            time.sleep(0.05)
 
         if ok:
             print("[DIAG] ARDUINO : pong recu !")
