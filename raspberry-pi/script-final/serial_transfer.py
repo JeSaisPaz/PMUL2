@@ -2,8 +2,6 @@
 # Utilise COBS (Consistent Overhead Byte Stuffing) + CRC8 pour l'integrite
 # des trames entre le Raspberry Pi et l'Arduino Mega
 
-import serial
-
 
 class SerialTransfer:
     START_BYTE      = 0x7E

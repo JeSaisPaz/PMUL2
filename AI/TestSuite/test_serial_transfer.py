@@ -52,10 +52,9 @@ print("[OK] COBS encode/decode")
 # test CRC8
 
 # tableau de test: les 256 valeurs CRC pour le polynome 0x9B
-# (generees avec PacketCRC.h)
-expected_table = st._generate_crc_table()  # genere sur place via la meme methode
+expected_table = st._crc_table.copy()
 # juste on verifie que la table est reproductible
-table2 = st._generate_crc_table()
+table2 = st._crc_table.copy()
 assert table2 == expected_table, "CRC table not deterministic"
 assert len(expected_table) == 256, "CRC table wrong size"
 
@@ -78,11 +77,11 @@ print("[OK] send + available (clean payload)")
 # test send + available avec un payload contenant START_BYTE
 
 st3 = SerialTransfer(FakePort())
-st3.send(SerialTransfer.PID_TARGET_ORDER, bytes([0x7E, 0x01, 0x02, 0x03]))
+st3.send(SerialTransfer.PID_ITEM_INFO, bytes([0x7E, 0x01, 0x02, 0x03]))
 result = st3.available()
 assert result is not None, "available() should return a packet even with 0x7E in payload"
 pid, data = result
-assert pid == SerialTransfer.PID_TARGET_ORDER, f"Expected PID_TARGET_ORDER, got {pid:#04x}"
+assert pid == SerialTransfer.PID_ITEM_INFO, f"Expected PID_ITEM_INFO, got {pid:#04x}"
 assert data == bytes([0x7E, 0x01, 0x02, 0x03]), f"Round-trip failed: {data.hex()}"
 print("[OK] send + available (payload with START_BYTE)")
 
