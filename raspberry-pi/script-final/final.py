@@ -207,7 +207,7 @@ def handleLocalOrder(payload):
     lineCount = payload[1]
     if lineCount == 0 or len(payload) < 2 + lineCount * 2:
         return
-    color_names = {0x01: "jaune", 0x02: "bleu", 0x03: "magenta"}
+    color_names = {0x01: "jaune", 0x02: "bleu", 0x03: "magenta", 0x04: "vert", 0x05: "rouge", 0x06: "orange"}
     print(f"[ARDUINO] Commande keypad (team {teamId})")
     try:
         r_colors = requests.get(f"{BACKEND_URL}/api/colors", timeout=5)
@@ -275,7 +275,11 @@ def pollAndSendColors():
         r = requests.get(f"{BACKEND_URL}/api/colors", timeout=3)
         if r.status_code != 200:
             return
-        name_to_byte = {"jaune": 0x01, "yellow": 0x01, "bleu": 0x02, "blue": 0x02, "magenta": 0x03}
+        name_to_byte = {"jaune": 0x01, "yellow": 0x01, "bleu": 0x02, "blue": 0x02,
+                        "magenta": 0x03, "pink": 0x03,
+                        "vert": 0x04, "green": 0x04,
+                        "rouge": 0x05, "red": 0x05,
+                        "orange": 0x06}
         active = []
         for c in r.json():
             # couleur active si tous les champs HSV sont definis
@@ -291,7 +295,7 @@ def pollAndSendColors():
             if active:
                 payload = bytes([len(active)] + active)
                 st.send(SerialTransfer.PID_COLOR_LIST, payload)
-                names = {0x01:"Jaune",0x02:"Bleu",0x03:"Magenta"}
+                names = {0x01:"Jaune",0x02:"Bleu",0x03:"Magenta",0x04:"Vert",0x05:"Rouge",0x06:"Orange"}
                 print(f"[COLORS] {len(active)} actives envoyees: "
                       f"{[names.get(b,'?') for b in active]}")
     except Exception:
