@@ -37,11 +37,15 @@ uint16_t    currentItemId = 0;
 ItemDecision currentDecision = ItemDecision::PASS;
 uint8_t     currentOrderId  = 0;
 
-// keypad
-Pmul2Keypad keypad;
+// keypad + encodeur
+Pmul2Keypad  keypad;
+Pmul2Encoder encoder;
 
 // mode: false = SCAN, true = ORDER (saisie commande)
 bool modeOrder = false;
+
+// etat du menu de saisie: 0=choix couleur, 1=qte, 2=resume
+byte orderPage = 0;
 
 // couleurs actives envoyees par le backend (max 4, mappees sur A,B,C,D)
 uint8_t activeColors[4] = {COLOR_BLUE, COLOR_YELLOW, COLOR_MAGENTA};
@@ -116,6 +120,11 @@ void loop() {
   // keypad (toujours actif, meme en SCAN)
   char key = keypad.read();
   if (key) handleKeypad(key);
+
+  // encodeur (toujours actif)
+  int8_t encDelta = encoder.readDelta();
+  if (encDelta != 0) handleEncoder(encDelta);
+  if (encoder.pressed()) handleEncoderButton();
 
   if (!systemOn) {
     servoScan.write(0);
@@ -235,14 +244,8 @@ void handleKeypad(char key) {
     return;
   }
 
-  if (orderPage == 0 && (key == 'A' || key == 'B' || key == 'C' || key == 'D')) {
-    uint8_t idx = key - 'A';
-    if (idx < activeColorCount) {
-      editingColorIdx = idx;
-      editingQty = 0;
-      editingQtyStarted = false;
-      orderPage = 1;
-    }
+  if (orderPage == 0 && key >= '0' && key <= '9') {
+    // en page 0, les chiffres ne font rien (on utilise l'encodeur)
     return;
   }
 
@@ -269,9 +272,49 @@ void enterOrderMode() {
   modeOrder = true;
   orderPage = 0;
   localLineCount = 0;
-  editingColor = KeypadColor::NONE;
+  editingColorIdx = 0;
   editingQty = 0;
   editingQtyStarted = false;
+}
+
+void handleEncoder(int8_t delta) {
+  if (!modeOrder) return;
+
+  if (orderPage == 0) {
+    // cycle les couleurs actives
+    if (delta > 0) {
+      if (editingColorIdx + 1 < activeColorCount) editingColorIdx++;
+    } else {
+      if (editingColorIdx > 0) editingColorIdx--;
+    }
+  }
+  else if (orderPage == 1) {
+    // ajuste la quantite (steps de 1, boucle 0-10)
+    int16_t q = (int16_t)editingQty + delta;
+    if (q < 0) q = 0;
+    if (q > 10) q = 10;
+    editingQty = (uint8_t)q;
+    editingQtyStarted = true;
+  }
+}
+
+void handleEncoderButton() {
+  if (!modeOrder) return;
+
+  if (orderPage == 0 && activeColorCount > 0) {
+    // encoder press = selectionner la couleur
+    editingQty = 0;
+    editingQtyStarted = false;
+    orderPage = 1;
+  }
+  else if (orderPage == 1) {
+    // encoder press = confirmer la quantite (comme *)
+    confirmOrderStep();
+  }
+  else if (orderPage == 2) {
+    // encoder press = confirmer envoi (comme *)
+    confirmOrderStep();
+  }
 }
 
 void confirmOrderStep() {
@@ -347,7 +390,7 @@ void drawOrderMenu() {
   if (orderPage == 0) {
     lcd.setCursor(0, 0);
     if (localLineCount == 0) {
-      lcd.print("Nouvelle cmd");
+      lcd.print("Ajouter ligne?");
     } else {
       lcd.print("Cmd: ");
       for (uint8_t i = 0; i < localLineCount && i < 4; i++) {
@@ -357,13 +400,10 @@ void drawOrderMenu() {
       }
     }
     lcd.setCursor(0, 1);
-    // affiche les touches disponibles selon les couleurs actives
-    for (uint8_t i = 0; i < activeColorCount && i < 4; i++) {
-      char key = 'A' + i;
-      lcd.print(key);
-      lcd.print("=");
-      lcd.print(colorNameById(activeColors[i])[0]);
-      if (i < activeColorCount - 1) lcd.print(" ");
+    if (activeColorCount > 0 && editingColorIdx < activeColorCount) {
+      lcd.print("[");
+      lcd.print(colorNameById(activeColors[editingColorIdx]));
+      lcd.print("]");
     }
     if (localLineCount > 0) {
       lcd.print(" #=fin");
@@ -377,7 +417,7 @@ void drawOrderMenu() {
     lcd.setCursor(0, 1);
     lcd.print("Qte: ");
     lcd.print(editingQty);
-    lcd.print(" *=ok");
+    lcd.print(" pressez=ok");
   }
   else if (orderPage == 2) {
     lcd.setCursor(0, 0);
@@ -389,7 +429,7 @@ void drawOrderMenu() {
     lcd.print(" M");
     lcd.print(m);
     lcd.setCursor(0, 1);
-    lcd.print("*=envoyer #=annul");
+    lcd.print("pressez=envoi #=annul");
   }
 }
 
