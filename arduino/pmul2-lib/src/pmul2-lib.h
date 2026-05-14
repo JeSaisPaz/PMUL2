@@ -37,6 +37,8 @@ class Pmul2Lib {
 
         // lecture depuis le Pi/backend
         bool readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId);
+        // recoit la liste des couleurs actives (max 4)
+        bool readColorList(uint8_t* colors, uint8_t& count);
         bool handlePing();
 
     private:

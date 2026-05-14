@@ -103,3 +103,19 @@ bool Pmul2Com::handlePing() {
     }
     return false;
 }
+
+bool Pmul2Com::readColorList(uint8_t* colors, uint8_t& count) {
+    if (!_checkPacket(PID_COLOR_LIST)) return false;
+
+    // payload: count(1B) + [colorId(1B)] * N
+    _transfer.packet.rxObj(count, 0);
+
+    if (count > 4) count = 4;
+
+    for (uint8_t i = 0; i < count; i++) {
+        _transfer.packet.rxObj(colors[i], 1 + i);
+    }
+
+    _consumePacket();
+    return true;
+}

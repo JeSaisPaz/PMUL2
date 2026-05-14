@@ -43,19 +43,17 @@ Pmul2Keypad keypad;
 // mode: false = SCAN, true = ORDER (saisie commande)
 bool modeOrder = false;
 
-// etat du menu de saisie de commande
-// 0 = ecran d'accueil commande (choisir couleur ou finir)
-// 1 = choix de la quantite pour la couleur selectionnee
-// 2 = resume / confirmation d'envoi
-byte orderPage = 0;
+// couleurs actives envoyees par le backend (max 4, mappees sur A,B,C,D)
+uint8_t activeColors[4] = {COLOR_BLUE, COLOR_YELLOW, COLOR_MAGENTA};
+uint8_t activeColorCount = 3;
 
 // commande en cours de saisie (max 8 lignes)
 uint8_t localColors[8];
 uint8_t localQtys[8];
 uint8_t localLineCount = 0;
 
-// pour la page 1: couleur en cours, qte en cours de saisie
-KeypadColor editingColor = KeypadColor::NONE;
+// pour la page 1: index dans activeColors, qte en cours de saisie
+uint8_t editingColorIdx = 0;
 uint8_t editingQty = 0;
 bool editingQtyStarted = false;
 
@@ -102,6 +100,18 @@ void loop() {
 
   // diag
   objetPmul.handlePing();
+
+  // recoit les couleurs actives du backend (poll continu)
+  {
+    uint8_t colors[4];
+    uint8_t count;
+    if (objetPmul.readColorList(colors, count)) {
+      activeColorCount = count;
+      for (uint8_t i = 0; i < count; i++) {
+        activeColors[i] = colors[i];
+      }
+    }
+  }
 
   // keypad (toujours actif, meme en SCAN)
   char key = keypad.read();
@@ -218,19 +228,21 @@ void handleKeypad(char key) {
       exitOrderMode(false);
     } else {
       orderPage = 0;
-      editingColor = KeypadColor::NONE;
+      editingColorIdx = 0;
       editingQty = 0;
       editingQtyStarted = false;
     }
     return;
   }
 
-  if (orderPage == 0 && (key == 'A' || key == 'B' || key == 'C')) {
-    // choix de la couleur
-    editingColor = keyToColor(key);
-    editingQty = 0;
-    editingQtyStarted = false;
-    orderPage = 1;
+  if (orderPage == 0 && (key == 'A' || key == 'B' || key == 'C' || key == 'D')) {
+    uint8_t idx = key - 'A';
+    if (idx < activeColorCount) {
+      editingColorIdx = idx;
+      editingQty = 0;
+      editingQtyStarted = false;
+      orderPage = 1;
+    }
     return;
   }
 
@@ -264,22 +276,17 @@ void enterOrderMode() {
 
 void confirmOrderStep() {
   if (orderPage == 1) {
-    // on a fini de saisir la qte, on ajoute la ligne
-    if (editingQty > 0 && editingColor != KeypadColor::NONE && localLineCount < 8) {
-      localColors[localLineCount] = static_cast<uint8_t>(editingColor);
+    if (editingQty > 0 && editingColorIdx < activeColorCount && localLineCount < 8) {
+      localColors[localLineCount] = activeColors[editingColorIdx];
       localQtys[localLineCount]   = editingQty;
       localLineCount++;
     }
-    // retour a la page 0 pour ajouter une autre ligne ou finir
     orderPage = 0;
-    editingColor = KeypadColor::NONE;
+    editingColorIdx = 0;
     editingQty = 0;
     editingQtyStarted = false;
-
-    // si on a deja des lignes, on propose le resume
     if (localLineCount > 0) {
-      // on verifie si tout est pret pour envoyer
-      // (on attend que l'utilisateur appuie sur # pour passer au resume)
+      // l'utilisateur appuiera sur # pour passer au resume
     }
   }
   else if (orderPage == 2) {
@@ -343,46 +350,53 @@ void drawOrderMenu() {
       lcd.print("Nouvelle cmd");
     } else {
       lcd.print("Cmd: ");
-      // resume compact
       for (uint8_t i = 0; i < localLineCount && i < 4; i++) {
-        lcd.print(colorName(static_cast<KeypadColor>(localColors[i]))[0]);
+        lcd.print(colorNameById(localColors[i])[0]);
         lcd.print(localQtys[i]);
         if (i < localLineCount - 1) lcd.print(",");
       }
     }
     lcd.setCursor(0, 1);
+    // affiche les touches disponibles selon les couleurs actives
+    for (uint8_t i = 0; i < activeColorCount && i < 4; i++) {
+      char key = 'A' + i;
+      lcd.print(key);
+      lcd.print("=");
+      lcd.print(colorNameById(activeColors[i])[0]);
+      if (i < activeColorCount - 1) lcd.print(" ");
+    }
     if (localLineCount > 0) {
-      lcd.print("A/B/C + #=fin D=del");
-    } else {
-      lcd.print("A/B/C=couleur #=fin");
+      lcd.print(" #=fin");
     }
   }
   else if (orderPage == 1) {
     lcd.setCursor(0, 0);
-    lcd.print(colorName(editingColor));
+    if (editingColorIdx < activeColorCount) {
+      lcd.print(colorNameById(activeColors[editingColorIdx]));
+    }
     lcd.setCursor(0, 1);
     lcd.print("Qte: ");
     lcd.print(editingQty);
     lcd.print(" *=ok");
   }
   else if (orderPage == 2) {
-    // resume avant envoi
     lcd.setCursor(0, 0);
+    uint8_t b = countColor(COLOR_BLUE), j = countColor(COLOR_YELLOW), m = countColor(COLOR_MAGENTA);
     lcd.print("B");
-    lcd.print(countColor(KeypadColor::BLUE));
+    lcd.print(b);
     lcd.print(" J");
-    lcd.print(countColor(KeypadColor::YELLOW));
+    lcd.print(j);
     lcd.print(" M");
-    lcd.print(countColor(KeypadColor::MAGENTA));
+    lcd.print(m);
     lcd.setCursor(0, 1);
     lcd.print("*=envoyer #=annul");
   }
 }
 
-uint8_t countColor(KeypadColor c) {
+uint8_t countColor(uint8_t colorId) {
   uint8_t total = 0;
   for (uint8_t i = 0; i < localLineCount; i++) {
-    if (static_cast<KeypadColor>(localColors[i]) == c) {
+    if (localColors[i] == colorId) {
       total += localQtys[i];
     }
   }

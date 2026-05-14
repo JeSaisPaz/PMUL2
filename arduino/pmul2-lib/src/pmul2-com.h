@@ -24,6 +24,7 @@ class Pmul2Com {
         static const uint8_t PID_ITEM_INFO    = 0x10; // Pi vers Arduino: info sur le bloc scanne
         static const uint8_t PID_SCAN_RESULT  = 0x11; // Arduino vers Pi: resultat du tri
         static const uint8_t PID_LOCAL_ORDER  = 0x04; // Arduino vers Pi: commande keypad
+        static const uint8_t PID_COLOR_LIST   = 0x05; // Pi vers Arduino: couleurs actives
         static const uint8_t PID_STATUS       = 0xFE; // status Arduino (ready/busy/done/scan_needed)
 
         // constructeur
@@ -41,6 +42,8 @@ class Pmul2Com {
 
         // lecture (Pi vers Arduino)
         bool readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId);
+        // recoit la liste des couleurs actives depuis le backend (max 4)
+        bool readColorList(uint8_t* colors, uint8_t& count);
         bool handlePing();
 
     private:

@@ -3,32 +3,33 @@
 
 #include <stdint.h>
 
-// IDs des couleurs pour le keypad (miroir du backend)
-// A=Bleu, B=Jaune, C=Magenta
-enum class KeypadColor : uint8_t {
-    BLUE    = 0x02,
-    YELLOW  = 0x01,
-    MAGENTA = 0x03,
-    NONE    = 0x00
+// byte IDs des couleurs (miroir du backend)
+// le backend envoie la liste des IDs actifs, l'Arduino les stocke
+// et les affiche dans l'ordre sur les touches A, B, C, D
+
+const uint8_t COLOR_YELLOW  = 0x01;
+const uint8_t COLOR_BLUE    = 0x02;
+const uint8_t COLOR_MAGENTA = 0x03;
+
+// table de lookup: byte ID -> nom affichable sur LCD
+struct ColorEntry {
+    uint8_t id;
+    const char* name;
 };
 
-// mapping touche keypad vers couleur
-inline KeypadColor keyToColor(char key) {
-    switch (key) {
-        case 'A': return KeypadColor::BLUE;
-        case 'B': return KeypadColor::YELLOW;
-        case 'C': return KeypadColor::MAGENTA;
-        default:  return KeypadColor::NONE;
-    }
-}
+const ColorEntry COLOR_TABLE[] = {
+    {COLOR_YELLOW,  "Jaune"},
+    {COLOR_BLUE,    "Bleu"},
+    {COLOR_MAGENTA, "Magenta"},
+};
+const uint8_t COLOR_TABLE_SIZE = sizeof(COLOR_TABLE) / sizeof(COLOR_TABLE[0]);
 
-inline const char* colorName(KeypadColor c) {
-    switch (c) {
-        case KeypadColor::BLUE:    return "Bleu";
-        case KeypadColor::YELLOW:  return "Jaune";
-        case KeypadColor::MAGENTA: return "Magenta";
-        default:                   return "?";
+// trouve le nom d'une couleur par son ID
+inline const char* colorNameById(uint8_t id) {
+    for (uint8_t i = 0; i < COLOR_TABLE_SIZE; i++) {
+        if (COLOR_TABLE[i].id == id) return COLOR_TABLE[i].name;
     }
+    return "?";
 }
 
 #endif

@@ -263,14 +263,55 @@ def handleArduinoFrame():
     elif pid == SerialTransfer.PID_PING:
         print("[ARDUINO] Ping recu (diag)")
 
+# poll des couleurs actives depuis le backend
+# envoie a l'Arduino seulement si la liste change
+
+last_color_hash = None
+
+def pollAndSendColors():
+    """Polls GET /api/colors, envoie PID_COLOR_LIST si changement."""
+    global last_color_hash
+    try:
+        r = requests.get(f"{BACKEND_URL}/api/colors", timeout=3)
+        if r.status_code != 200:
+            return
+        name_to_byte = {"jaune": 0x01, "yellow": 0x01, "bleu": 0x02, "blue": 0x02, "magenta": 0x03}
+        active = []
+        for c in r.json():
+            # couleur active si tous les champs HSV sont definis
+            if None not in (c.get("hueMin"), c.get("hueMax"),
+                            c.get("saturationMin"), c.get("saturationMax"),
+                            c.get("valueMin"), c.get("valueMax")):
+                bid = name_to_byte.get((c.get("name") or "").lower())
+                if bid:
+                    active.append(bid)
+        h = hash(tuple(active))
+        if h != last_color_hash:
+            last_color_hash = h
+            if active:
+                payload = bytes([len(active)] + active)
+                st.send(SerialTransfer.PID_COLOR_LIST, payload)
+                names = {0x01:"Jaune",0x02:"Bleu",0x03:"Magenta"}
+                print(f"[COLORS] {len(active)} actives envoyees: "
+                      f"{[names.get(b,'?') for b in active]}")
+    except Exception:
+        pass  # backend down, on ressayera plus tard
+
 # boucle principale
 
 def main():
     global running
     print("[PI_DRIVER] Pret. En attente de blocs...")
 
+    last_poll = 0
     while running:
         handleArduinoFrame()
+
+        now = time.time()
+        if now - last_poll > 2:
+            pollAndSendColors()
+            last_poll = now
+
         time.sleep(0.05)
 
 
