@@ -1,6 +1,6 @@
 /*
  * pmul2-lib.cpp
- * Librairie développée dans le cadre du projet multidisciplinaire 2,
+ * Librairie developpee dans le cadre du projet multidisciplinaire 2,
  * celle-ci permet le management des commandes depuis une librairie
  * externe afin de rendre le code de notre sketch arduino principal
  * le plus lisible possible.
@@ -49,19 +49,18 @@ void Pmul2Lib::sendPong() {
     _com.sendPong();
 }
 
-bool Pmul2Lib::handlePing() {
-    return _com.handlePing();
+void Pmul2Lib::sendScanResult(uint16_t itemId, ItemStatus status) {
+    _com.sendScanResult(itemId, status);
 }
-
 
 bool Pmul2Lib::readTargetOrder(Order& order) {
     return _com.readTargetOrder(order);
 }
 
-bool Pmul2Lib::readBlockInfo(Color& color, Team& team) {
-    return _com.readBlockInfo(color, team);
+bool Pmul2Lib::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId) {
+    return _com.readItemInfo(itemId, decision, orderId);
 }
 
-Pmul2Com::FrameType Pmul2Lib::readFrame(Order& order, Color& color, Team& team) {
-    return _com.readFrame(order, color, team);
+bool Pmul2Lib::handlePing() {
+    return _com.handlePing();
 }

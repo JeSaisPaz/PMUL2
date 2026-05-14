@@ -1,6 +1,6 @@
 /*
  * pmul2-lib.h
- * Librairie développée dans le cadre du projet multidisciplinaire 2,
+ * Librairie developpee dans le cadre du projet multidisciplinaire 2,
  * celle-ci permet le management des commandes depuis une librairie
  * externe afin de rendre le code de notre sketch arduino principal
  * le plus lisible possible.
@@ -9,7 +9,7 @@
  * License: MIT (We love open source around here.)
  */
 
-#ifndef PMUL2_LIB_H // protection au cas ou quelqu'un inclut 2 fois
+#ifndef PMUL2_LIB_H
 #define PMUL2_LIB_H
 
 #include <Arduino.h>
@@ -19,40 +19,31 @@
 
 class Pmul2Lib {
     public:
-        // fonctions et attributs publics
-
         // constructeur
         Pmul2Lib(Stream &serialPort);
-        // Ecriture vers le raspberry
-        // fonction pour avoir un print de la version de la librairie dans la communication serie
+
+        // version de la lib
         void version();
-        // envoie une mise à jour de commande vers le Raspberry Pi
+
+        // ecriture vers le Pi/backend
         void sendOrder(const Order& order);
-        // envoie au Raspberry Pi la commande locale en traitement
         void sendTargetOrder(const Order& order);
-        // envoie que la commande est finie
         void sendOrderDone();
-        // envoie que l'arduino est occupé
         void sendBusy();
-        // envoie que l'arduino est disponible
         void sendReady();
-        // envoie qu'un bloc est en position de scan
         void sendScanNeeded();
-        // diag: repond pong a un ping
         void sendPong();
-        // diag: si un ping est dans le buffer, renvoie un pong
-        bool handlePing();
-        
-        // Lecture depuis le raspberry
-        // lit une information envoyée par le Raspberry Pi
+        // envoie le resultat du tri (confirmation IR)
+        void sendScanResult(uint16_t itemId, ItemStatus status);
+
+        // lecture depuis le Pi/backend
         bool readTargetOrder(Order& order);
-        // lit l'information d'un block
-        bool readBlockInfo(Color& color, Team& team);
-        // dispatcheur: lit n'importe quelle trame entrante et la route vers le bon type
-        Pmul2Com::FrameType readFrame(Order& order, Color& color, Team& team);
-        
+        // lit les infos d'un item scanne (id, decision, orderId)
+        bool readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId);
+        // diag
+        bool handlePing();
+
     private:
-        // fonctions et attributs privés
         Stream* _serial;
         Pmul2Com _com;
 };

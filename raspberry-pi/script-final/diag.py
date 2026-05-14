@@ -1,4 +1,4 @@
-# diag.py — verifie toute la chaine de com en une commande
+# diag.py - verifie toute la chaine de com en une commande
 #   Arduino <-> Pi (SerialTransfer ping/pong, meme pattern que final.py)
 #   Pi <-> Backend (HTTP + Socket.IO)
 #
@@ -10,7 +10,7 @@ from serial_transfer import SerialTransfer
 
 BACKEND_URL = "http://localhost:3000"
 
-# --- 1. port serie ---
+# 1. port serie
 
 PORT_CANDIDATES = ["/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyACM0", "/dev/ttyACM1",
                    "/dev/serial0", "/dev/ttyAMA0"]
@@ -27,7 +27,7 @@ if port is None:
 else:
     print(f"[DIAG] SERIAL  : port detecte -> {port}")
 
-# --- 2. ping Arduino via SerialTransfer (meme logique que final.py) ---
+# 2. ping Arduino via SerialTransfer (meme logique que final.py)
 
 arduino_ok = False
 
@@ -49,7 +49,7 @@ if port:
             time.sleep(0.1)
 
         if not ready:
-            print("[DIAG] ARDUINO : pas de 'R' — branche ? flashe ?")
+            print("[DIAG] ARDUINO : pas de 'R' - branche ? flashe ?")
         else:
             st = SerialTransfer(s)
             st.send(SerialTransfer.PID_PING, b"\x01")
@@ -71,7 +71,7 @@ if port:
     except Exception as e:
         print(f"[DIAG] SERIAL  : erreur -> {e}")
 
-# --- 3. backend HTTP ---
+# 3. backend HTTP
 
 try:
     r = requests.get(f"{BACKEND_URL}/api/health", timeout=3)
@@ -81,10 +81,10 @@ try:
     else:
         print(f"[DIAG] BACKEND : HTTP {r.status_code}")
 except Exception as e:
-    print(f"[DIAG] BACKEND : injoignable — {e}")
+    print(f"[DIAG] BACKEND : injoignable - {e}")
     print("        Lance : cd ~/PMUL2/web/PMUL2/pmul2-team01-app && npm start")
 
-# --- 4. backend Socket.IO ---
+# 4. backend Socket.IO
 
 sio = socketio.Client()
 
@@ -97,16 +97,16 @@ try:
     sio.disconnect()
     print("[DIAG] SOCKET  : connecte au backend")
 except Exception as e:
-    print(f"[DIAG] SOCKET  : echec — {e}")
+    print(f"[DIAG] SOCKET  : echec - {e}")
     print("        Verifie que le backend tourne (npm start)")
 
-# --- resume ---
+# resume
 print()
 ok = all([
     port is not None,
     arduino_ok,
 ])
 if ok:
-    print("[DIAG] Tout est pret — lance sudo python final.py")
+    print("[DIAG] Tout est pret - lance sudo python final.py")
 else:
     print("[DIAG] Des checks ont echoue, relis les erreurs ci-dessus")
