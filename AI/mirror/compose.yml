@@ -1,0 +1,63 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: pmul2_db_mirror
+    restart: always
+    volumes:
+      - db_mirror_data:/var/lib/mysql
+    env_file:
+      - ../../web/PMUL2/db_pmul2.env
+    environment:
+      - TZ=Europe/Brussels
+    ports:
+      - "3306:3306"
+    networks:
+      - nt-pmul2-mirror
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: pmul2_pma_mirror
+    restart: always
+    env_file:
+      - ../../web/PMUL2/db_pmul2.env
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    environment:
+      - TZ=Europe/Brussels
+    networks:
+      - nt-pmul2-mirror
+
+  app:
+    image: node:22
+    container_name: pmul2_app_mirror
+    restart: always
+    working_dir: /home/node/app
+    volumes:
+      - ../../web/PMUL2/pmul2-team01-app:/home/node/app
+    command: ["bash", "./boot.sh"]
+    ports:
+      - "3000:3000"
+    env_file:
+      - ../../web/PMUL2/db_pmul2.env
+    environment:
+      - DATABASE_URL=mysql://team01:team01-thebestone@mysql:3306/team01-database
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - nt-pmul2-mirror
+
+networks:
+  nt-pmul2-mirror:
+    driver: bridge
+
+volumes:
+  db_mirror_data:

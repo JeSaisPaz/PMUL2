@@ -293,7 +293,10 @@ module.exports = function (io, piBridge) {
 
     router.delete('/scans/:id/delete', async function (req, res) {
         try {
-            await prisma.rEAD_CYCLE.delete({ where: { id: parseInt(req.params.id) } });
+            const scan = await prisma.rEAD_CYCLE.findUnique({ where: { id: parseInt(req.params.id) } });
+            if (!scan) return res.status(404).json({ error: "Scan not found" });
+
+            await prisma.rEAD_CYCLE.delete({ where: { id: scan.id } });
             notifyClients();
             res.sendStatus(204);
         } catch (error) {
@@ -304,6 +307,10 @@ module.exports = function (io, piBridge) {
     router.post('/scans', async function (req, res) {
         try {
             const { scan } = req.body;
+            if (!scan || !scan.qrValue || scan.hue === undefined) {
+                return res.status(400).json({ error: "Missing scan fields: qrValue, hue, saturation, value" });
+            }
+
             const readCycle = await prisma.rEAD_CYCLE.create({
                 data: { qrValue: scan.qrValue, hue: scan.hue, saturation: scan.saturation, value: scan.value }
             });
