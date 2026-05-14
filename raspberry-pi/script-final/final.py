@@ -199,6 +199,40 @@ def handleScanResult(payload):
     except Exception as e:
         print(f"  [!] Backend injoignable: {e}")
 
+def handleLocalOrder(payload):
+    """L'Arduino a saisi une commande au keypad, on l'envoie au backend."""
+    if len(payload) < 2:
+        return
+    teamId    = payload[0]
+    lineCount = payload[1]
+    if lineCount == 0 or len(payload) < 2 + lineCount * 2:
+        return
+    color_names = {0x01: "jaune", 0x02: "bleu", 0x03: "magenta"}
+    print(f"[ARDUINO] Commande keypad (team {teamId})")
+    try:
+        r_colors = requests.get(f"{BACKEND_URL}/api/colors", timeout=5)
+        if r_colors.status_code != 200:
+            print("  [!] Impossible de recuperer les couleurs de la DB")
+            return
+        db_colors = {c["name"].lower(): c["id"] for c in r_colors.json()}
+        order_lines = []
+        for i in range(lineCount):
+            colorByte = payload[2 + i * 2]
+            qty       = payload[2 + i * 2 + 1]
+            name = color_names.get(colorByte)
+            cid  = db_colors.get(name) if name else None
+            if cid and qty > 0:
+                order_lines.append({"quantity": qty, "id": cid})
+        if not order_lines:
+            return
+        r = requests.post(f"{BACKEND_URL}/api/neworder", json={"lines": order_lines}, timeout=5)
+        if r.status_code == 204:
+            print(f"  [BACKEND] Commande creee ({lineCount} lignes)")
+        else:
+            print(f"  [!] POST /neworder {r.status_code}")
+    except Exception as e:
+        print(f"  [!] Backend injoignable: {e}")
+
 def handleArduinoFrame():
     """Lit et dispatche une trame entrante de l'Arduino."""
     result = st.available()
@@ -222,6 +256,9 @@ def handleArduinoFrame():
 
     elif pid == SerialTransfer.PID_SCAN_RESULT:
         handleScanResult(payload)
+
+    elif pid == SerialTransfer.PID_LOCAL_ORDER:
+        handleLocalOrder(payload)
 
     elif pid == SerialTransfer.PID_PING:
         print("[ARDUINO] Ping recu (diag)")

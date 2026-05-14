@@ -13,7 +13,9 @@
 #define PMUL2_LIB_H
 
 #include <Arduino.h>
+#include "pmul2-colors.h"
 #include "pmul2-com.h"
+#include "pmul2-keypad.h"
 
 class Pmul2Lib {
     public:
@@ -30,6 +32,8 @@ class Pmul2Lib {
         void sendScanNeeded();
         void sendPong();
         void sendScanResult(uint16_t itemId, ItemStatus status);
+        // envoie une commande saisie au keypad
+        void sendLocalOrder(uint8_t teamId, uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys);
 
         // lecture depuis le Pi/backend
         bool readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId);

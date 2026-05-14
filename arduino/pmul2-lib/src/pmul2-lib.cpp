@@ -45,6 +45,10 @@ void Pmul2Lib::sendScanResult(uint16_t itemId, ItemStatus status) {
     _com.sendScanResult(itemId, status);
 }
 
+void Pmul2Lib::sendLocalOrder(uint8_t teamId, uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys) {
+    _com.sendLocalOrder(teamId, lineCount, colors, qtys);
+}
+
 bool Pmul2Lib::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId) {
     return _com.readItemInfo(itemId, decision, orderId);
 }

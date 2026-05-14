@@ -12,7 +12,7 @@ class SerialTransfer:
 
     # IDs des packets (miroir de pmul2-com.h)
     PID_PING         = 0x00  # diag
-    PID_TARGET_ORDER = 0x01  # commande a executer
+    PID_LOCAL_ORDER  = 0x04  # Arduino vers Pi: commande keypad
     PID_ITEM_INFO    = 0x10  # Pi vers Arduino: info sur le bloc scanne
     PID_SCAN_RESULT  = 0x11  # Arduino vers Pi: resultat du tri
     PID_STATUS       = 0xFE  # status Arduino

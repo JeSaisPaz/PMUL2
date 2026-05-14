@@ -52,11 +52,21 @@ void Pmul2Com::sendPong() {
 }
 
 void Pmul2Com::sendScanResult(uint16_t itemId, ItemStatus status) {
-    // payload: itemId (2 bytes big-endian) + status (1 byte) = 3 bytes
-    _transfer.packet.txBuff[0] = (itemId >> 8) & 0xFF;  // high byte
-    _transfer.packet.txBuff[1] = itemId & 0xFF;          // low byte
+    _transfer.packet.txBuff[0] = (itemId >> 8) & 0xFF;
+    _transfer.packet.txBuff[1] = itemId & 0xFF;
     _transfer.packet.txBuff[2] = static_cast<uint8_t>(status);
     _transfer.sendData(3, PID_SCAN_RESULT);
+}
+
+void Pmul2Com::sendLocalOrder(uint8_t teamId, uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys) {
+    // payload: teamId(1) + lineCount(1) + [color(1) + qty(1)] * N
+    _transfer.packet.txBuff[0] = teamId;
+    _transfer.packet.txBuff[1] = lineCount;
+    for (uint8_t i = 0; i < lineCount && i < 8; i++) {
+        _transfer.packet.txBuff[2 + i * 2]     = colors[i];
+        _transfer.packet.txBuff[2 + i * 2 + 1] = qtys[i];
+    }
+    _transfer.sendData(2 + lineCount * 2, PID_LOCAL_ORDER);
 }
 
 // lecture Pi vers Arduino

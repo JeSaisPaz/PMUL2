@@ -21,9 +21,9 @@ class Pmul2Com {
     public:
         // IDs des packets pour SerialTransfer
         static const uint8_t PID_PING         = 0x00; // diag
-        static const uint8_t PID_TARGET_ORDER = 0x01; // commande depuis le Pi
         static const uint8_t PID_ITEM_INFO    = 0x10; // Pi vers Arduino: info sur le bloc scanne
         static const uint8_t PID_SCAN_RESULT  = 0x11; // Arduino vers Pi: resultat du tri
+        static const uint8_t PID_LOCAL_ORDER  = 0x04; // Arduino vers Pi: commande keypad
         static const uint8_t PID_STATUS       = 0xFE; // status Arduino (ready/busy/done/scan_needed)
 
         // constructeur
@@ -36,6 +36,8 @@ class Pmul2Com {
         void sendScanNeeded();
         void sendPong();
         void sendScanResult(uint16_t itemId, ItemStatus status);
+        // envoie une commande saisie au keypad: lines = [{color, qty}, ...]
+        void sendLocalOrder(uint8_t teamId, uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys);
 
         // lecture (Pi vers Arduino)
         bool readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId);
