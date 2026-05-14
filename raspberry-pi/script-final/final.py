@@ -223,10 +223,6 @@ def handleArduinoFrame():
     elif pid == SerialTransfer.PID_SCAN_RESULT:
         handleScanResult(payload)
 
-    elif pid == SerialTransfer.PID_ORDER_UPDATE:
-        if len(payload) >= 4:
-            print(f"[ARDUINO] Progres: team={payload[0]} B={payload[1]} Y={payload[2]} M={payload[3]}")
-
     elif pid == SerialTransfer.PID_PING:
         print("[ARDUINO] Ping recu (diag)")
 

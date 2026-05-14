@@ -26,32 +26,6 @@ void Pmul2Com::_consumePacket() {
     _packetReady = false;
 }
 
-void Pmul2Com::_packOrder(const Order& order) {
-    _transfer.packet.txObj(order.teamId, 0);
-    _transfer.packet.txObj(order.blueAmount, 1);
-    _transfer.packet.txObj(order.yellowAmount, 2);
-    _transfer.packet.txObj(order.magentaAmount, 3);
-}
-
-void Pmul2Com::_unpackOrder(Order& order) {
-    _transfer.packet.rxObj(order.teamId, 0);
-    _transfer.packet.rxObj(order.blueAmount, 1);
-    _transfer.packet.rxObj(order.yellowAmount, 2);
-    _transfer.packet.rxObj(order.magentaAmount, 3);
-}
-
-// envoi Arduino vers Pi
-
-void Pmul2Com::sendOrderUpdate(const Order& order) {
-    _packOrder(order);
-    _transfer.sendData(4, PID_ORDER_UPDATE);
-}
-
-void Pmul2Com::sendTargetOrder(const Order& order) {
-    _packOrder(order);
-    _transfer.sendData(4, PID_TARGET_ORDER);
-}
-
 void Pmul2Com::sendOrderDone() {
     _transfer.packet.txBuff[0] = STATUS_DONE;
     _transfer.sendData(1, PID_STATUS);
@@ -86,13 +60,6 @@ void Pmul2Com::sendScanResult(uint16_t itemId, ItemStatus status) {
 }
 
 // lecture Pi vers Arduino
-
-bool Pmul2Com::readTargetOrder(Order& order) {
-    if (!_checkPacket(PID_TARGET_ORDER)) return false;
-    _unpackOrder(order);
-    _consumePacket();
-    return true;
-}
 
 bool Pmul2Com::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId) {
     if (!_checkPacket(PID_ITEM_INFO)) return false;

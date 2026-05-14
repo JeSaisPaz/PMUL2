@@ -3,8 +3,6 @@
 
 #include <Arduino.h>
 #include "SerialTransfer.h"
-#include "pmul2-colors.h"
-#include "pmul2-orders.h"
 
 // decisions possibles pour un item (miroir du backend)
 enum class ItemDecision : uint8_t {
@@ -24,7 +22,6 @@ class Pmul2Com {
         // IDs des packets pour SerialTransfer
         static const uint8_t PID_PING         = 0x00; // diag
         static const uint8_t PID_TARGET_ORDER = 0x01; // commande depuis le Pi
-        static const uint8_t PID_ORDER_UPDATE = 0x03; // progres vers le Pi
         static const uint8_t PID_ITEM_INFO    = 0x10; // Pi vers Arduino: info sur le bloc scanne
         static const uint8_t PID_SCAN_RESULT  = 0x11; // Arduino vers Pi: resultat du tri
         static const uint8_t PID_STATUS       = 0xFE; // status Arduino (ready/busy/done/scan_needed)
@@ -33,21 +30,15 @@ class Pmul2Com {
         explicit Pmul2Com(Stream& stream);
 
         // envoi (Arduino vers Pi)
-        void sendOrderUpdate(const Order& order);
-        void sendTargetOrder(const Order& order);
         void sendOrderDone();
         void sendBusy();
         void sendReady();
         void sendScanNeeded();
         void sendPong();
-        // envoie le resultat du tri d'un bloc (itemId 2 bytes, status 1 byte)
         void sendScanResult(uint16_t itemId, ItemStatus status);
 
         // lecture (Pi vers Arduino)
-        bool readTargetOrder(Order& order);
-        // recoit l'info d'un item scanne par le Pi/backend
         bool readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId);
-        // diag
         bool handlePing();
 
     private:
@@ -65,9 +56,6 @@ class Pmul2Com {
         void _poll();
         void _consumePacket();
         bool _checkPacket(uint8_t expectedPID);
-
-        void _packOrder(const Order& order);
-        void _unpackOrder(Order& order);
 };
 
 #endif

@@ -13,8 +13,6 @@
 #define PMUL2_LIB_H
 
 #include <Arduino.h>
-#include "pmul2-colors.h"
-#include "pmul2-orders.h"
 #include "pmul2-com.h"
 
 class Pmul2Lib {
@@ -26,21 +24,15 @@ class Pmul2Lib {
         void version();
 
         // ecriture vers le Pi/backend
-        void sendOrder(const Order& order);
-        void sendTargetOrder(const Order& order);
         void sendOrderDone();
         void sendBusy();
         void sendReady();
         void sendScanNeeded();
         void sendPong();
-        // envoie le resultat du tri (confirmation IR)
         void sendScanResult(uint16_t itemId, ItemStatus status);
 
         // lecture depuis le Pi/backend
-        bool readTargetOrder(Order& order);
-        // lit les infos d'un item scanne (id, decision, orderId)
         bool readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId);
-        // diag
         bool handlePing();
 
     private:

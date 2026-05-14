@@ -21,14 +21,6 @@ void Pmul2Lib::version() {
     _serial->println("Pmul2Lib version: beta-v0.0.1");
 }
 
-void Pmul2Lib::sendOrder(const Order& order) {
-    _com.sendOrderUpdate(order);
-}
-
-void Pmul2Lib::sendTargetOrder(const Order& order) {
-    _com.sendTargetOrder(order);
-}
-
 void Pmul2Lib::sendOrderDone() {
     _com.sendOrderDone();
 }
@@ -51,10 +43,6 @@ void Pmul2Lib::sendPong() {
 
 void Pmul2Lib::sendScanResult(uint16_t itemId, ItemStatus status) {
     _com.sendScanResult(itemId, status);
-}
-
-bool Pmul2Lib::readTargetOrder(Order& order) {
-    return _com.readTargetOrder(order);
 }
 
 bool Pmul2Lib::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId) {
