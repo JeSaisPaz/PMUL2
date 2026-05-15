@@ -41,7 +41,7 @@ $(document).ready(function() {
             },
             { 
                 data: 'COLOR', 
-                render: (color) => `
+                render: (color) => color ? `
                     <div class="d-flex align-items-center">
                         <span 
                             class="p-2 border rounded-circle me-2" 
@@ -49,10 +49,11 @@ $(document).ready(function() {
                         </span>
                         <span>${color.name}</span>
                     </div>
-                `
+                ` : '---'
             },
             { 
-                data: 'team'
+                data: 'team',
+                render: (team) => team ?? '---'
             },
             {
                 data: 'status',

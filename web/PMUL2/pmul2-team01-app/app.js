@@ -7,7 +7,7 @@ var http = require('http');
 var socketIo = require('socket.io');
 
 
-var indexRouter = require('./routes/index');
+var indexRouter = require('./routes/user');
 // var apiRouter = require('./routes/api');
 
 
@@ -16,8 +16,7 @@ var app = express();
 // setup pour les websockets live update
 var server = http.createServer(app);
 var io = socketIo(server);
-var piBridge = require('./routes/pie')(io);
-var apiRouter = require('./routes/api')(io, piBridge);
+var apiRouter = require('./routes/api')(io);
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));

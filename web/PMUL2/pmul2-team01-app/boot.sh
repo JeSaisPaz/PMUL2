@@ -5,4 +5,4 @@ npx prisma generate
 npx prisma db push
 
 echo "Demarrage du serveur..."
-npm start
+npm run dev
