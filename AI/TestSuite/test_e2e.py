@@ -29,21 +29,23 @@ def seed():
         "('Jaune', '#FFFF00', 25, 35, 50, 255, 50, 255, true), "
         "('Magenta', '#FF00FF', 140, 160, 50, 255, 50, 255, true);"
     )
-    try:
-        for container in ["pmul2_db", "pmul2_db_mirror"]:
+    containers = ["pmul2_db", "pmul2_db_mirror"]
+
+    for cont in containers:
+        try:
+            cmd = f'mysql -u root -pteam01-therootone team01-database -e "{sql}"'
             r = subprocess.run(
-                ["docker", "exec", container, "mysql", "-u", "root",
-                 "-p${MYSQL_ROOT_PASSWORD}", "-e", sql],
-                capture_output=True, text=True, timeout=10,
-                env={**os.environ, "MYSQL_ROOT_PASSWORD": "team01-therootone"}
+                ["docker", "exec", "-i", cont, "sh", "-c", cmd],
+                capture_output=True, text=True, timeout=15
             )
-            if r.returncode == 0:
-                print("  [SETUP] DB seedee")
+            if r.returncode == 0 and "ERROR" not in r.stderr:
+                print(f"  [SETUP] DB seedee via {cont}")
                 return True
-        return False
-    except Exception as e:
-        print(f"  [SETUP] seed failed: {e}")
-        return False
+        except Exception:
+            continue
+
+    print("  [SETUP] seed echoue - insere les couleurs manuellement dans phpmyadmin")
+    return False
 
 print(f"\n=== E2E TEST - {BASE} ===\n")
 
@@ -145,7 +147,7 @@ except Exception as e:
 if r2.status_code == 204:
     ok(f"PATCH /items/{itemId}/status -> 204")
 elif r2.status_code == 400:
-    ok(f"PATCH /items/{itemId}/status -> 400 (item pas en IN_PROCESS, deja traite)")
+    ok(f"PATCH /items/{itemId}/status -> 400 (deja traite)")
 else:
     nok(f"PATCH /items/{itemId}/status", f" -> HTTP {r2.status_code}: {r2.text}")
 
