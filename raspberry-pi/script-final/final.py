@@ -17,6 +17,7 @@ import numpy as np
 from pyzbar.pyzbar import decode
 from picamera2 import Picamera2, Preview
 from serial_transfer import SerialTransfer
+import socketio
 
 # config
 BAUD        = 9600
@@ -66,6 +67,8 @@ def cleanup(signum=None, frame=None):
     running = False
     cam.stop()
     s.close()
+    if sio.connected:
+        sio.disconnect()
     sys.exit(0)
 
 signal.signal(signal.SIGINT, cleanup)
@@ -117,7 +120,7 @@ def handleScanNeeded():
 
     print(f"  [SCAN] QR={qr_text} H={hue} S={sat} V={val}")
 
-    # etape 1: POST /api/scans - le backend cree l'item (retourne 204, pas de JSON)
+    # POST /api/scans - le backend cree l'item et renvoie tout direct
     try:
         r = requests.post(f"{BACKEND_URL}/api/scans", json={
             "scan": {
@@ -128,44 +131,19 @@ def handleScanNeeded():
             }
         }, timeout=5)
 
-        if r.status_code != 204:
+        # le backend renvoie 201 avec {itemId, decision, orderId}
+        if r.status_code != 201:
             print(f"  [!] POST /scans a repondu HTTP {r.status_code}: {r.text}")
             return
 
-        # etape 2: GET /api/scans - recupere le dernier scan avec son ITEM lie
-        time.sleep(0.2)  # laisse le temps a la DB de commit
-        r2 = requests.get(f"{BACKEND_URL}/api/scans", timeout=5)
-        if r2.status_code != 200:
-            print(f"  [!] GET /scans a repondu HTTP {r2.status_code}")
-            return
-
-        scans = r2.json()
-        if not scans:
-            print("  [!] Aucun scan dans la DB")
-            return
-
-        latest = scans[0]
-        item = latest.get("ITEM")
-        if not item:
-            print("  [!] Dernier scan sans ITEM lie")
-            return
-
-        itemId   = item["id"]
-        decision = item["decision"]  # "ORDER", "STOCK", "PASS"
-        orderId  = 0
-        if decision == "ORDER" and item.get("ORDER_LINE_id"):
-            try:
-                r3 = requests.get(f"{BACKEND_URL}/api/orders/{item['ORDER_LINE_id']}/details", timeout=5)
-                # l'order_line_id n'est pas le order_id, on cherche dans les orders
-                # en fait on prend le champ ORDER_id depuis l'ORDER_LINE du backend
-                # pas directement accessible via l'API publique, donc on laisse 0
-                # (l'Arduino peut afficher orderId=0 pour "commande inconnue")
-            except:
-                pass
+        data = r.json()
+        itemId   = data["itemId"]
+        decision = data["decision"]
+        orderId  = data.get("orderId") or 0
 
         print(f"  [BACKEND] Item #{itemId} decision={decision} orderId={orderId}")
 
-        # etape 3: envoie l'info a l'Arduino pour l'aiguillage
+        # envoie l'info a l'Arduino pour l'aiguillage
         decisionByte = {"ORDER": 0x01, "STOCK": 0x02}.get(decision, 0x00)
         payload = bytes([
             (itemId >> 8) & 0xFF,
@@ -189,12 +167,9 @@ def handleScanResult(payload):
     print(f"[ARDUINO] Resultat: Item #{itemId} {decisionStatus}")
 
     try:
-        # utilise le endpoint existant PATCH /api/items/:id/status
-        r = requests.patch(f"{BACKEND_URL}/api/items/{itemId}/status", json={
+        requests.patch(f"{BACKEND_URL}/api/items/{itemId}/status", json={
             "status": {"status": decisionStatus}
         }, timeout=5)
-        if r.status_code != 204:
-            print(f"  [!] Backend a repondu HTTP {r.status_code}: {r.text}")
     except Exception as e:
         print(f"  [!] Backend injoignable: {e}")
 
@@ -221,8 +196,6 @@ def handleLocalOrder(payload):
             cid  = db_colors.get(name) if name else None
             if cid and qty > 0:
                 order_lines.append({"quantity": qty, "id": cid})
-        if not order_lines:
-            return
         r = requests.post(f"{BACKEND_URL}/api/neworder", json={"lines": order_lines}, timeout=5)
         if r.status_code == 204:
             print(f"  [BACKEND] Commande creee ({lineCount} lignes)")
@@ -261,14 +234,17 @@ def handleArduinoFrame():
     elif pid == SerialTransfer.PID_PING:
         print("[ARDUINO] Ping recu (diag)")
 
-# poll des couleurs actives depuis le backend
-# envoie a l'Arduino seulement si la liste change
+# couleurs actives via Socket.IO (le backend previent quand ca change)
 
-last_color_hash = None
+sio = socketio.Client()
 
-def pollAndSendColors():
-    """Polls GET /api/colors, envoie PID_COLOR_LIST si changement."""
-    global last_color_hash
+@sio.on('color_update')
+def on_color_update():
+    # le backend a modifie les couleurs, on refetch et on balance a l'Arduino
+    fetchAndSendColors()
+
+def fetchAndSendColors():
+    """GET /api/colors -> PID_COLOR_LIST vers l'Arduino (appele au connect + sur event)."""
     try:
         r = requests.get(f"{BACKEND_URL}/api/colors", timeout=3)
         if r.status_code != 200:
@@ -280,24 +256,27 @@ def pollAndSendColors():
                         "orange": 0x06}
         active = []
         for c in r.json():
-            # couleur active si tous les champs HSV sont definis
-            if None not in (c.get("hueMin"), c.get("hueMax"),
-                            c.get("saturationMin"), c.get("saturationMax"),
-                            c.get("valueMin"), c.get("valueMax")):
+            # le backend filtre deja status:true, mais on double-check
+            if c.get("status"):
                 bid = name_to_byte.get((c.get("name") or "").lower())
                 if bid:
                     active.append(bid)
-        h = hash(tuple(active))
-        if h != last_color_hash:
-            last_color_hash = h
-            if active:
-                payload = bytes([len(active)] + active)
-                st.send(SerialTransfer.PID_COLOR_LIST, payload)
-                names = {0x01:"Jaune",0x02:"Bleu",0x03:"Magenta",0x04:"Vert",0x05:"Rouge",0x06:"Orange"}
-                print(f"[COLORS] {len(active)} actives envoyees: "
-                      f"{[names.get(b,'?') for b in active]}")
+        if active:
+            st.send(SerialTransfer.PID_COLOR_LIST, bytes([len(active)] + active))
+            names = {0x01:"Jaune",0x02:"Bleu",0x03:"Magenta",0x04:"Vert",0x05:"Rouge",0x06:"Orange"}
+            print(f"[COLORS] {len(active)} actives envoyees: "
+                  f"{[names.get(b,'?') for b in active]}")
     except Exception:
-        pass  # backend down, on ressayera plus tard
+        pass  # backend down, on retentera au prochain event
+
+@sio.on('connect')
+def on_connect():
+    print("[SIO] Connecte au backend")
+    fetchAndSendColors()  # charge les couleurs direct au connect
+
+@sio.on('disconnect')
+def on_disconnect():
+    print("[SIO] Deconnecte du backend")
 
 # boucle principale
 
@@ -305,15 +284,11 @@ def main():
     global running
     print("[PI_DRIVER] Pret. En attente de blocs...")
 
-    last_poll = 0
+    # connexion Socket.IO pour les updates de couleur
+    sio.connect(BACKEND_URL)
+
     while running:
         handleArduinoFrame()
-
-        now = time.time()
-        if now - last_poll > 2:
-            pollAndSendColors()
-            last_poll = now
-
         time.sleep(0.05)
 
 

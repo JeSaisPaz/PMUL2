@@ -7,7 +7,7 @@ var http = require('http');
 var socketIo = require('socket.io');
 
 
-var indexRouter = require('./routes/user');
+// var indexRouter = require('./routes/user');
 // var apiRouter = require('./routes/api');
 
 
