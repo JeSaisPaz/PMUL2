@@ -9,7 +9,7 @@ import sys, os, subprocess, time, json
 HOST = sys.argv[2] if len(sys.argv) > 2 else "localhost:3000"
 PORT = sys.argv[4] if len(sys.argv) > 4 else None
 found = None
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SUITE = os.path.join(ROOT, "AI", "TestSuite")
 WEB   = os.path.join(ROOT, "web", "PMUL2", "pmul2-team01-app")
 PI    = os.path.join(ROOT, "raspberry-pi", "script-final")
