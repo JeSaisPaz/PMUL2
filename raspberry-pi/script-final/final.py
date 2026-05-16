@@ -23,8 +23,7 @@ BAUD        = 9600
 BACKEND_URL = "http://localhost:3000"
 
 # init serie (auto-detect)
-PORT_CANDIDATES = ["/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyACM0", "/dev/ttyACM1",
-                   "/dev/serial0", "/dev/ttyAMA0"]
+PORT_CANDIDATES = ["/dev/ttyUSB0", "/dev/ttyUSB1"]
 port = None
 for c in PORT_CANDIDATES:
     if os.path.exists(c):

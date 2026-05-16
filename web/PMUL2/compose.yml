@@ -1,6 +1,6 @@
 services:
   mysql:
-    image: mysql:latest
+    image: arm64v8/mysql:latest
     container_name: pmul2_db
     restart: always
     volumes:
@@ -28,7 +28,7 @@ services:
       - nt-pmul2
 
   app:
-    image: node:latest
+    image: arm64v8/node:latest
     container_name: pmul2_app
     user: node
     restart: always
