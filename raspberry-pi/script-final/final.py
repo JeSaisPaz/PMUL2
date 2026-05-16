@@ -202,12 +202,11 @@ def handleLocalOrder(payload):
     """L'Arduino a saisi une commande au keypad, on l'envoie au backend."""
     if len(payload) < 2:
         return
-    teamId    = payload[0]
-    lineCount = payload[1]
-    if lineCount == 0 or len(payload) < 2 + lineCount * 2:
+    lineCount = payload[0]
+    if lineCount == 0 or len(payload) < 1 + lineCount * 2:
         return
     color_names = {0x01: "jaune", 0x02: "bleu", 0x03: "magenta", 0x04: "vert", 0x05: "rouge", 0x06: "orange"}
-    print(f"[ARDUINO] Commande keypad (team {teamId})")
+    print(f"[ARDUINO] Commande keypad")
     try:
         r_colors = requests.get(f"{BACKEND_URL}/api/colors", timeout=5)
         if r_colors.status_code != 200:
@@ -216,8 +215,8 @@ def handleLocalOrder(payload):
         db_colors = {c["name"].lower(): c["id"] for c in r_colors.json()}
         order_lines = []
         for i in range(lineCount):
-            colorByte = payload[2 + i * 2]
-            qty       = payload[2 + i * 2 + 1]
+            colorByte = payload[1 + i * 2]
+            qty       = payload[1 + i * 2 + 1]
             name = color_names.get(colorByte)
             cid  = db_colors.get(name) if name else None
             if cid and qty > 0:

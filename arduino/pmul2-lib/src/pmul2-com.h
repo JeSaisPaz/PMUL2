@@ -38,7 +38,7 @@ class Pmul2Com {
         void sendPong();
         void sendScanResult(uint16_t itemId, ItemStatus status);
         // envoie une commande saisie au keypad: lines = [{color, qty}, ...]
-        void sendLocalOrder(uint8_t teamId, uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys);
+        void sendLocalOrder(uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys);
 
         // lecture (Pi vers Arduino)
         bool readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId);

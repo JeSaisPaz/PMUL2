@@ -122,7 +122,7 @@ IR1 ON → Arduino bloque → PID_STATUS(SCAN_NEEDED) → Pi
 | PID | Direction | Nom | Payload |
 |-----|-----------|-----|---------|
 | 0x00 | Pi↔Arduino | PING | 1 byte |
-| 0x04 | Arduino→Pi | LOCAL_ORDER | teamId + lineCount + [color+qty]*N |
+| 0x04 | Arduino→Pi | LOCAL_ORDER | lineCount + [color+qty]*N |
 | 0x05 | Pi→Arduino | COLOR_LIST | count + [colorId]*N |
 | 0x10 | Pi→Arduino | ITEM_INFO | itemId(2B) + decision(1B) + orderId(1B) |
 | 0x11 | Arduino→Pi | SCAN_RESULT | itemId(2B) + status(1B) |

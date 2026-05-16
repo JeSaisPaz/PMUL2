@@ -341,7 +341,7 @@ void confirmOrderStep() {
 
 void sendLocalOrder() {
   if (localLineCount == 0) return;
-  objetPmul.sendLocalOrder(0x01, localLineCount, localColors, localQtys);
+  objetPmul.sendLocalOrder(localLineCount, localColors, localQtys);
 }
 
 void exitOrderMode(bool sent) {

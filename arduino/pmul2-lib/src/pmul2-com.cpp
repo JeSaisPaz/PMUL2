@@ -58,15 +58,14 @@ void Pmul2Com::sendScanResult(uint16_t itemId, ItemStatus status) {
     _transfer.sendData(3, PID_SCAN_RESULT);
 }
 
-void Pmul2Com::sendLocalOrder(uint8_t teamId, uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys) {
-    // payload: teamId(1) + lineCount(1) + [color(1) + qty(1)] * N
-    _transfer.packet.txBuff[0] = teamId;
-    _transfer.packet.txBuff[1] = lineCount;
+void Pmul2Com::sendLocalOrder(uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys) {
+    // payload: lineCount(1) + [color(1) + qty(1)] * N
+    _transfer.packet.txBuff[0] = lineCount;
     for (uint8_t i = 0; i < lineCount && i < 8; i++) {
-        _transfer.packet.txBuff[2 + i * 2]     = colors[i];
-        _transfer.packet.txBuff[2 + i * 2 + 1] = qtys[i];
+        _transfer.packet.txBuff[1 + i * 2]     = colors[i];
+        _transfer.packet.txBuff[1 + i * 2 + 1] = qtys[i];
     }
-    _transfer.sendData(2 + lineCount * 2, PID_LOCAL_ORDER);
+    _transfer.sendData(1 + lineCount * 2, PID_LOCAL_ORDER);
 }
 
 // lecture Pi vers Arduino
