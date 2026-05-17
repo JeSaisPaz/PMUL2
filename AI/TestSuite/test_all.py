@@ -16,12 +16,18 @@ PI    = os.path.join(ROOT, "raspberry-pi", "script-final")
 
 results = {}
 
-def run(label, cmd, cwd=None):
+def run(label, cmd, cwd=None, docker_exec=None):
+    global results
     print(f"\n{'='*50}")
     print(f"  {label}")
     print(f"{'='*50}")
     try:
-        r = subprocess.run(cmd, shell=True, cwd=cwd or ROOT, capture_output=True, text=True, timeout=120)
+        if docker_exec:
+            # lance dans le container Docker (Node.js compatible)
+            full_cmd = ["docker", "exec", "-i", docker_exec, "sh", "-c", cmd]
+            r = subprocess.run(full_cmd, cwd="/home/node/app", capture_output=True, text=True, timeout=120)
+        else:
+            r = subprocess.run(cmd, shell=True, cwd=cwd or ROOT, capture_output=True, text=True, timeout=120)
         print(r.stdout[-2000:] if len(r.stdout) > 2000 else r.stdout)
         if r.stderr.strip():
             print(r.stderr[-500:])
@@ -34,9 +40,19 @@ def run(label, cmd, cwd=None):
         results[label] = f"CRASH: {e}"
         print(f"  CRASH: {e}")
 
-# 0. seed couleurs dans la DB (via Prisma)
-run("0. Seed couleurs (Prisma)",
-    f'node "{SUITE}/seed_colors.js"', cwd=WEB)
+# 0. seed couleurs dans la DB (via Prisma dans le container Docker)
+# le container ne monte que pmul2-team01-app donc on copie le script dedans
+seed_src = os.path.join(SUITE, "seed_colors.js")
+seed_dst = os.path.join(WEB, "seed_colors.js")
+try:
+    import shutil
+    shutil.copy(seed_src, seed_dst)
+    run("0. Seed couleurs (Prisma)",
+        "node seed_colors.js",
+        docker_exec="pmul2_app")
+except Exception as e:
+    results["0. Seed couleurs"] = f"CRASH: {e}"
+    print(f"  CRASH: {e}")
 
 # 1. SerialTransfer (pas de hardware)
 run("1. SerialTransfer (COBS/CRC8)",
@@ -50,9 +66,18 @@ run("2. API REST (tous les endpoints)",
 run("3. E2E (scan -> tri -> confirmation)",
     f'python "{SUITE}/test_e2e.py" --host {HOST}')
 
-# 4. Database (Prisma + schema)
-run("4. Database (Prisma schema FK)",
-    f'node "{SUITE}/test_database.js"', cwd=WEB)
+# 4. Database (Prisma schema) - dans le container Docker
+db_src = os.path.join(SUITE, "test_database.js")
+db_dst = os.path.join(WEB, "test_database.js")
+try:
+    import shutil
+    shutil.copy(db_src, db_dst)
+    run("4. Database (Prisma schema FK)",
+        "node test_database.js",
+        docker_exec="pmul2_app")
+except Exception as e:
+    results["4. Database"] = f"CRASH: {e}"
+    print(f"  CRASH: {e}")
 
 # 5. ping Arduino (si port serie dispo)
 if PORT:
