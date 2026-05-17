@@ -67,7 +67,7 @@ async function run() {
 
     // ORDER: statuts valides
     const orders = await prisma.oRDER.findMany();
-    const validStatuses = ["IN_PROCESS", "COMPLETED", "CANCELLED"];
+    const validStatuses = ["PROCESS", "COMPLETED", "CANCELLED"];
     checkSync("ORDER.status valide", orders.every(o => validStatuses.includes(o.status)));
 
     // ITEM: foreign keys coherentes
