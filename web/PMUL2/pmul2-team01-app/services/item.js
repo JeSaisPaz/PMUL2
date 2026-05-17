@@ -1,4 +1,4 @@
-const { prisma, ITEM_STATUS, DECISION, DECISION_STATUS, ORDER_STATUS } = require("../routes/adapter");
+const { prisma, DECISION } = require("../routes/adapter");
 
 async function getItems() {
     return prisma.iTEM.findMany({
@@ -18,9 +18,9 @@ async function deleteItem(id) {
     if (!item) throw { code: 404, message: "Item not found" };
 
     if (
-        item.status === ITEM_STATUS.PROCESS ||
-        item.ORDER_LINE?.status === ORDER_STATUS.PROCESS ||
-        item.ORDER_LINE?.status === ORDER_STATUS.COMPLETED
+        item.status === "IN_PROCESS" ||
+        item.ORDER_LINE?.status === "IN_PROCESS" ||
+        item.ORDER_LINE?.status === "COMPLETED"
     ) {
         throw { code: 400, message: "Item cannot be deleted" };
     }
@@ -38,12 +38,12 @@ async function updateItemStatus(id, status) {
     if (!Object.values(DECISION_STATUS).includes(status.status)) {
         throw { code: 400, message: "Invalid status" };
     }
-    if (item.decisionStatus !== DECISION_STATUS.PROCESS || item.status !== ITEM_STATUS.PROCESS) {
+    if (item.decisionStatus !== "IN_PROCESS" || item.status !== "IN_PROCESS") {
         throw { code: 400, message: "Item is not in a processable state" };
     }
 
     if (item.decision === DECISION.PASS) {
-        const newStatus = status.status === DECISION_STATUS.CONFIRMED ? ITEM_STATUS.EXTERNAL : ITEM_STATUS.CANCELLED;
+        const newStatus = status.status === "CONFIRMED" ? "EXTERNAL" : "CANCELLED";
         await prisma.$transaction([
             prisma.iTEM.update({ where: { id }, data: { status: newStatus, decisionStatus: status.status } }),
             prisma.iTEM_HISTORY.create({ data: { ITEM_id: id, status: newStatus } }),
@@ -52,7 +52,7 @@ async function updateItemStatus(id, status) {
     }
 
     else if (item.decision === DECISION.STOCK) {
-        const newStatus = status.status === DECISION_STATUS.CONFIRMED ? ITEM_STATUS.AVAILABLE : ITEM_STATUS.CANCELLED;
+        const newStatus = status.status === "CONFIRMED" ? "AVAILABLE" : "CANCELLED";
         await prisma.$transaction([
             prisma.iTEM.update({ where: { id }, data: { status: newStatus, decisionStatus: status.status } }),
             prisma.iTEM_HISTORY.create({ data: { ITEM_id: id, status: newStatus } }),
@@ -61,9 +61,9 @@ async function updateItemStatus(id, status) {
     }
 
     else if (item.decision === DECISION.ORDER) {
-        const newStatus = status.status === DECISION_STATUS.CONFIRMED ? ITEM_STATUS.ORDERED : ITEM_STATUS.CANCELLED;
+        const newStatus = status.status === "CONFIRMED" ? "ORDERED" : "CANCELLED";
 
-        if (item.ORDER_LINE?.ORDER.status !== ORDER_STATUS.CANCELLED) {
+        if (item.ORDER_LINE?.ORDER.status !== "CANCELLED") {
             await prisma.$transaction([
                 prisma.iTEM.update({ where: { id }, data: { status: newStatus, decisionStatus: status.status } }),
                 prisma.iTEM_HISTORY.create({ data: { ITEM_id: id, status: newStatus } }),
@@ -73,7 +73,7 @@ async function updateItemStatus(id, status) {
             const currentLine = await prisma.oRDER_LINE.findUnique({
                 where: { id: item.ORDER_LINE_id },
                 include: {
-                    ITEM: { where: { status: ITEM_STATUS.ORDERED } },
+                    ITEM: { where: { status: "ORDERED" } },
                     ORDER: true
                 }
             });
@@ -81,17 +81,16 @@ async function updateItemStatus(id, status) {
             if (currentLine.ITEM.length >= currentLine.quantity) {
                 await prisma.oRDER_LINE.update({
                     where: { id: currentLine.id },
-                    data: { status: ORDER_STATUS.COMPLETED }
-                });
+                    data: { status: "COMPLETED" }
 
                 const pendingLines = await prisma.oRDER_LINE.count({
-                    where: { ORDER_id: currentLine.ORDER_id, status: ORDER_STATUS.PROCESS }
+                    where: { ORDER_id: currentLine.ORDER_id, status: "IN_PROCESS" }
                 });
 
                 if (pendingLines === 0) {
                     await prisma.oRDER.update({
                         where: { id: currentLine.ORDER_id },
-                        data: { status: ORDER_STATUS.COMPLETED, completedAt: new Date() }
+                        data: { status: "COMPLETED", completedAt: new Date() }
                     });
                 }
             }

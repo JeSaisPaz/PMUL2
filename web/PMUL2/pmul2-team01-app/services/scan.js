@@ -1,4 +1,4 @@
-const { prisma, ORDER_STATUS, ITEM_STATUS, DECISION, TEAM } = require("../routes/adapter");
+const { prisma, DECISION, TEAM } = require("../routes/adapter");
 
 async function getScans() {
     return prisma.rEAD_CYCLE.findMany({
@@ -40,13 +40,13 @@ async function createScan(scan) {
             const orderLines = await prisma.oRDER_LINE.findMany({
                 where: {
                     COLOR_id: validColor.id,
-                    ORDER: { status: ORDER_STATUS.PROCESS },
-                    status: ORDER_STATUS.PROCESS,
+                    ORDER: { status: "IN_PROCESS" },
+                    status: "IN_PROCESS",
                 },
                 orderBy: { ORDER: { createdAt: 'asc' } },
                 include: {
                     ITEM: {
-                        where: { status: { in: [ITEM_STATUS.ORDERED, ITEM_STATUS.PROCESS] } }
+                        where: { status: { in: ["ORDERED", "IN_PROCESS"] } }
                     }
                 }
             });
