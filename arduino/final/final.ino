@@ -73,6 +73,10 @@ void setup() {
   Serial.begin(9600);
   Serial1.begin(9600);
 
+  // dit au Pi qu'on est pret AVANT lcd.init() qui peut bloquer
+  Serial.write('R');
+  Serial1.println("Pret.");
+
   lcd.init();
   lcd.backlight();
   lcd.print("Systeme Pret");
@@ -94,9 +98,6 @@ void setup() {
   servoScan.write(0);
   servoStock.write(0);
   servoCommande.write(0);
-
-  Serial.write('R');
-  Serial1.println("Pret.");
 }
 
 void loop() {

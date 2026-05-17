@@ -162,10 +162,13 @@ def do_diag():
 
     # Socket.IO
     try:
+        import socketio
         sio = socketio.Client()
         sio.connect(f"http://{HOST}", wait_timeout=3)
         sio.disconnect()
         print(f"  [OK] Backend Socket.IO")
+    except ImportError:
+        print(f"  [SKIP] Socket.IO (pip install python-socketio[client])")
     except Exception as e:
         print(f"  [!!] Socket.IO: {e}")
 
