@@ -35,7 +35,7 @@ async function updateItemStatus(id, status) {
     });
 
     if (!item) throw { code: 404, message: "Item not found" };
-    if (!Object.values(DECISION_STATUS).includes(status.status)) {
+    if (!["CONFIRMED", "FAILED", "IN_PROCESS"].includes(status.status)) {
         throw { code: 400, message: "Invalid status" };
     }
     if (item.decisionStatus !== "IN_PROCESS" || item.status !== "IN_PROCESS") {
