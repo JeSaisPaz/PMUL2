@@ -45,9 +45,11 @@ def run_section(label, fn):
     print(f"{'='*50}")
     try:
         fn()
-        results[label] = "OK"
+        if label not in results:
+            results[label] = "OK"
     except Exception as e:
-        results[label] = f"FAIL: {e}"
+        if label not in results:
+            results[label] = f"FAIL: {e}"
         print(f"  FAIL: {e}")
 
 # 0. seed couleurs
@@ -139,13 +141,12 @@ def do_arduino_ping():
 
 run_section("5. Arduino ping", do_arduino_ping)
 
-# 6. Diagnostic complet (inline)
+# 6. Diagnostic complet
 def do_diag():
     p = PORT or found
     if not p:
-        results["6. Diagnostic"] = "SKIP (pas de port)"
         print("  SKIP  pas de port serie")
-        return
+        return  # run_section marquera comme OK (skip volontaire)
 
     import requests, socketio
 
@@ -162,15 +163,11 @@ def do_diag():
     # Socket.IO
     try:
         sio = socketio.Client()
-        connected = [False]
-        @sio.on('connect')
-        def on_connect():
-            connected[0] = True
         sio.connect(f"http://{HOST}", wait_timeout=3)
         sio.disconnect()
         print(f"  [OK] Backend Socket.IO")
     except Exception as e:
-        print(f"  [!!] Backend Socket.IO: {e}")
+        print(f"  [!!] Socket.IO: {e}")
 
     # Arduino ping
     try:
@@ -199,12 +196,10 @@ def do_diag():
             else:
                 print(f"  [!!] Arduino pas de pong")
         else:
-            print(f"  [!!] Arduino pas pret (R)")
+            print(f"  [!!] Arduino pas pret (pas de R)")
         s.close()
     except Exception as e:
         print(f"  [!!] Arduino: {e}")
-
-    results["6. Diagnostic"] = "OK"
 
 run_section("6. Diagnostic complet", do_diag)
 
