@@ -67,7 +67,7 @@ async function cancelOrder(id) {
         prisma.iTEM.updateMany({
             where: { id: { in: allItems.map(i => i.id) } },
             data: { status: "CANCELLED" }
-        })),
+        }),
         prisma.iTEM_HISTORY.createMany({
             data: allItems.map(item => ({ ITEM_id: item.id, status: "CANCELLED" }))
         })
