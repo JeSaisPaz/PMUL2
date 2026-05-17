@@ -25,7 +25,7 @@ print("  Ctrl+C pour quitter\n")
 
 cam = Picamera2()
 cam.configure(cam.create_preview_configuration(main={"size": (640, 480)}))
-cam.start_preview(Preview.DRM)
+cam.start_preview(Preview.NULL)  # pas d'overlay ecran, juste le log console
 cam.start()
 time.sleep(2)
 
