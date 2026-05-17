@@ -1,4 +1,5 @@
 const { prisma, ORDER_STATUS, ITEM_STATUS, DECISION, TEAM } = require("../routes/adapter");
+
 async function getScans() {
     return prisma.rEAD_CYCLE.findMany({
         include: { ITEM: { include: { COLOR: true } } },
@@ -33,7 +34,7 @@ async function createScan(scan) {
     const validColor = (color && color.status === true) ? color : null;
 
     if (scan.qrValue === TEAM.TEAM01) {
-        //on recupere toutes les lignes de commandes contenant la couleur et en incluant les items ordered ou in process
+        //on récupère toutes les lignes de commandes contenant la couleur et en incluant les items ordered ou in process
         let orderLineInNeed = null;
         if(validColor){
             const orderLines = await prisma.oRDER_LINE.findMany({
@@ -49,9 +50,9 @@ async function createScan(scan) {
                     }
                 }
             });
-            orderLineInNeed = orderLines.find(line => line.ITEM.length < line.quantity) ?? null;
+            orderLineInNeed = orderLines.find(line => line.ITEM.length < line.quantity) ?? null;  
         }
-        //on prend la commande la plus vielle ('asc') avec de la place
+        //on prend la commande la plus vielle ('asc') avec de la place 
         const newItem = await prisma.iTEM.create({
             data: {
                 team: scan.qrValue,
