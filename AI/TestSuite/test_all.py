@@ -23,9 +23,8 @@ def run(label, cmd, cwd=None, docker_exec=None):
     print(f"{'='*50}")
     try:
         if docker_exec:
-            # lance dans le container Docker (Node.js compatible)
-            full_cmd = ["docker", "exec", "-i", docker_exec, "sh", "-c", cmd]
-            r = subprocess.run(full_cmd, cwd="/home/node/app", capture_output=True, text=True, timeout=120)
+            full_cmd = ["docker", "exec", "-i", "-w", "/home/node/app", docker_exec, "sh", "-c", cmd]
+            r = subprocess.run(full_cmd, capture_output=True, text=True, timeout=120)
         else:
             r = subprocess.run(cmd, shell=True, cwd=cwd or ROOT, capture_output=True, text=True, timeout=120)
         print(r.stdout[-2000:] if len(r.stdout) > 2000 else r.stdout)
