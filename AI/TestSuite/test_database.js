@@ -1,13 +1,8 @@
-# Agent: OpenCode (Claude) - AI/TestSuite
-# Test: Base de donnees - verifie que Prisma se connecte et que le
-#       schema est coherent (tables, relations, contraintes)
-#
-# Usage: node test_database.js
-#        (depuis le dossier web/PMUL2/pmul2-team01-app)
+// Agent: OpenCode (Claude) - AI/TestSuite
+// Test: Base de donnees
 
-const { PrismaClient } = require("../../generated/prisma");
+const { PrismaClient } = require("./generated/prisma");
 require("dotenv").config();
-
 const { PrismaMariaDb } = require("@prisma/adapter-mariadb");
 const adapter = new PrismaMariaDb({
     host: "mysql",

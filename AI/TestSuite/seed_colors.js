@@ -2,9 +2,8 @@
 // Seed: insere les couleurs actives dans la DB via Prisma
 // Usage: node seed_colors.js
 
-const { PrismaClient } = require("../../generated/prisma");
+const { PrismaClient } = require("./generated/prisma");
 require("dotenv").config();
-
 const { PrismaMariaDb } = require("@prisma/adapter-mariadb");
 const adapter = new PrismaMariaDb({
     host: "mysql",
