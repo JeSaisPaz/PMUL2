@@ -148,7 +148,7 @@ def do_diag():
         print("  SKIP  pas de port serie")
         return  # run_section marquera comme OK (skip volontaire)
 
-    import requests, socketio
+    import requests
 
     # health HTTP
     try:
