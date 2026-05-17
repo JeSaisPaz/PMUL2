@@ -1,4 +1,4 @@
-const { prisma } = require("../routes/adapter");
+const { prisma, ORDER_STATUS, ITEM_STATUS } = require("../routes/adapter");
 
 async function getOrders() {
     return prisma.oRDER.findMany({
@@ -20,9 +20,9 @@ async function getOrderDetails(id) {
         ...order,
         ORDER_LINE: order.ORDER_LINE.map(line => ({
             ...line,
-            orderedCount:   line.ITEM.filter(i => i.status === "ORDERED").length,
-            inProcessCount: line.ITEM.filter(i => i.status === "IN_PROCESS").length,
-            cancelledCount: line.ITEM.filter(i => i.status === "CANCELLED").length,
+            orderedCount:   line.ITEM.filter(i => i.status === ITEM_STATUS.ORDERED).length,
+            inProcessCount: line.ITEM.filter(i => i.status === ITEM_STATUS.IN_PROCESS).length,
+            cancelledCount: line.ITEM.filter(i => i.status === ITEM_STATUS.CANCELLED).length,
         }))
     };
 }
@@ -42,7 +42,7 @@ async function createOrder(lines) {
 async function deleteOrder(id) {
     const order = await prisma.oRDER.findUnique({ where: { id } });
     if (!order) throw { code: 404, message: "Order not found" };
-    if (order.status === "IN_PROCESS") {
+    if (order.status === ORDER_STATUS.IN_PROCESS) {
         throw { code: 400, message: "Order cannot be deleted" };
     }
     await prisma.oRDER.delete({ where: { id } });
@@ -55,21 +55,21 @@ async function cancelOrder(id) {
     });
 
     if (!order) throw { code: 404, message: "Order not found" };
-    if (order.status === "COMPLETED" || order.status === "CANCELLED") {
+    if (order.status === ORDER_STATUS.COMPLETED || order.status === ORDER_STATUS.CANCELLED) {
         throw { code: 400, message: "Order status cannot be changed" };
     }
 
     const allItems = order.ORDER_LINE.flatMap(line => line.ITEM);
 
     await prisma.$transaction([
-        prisma.oRDER.update({ where: { id }, data: { status: "CANCELLED" } }),
-        prisma.oRDER_LINE.updateMany({ where: { ORDER_id: id }, data: { status: "CANCELLED" } }),
+        prisma.oRDER.update({ where: { id }, data: { status: ORDER_STATUS.CANCELLED } }),
+        prisma.oRDER_LINE.updateMany({ where: { ORDER_id: id }, data: { status: ORDER_STATUS.CANCELLED } }),
         prisma.iTEM.updateMany({
             where: { id: { in: allItems.map(i => i.id) } },
-            data: { status: "CANCELLED" }
+            data: { status: ITEM_STATUS.CANCELLED }
         }),
         prisma.iTEM_HISTORY.createMany({
-            data: allItems.map(item => ({ ITEM_id: item.id, status: "CANCELLED" }))
+            data: allItems.map(item => ({ ITEM_id: item.id, status: ITEM_STATUS.CANCELLED }))
         })
     ]);
 }
