@@ -82,6 +82,7 @@ async function updateItemStatus(id, status) {
                 await prisma.oRDER_LINE.update({
                     where: { id: currentLine.id },
                     data: { status: "COMPLETED" }
+                });
 
                 const pendingLines = await prisma.oRDER_LINE.count({
                     where: { ORDER_id: currentLine.ORDER_id, status: "IN_PROCESS" }
