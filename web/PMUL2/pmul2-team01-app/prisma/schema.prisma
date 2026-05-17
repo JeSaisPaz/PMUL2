@@ -12,13 +12,13 @@ model ITEM {
   team              TEAM?
   decision          DECISION
   orderedAt         DateTime?                 @db.Timestamp(0)
-  status            ITEM_STATUS               @default(IN_PROCESS)
-  decisionStatus    DECISION_STATUS           @default(IN_PROCESS)
+  status            ITEM_STATUS               @default(PROCESS)
+  decisionStatus    DECISION_STATUS           @default(PROCESS)
   COLOR_id          Int?
   READ_CYCLE_id     Int?                       @unique
   ORDER_LINE_id     Int?
   
-  COLOR             COLOR?                     @relation(fields: [COLOR_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  COLOR             COLOR?                     @relation(fields: [COLOR_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   READ_CYCLE        READ_CYCLE?                @relation(fields: [READ_CYCLE_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   ORDER_LINE        ORDER_LINE?               @relation(fields: [ORDER_LINE_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   SELECTION_HISTORY SELECTION_HISTORY[]
@@ -30,7 +30,7 @@ model ITEM {
 
 model ITEM_HISTORY {
   id                Int                       @id @default(autoincrement())
-  status            ITEM_STATUS               @default(IN_PROCESS)
+  status            ITEM_STATUS               @default(PROCESS)
   createdAt         DateTime                  @default(now()) @db.Timestamp(0)
   ITEM_id           Int
 
@@ -41,7 +41,7 @@ model ITEM_HISTORY {
 
 model SELECTION_HISTORY {
   id              Int                         @id @default(autoincrement())                        
-  status          DECISION_STATUS             @default(IN_PROCESS)
+  status          DECISION_STATUS             @default(PROCESS)
   createdAt       DateTime                    @default(now()) @db.Timestamp(0)
   ITEM_id         Int
 
@@ -52,7 +52,7 @@ model SELECTION_HISTORY {
 
 model ORDER {
   id                Int                       @id @default(autoincrement())
-  status            ORDER_STATUS              @default(IN_PROCESS)
+  status            ORDER_STATUS              @default(PROCESS)
   createdAt         DateTime                  @default(now()) @db.Timestamp(0)
   updatedAt         DateTime                  @updatedAt @db.Timestamp(0)
   completedAt       DateTime?                 @db.Timestamp(0)
@@ -65,10 +65,10 @@ model ORDER_LINE {
   quantity         Int
   ORDER_id         Int
   COLOR_id         Int
-  status           ORDER_STATUS               @default(IN_PROCESS)
+  status           ORDER_STATUS               @default(PROCESS)
 
   ORDER            ORDER                      @relation(fields: [ORDER_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  COLOR            COLOR                      @relation(fields: [COLOR_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  COLOR            COLOR                      @relation(fields: [COLOR_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   ITEM             ITEM[]
 
   @@index([ORDER_id])
@@ -103,7 +103,7 @@ model COLOR {
 }
 
 enum ORDER_STATUS {
-  IN_PROCESS
+  PROCESS
   COMPLETED
   CANCELLED
 }
@@ -115,7 +115,7 @@ enum DECISION {
 }
 
 enum DECISION_STATUS {
-  IN_PROCESS
+  PROCESS
   CONFIRMED
   FAILED
 }
@@ -123,7 +123,7 @@ enum DECISION_STATUS {
 enum ITEM_STATUS {
   AVAILABLE
   ORDERED
-  IN_PROCESS
+  PROCESS
   EXTERNAL
   CANCELLED
 }

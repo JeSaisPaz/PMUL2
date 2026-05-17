@@ -4,7 +4,7 @@ var router = express.Router();
 const { getScans, createScan, deleteScan } = require("../services/scan");
 const { getOrders, getOrderDetails, createOrder, deleteOrder, cancelOrder } = require("../services/order");
 const { getItems, deleteItem, updateItemStatus } = require("../services/item");
-const { getColors } = require("../services/color");
+const { getColors, updateColors } = require("../services/color");
 
 module.exports = function (io) {
 
@@ -17,6 +17,7 @@ module.exports = function (io) {
         } catch (error) {
             const code = error.code || 500;
             res.status(code).json({ error: error.message});
+            console.log(error.message)
         }
     };
 
@@ -74,6 +75,12 @@ module.exports = function (io) {
 
     router.get('/colors', handle(async (req, res) => {
         res.json(await getColors());
+    }));
+
+    router.put('/colors/:name/update', handle(async (req, res) => {
+        await updateColors(req.body.color);
+        notifyClients();
+        res.sendStatus(204);
     }));
 
     //Scans

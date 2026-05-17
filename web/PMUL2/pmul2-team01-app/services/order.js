@@ -21,7 +21,7 @@ async function getOrderDetails(id) {
         ORDER_LINE: order.ORDER_LINE.map(line => ({
             ...line,
             orderedCount:   line.ITEM.filter(i => i.status === ITEM_STATUS.ORDERED).length,
-            inProcessCount: line.ITEM.filter(i => i.status === ITEM_STATUS.IN_PROCESS).length,
+            inProcessCount: line.ITEM.filter(i => i.status === ITEM_STATUS.PROCESS).length,
             cancelledCount: line.ITEM.filter(i => i.status === ITEM_STATUS.CANCELLED).length,
         }))
     };
@@ -42,7 +42,7 @@ async function createOrder(lines) {
 async function deleteOrder(id) {
     const order = await prisma.oRDER.findUnique({ where: { id } });
     if (!order) throw { code: 404, message: "Order not found" };
-    if (order.status === ORDER_STATUS.IN_PROCESS) {
+    if (order.status === ORDER_STATUS.PROCESS) {
         throw { code: 400, message: "Order cannot be deleted" };
     }
     await prisma.oRDER.delete({ where: { id } });

@@ -23,39 +23,41 @@ async function createScan(scan) {
         }
     });
 
-    const validColor = await prisma.cOLOR.findFirst({
+    const color = await prisma.cOLOR.findFirst({
         where: {
-            status: true,
             hueMin: { lte: scan.hue }, hueMax: { gte: scan.hue },
             saturationMin: { lte: scan.saturation }, saturationMax: { gte: scan.saturation },
             valueMin: { lte: scan.value }, valueMax: { gte: scan.value },
         }
     });
 
-    if (scan.qrValue === TEAM.TEAM01 && validColor) {
+    const validColor = (color && color.status === true) ? color : null;
+
+    if (scan.qrValue === TEAM.TEAM01) {
         //on récupère toutes les lignes de commandes contenant la couleur et en incluant les items ordered ou in process
-        const orderLines = await prisma.oRDER_LINE.findMany({
-            where: {
-                COLOR_id: validColor.id,
-                ORDER: { status: ORDER_STATUS.IN_PROCESS },
-                status: ORDER_STATUS.IN_PROCESS,
-            },
-            orderBy: { ORDER: { createdAt: 'asc' } },
-            include: {
-                ITEM: {
-                    where: { status: { in: [ITEM_STATUS.ORDERED, ITEM_STATUS.IN_PROCESS] } }
+        let orderLineInNeed = null;
+        if(validColor){
+            const orderLines = await prisma.oRDER_LINE.findMany({
+                where: {
+                    COLOR_id: validColor.id,
+                    ORDER: { status: ORDER_STATUS.PROCESS },
+                    status: ORDER_STATUS.PROCESS,
+                },
+                orderBy: { ORDER: { createdAt: 'asc' } },
+                include: {
+                    ITEM: {
+                        where: { status: { in: [ITEM_STATUS.ORDERED, ITEM_STATUS.PROCESS] } }
+                    }
                 }
-            }
-        });
-
+            });
+            orderLineInNeed = orderLines.find(line => line.ITEM.length < line.quantity) ?? null;  
+        }
         //on prend la commande la plus vielle ('asc') avec de la place 
-        const orderLineInNeed = orderLines.find(line => line.ITEM.length < line.quantity) ?? null;
-
         const newItem = await prisma.iTEM.create({
             data: {
                 team: scan.qrValue,
                 decision: orderLineInNeed ? DECISION.ORDER : DECISION.STOCK,
-                COLOR_id: validColor.id,
+                COLOR_id: color ? color.id : null,
                 READ_CYCLE_id: readCycle.id,
                 ORDER_LINE_id: orderLineInNeed ? orderLineInNeed.id : null,
                 ITEM_HISTORY: { create: {} },
@@ -73,7 +75,7 @@ async function createScan(scan) {
             data: {
                 team: validTeam ? scan.qrValue : null,
                 decision: DECISION.PASS,
-                COLOR_id: validColor ? validColor.id : null,
+                COLOR_id: color ? color.id : null,
                 READ_CYCLE_id: readCycle.id,
                 ITEM_HISTORY: { create: {} },
                 SELECTION_HISTORY: { create: {} }

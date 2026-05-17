@@ -1,34 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link
-      rel="stylesheet" 
-      href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/morph/bootstrap.min.css" 
-    />
-    <link rel="stylesheet" href="/stylesheets/style.css"/>
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-      const socket = io();
-    </script>
-    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <link rel="stylesheet" href="/stylesheets/datatables.min.css">
+  <link rel="stylesheet" href="/stylesheets/bootstrap.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css"/>
+
+  <script defer src="/js/alpinejs.min.js"></script>
+  <script src="/js/datatables.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>const socket = io();</script>
+</head>
 <body>
-  <header>
-    {% include 'navbar.twig' %}
-  </header>
+  <header>{% include 'navbar.twig' %}</header>
+  
   <main>
     <div class="container mt-4">
       {% block body %}{% endblock %}
     </div>
   </main>
-  <footer class="text-center text-muted">
-    <p>PMUL2 - TEAM01<p>
-  </footer>
+
+  <footer class="text-center text-muted"><p>PMUL2 - TEAM01</p></footer>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

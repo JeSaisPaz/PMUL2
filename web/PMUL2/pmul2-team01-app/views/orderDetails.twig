@@ -1,94 +1,97 @@
 {% extends "layout.twig" %}
 
 {% block body %}
-<div class="table-responsive p-3" x-data="orderDetails({{id}})">
-    <div>
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h1>Order #<span x-text="order.id"></span></h1>
-            <span class="badge fs-5" x-text="order.status" 
-                    :class="{
-                    'bg-success' : order.status === 'COMPLETED',
-                    'bg-danger' : order.status === 'CANCELLED',
-                    'bg-info' : order.status === 'IN_PROCESS'
-                    }">
-            </span>
+
+    <div class="card" x-data="orderDetails({{id}})">
+        <div class="table-responsive">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h1>{{title}}</h1>
+                <span class="badge fs-5" x-text="order.status" 
+                        :class="{
+                        'bg-success' : order.status === 'COMPLETED',
+                        'bg-danger' : order.status === 'CANCELLED',
+                        'bg-info' : order.status === 'PROCESS'
+                        }">
+                </span>
+            </div>
+
+            <div class="card-body">
+                <table class="table table-striped border table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Color</th>
+                            <th class="text-center">Received / Requested</th>
+                            <th>Status</th>
+                            <th>Pending</th>
+                            <th>Received</th>
+                            <th>Cancelled</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="line in order.ORDER_LINE" :key="line.id">
+                            <tr>
+                                <td class="fw-bold">
+                                    <div class="d-flex align-items-center">
+                                        <span class="p-2 border rounded-circle me-2" :style="{ backgroundColor: line.COLOR.hex }"></span>
+                                        <span x-text="line.COLOR.name"></span>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge rounded-pill" 
+                                        :class="line.orderedCount >= line.quantity ? 'bg-success' : 'bg-warning text-dark'">
+                                        <span x-text="line.orderedCount"></span> / <span x-text="line.quantity"></span>
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge rounded-pill" x-text="line.status" 
+                                        :class="{
+                                            'bg-success' : line.status === 'COMPLETED',
+                                            'bg-danger'  : line.status === 'CANCELLED',
+                                            'bg-info'    : line.status === 'PROCESS'
+                                        }">
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        <template x-for="item in line.ITEM.filter(i => i.status === 'PROCESS')" :key="item.id">
+                                            <a :href="'/items/' + item.id" class="btn btn-sm btn-info">#<span x-text="item.id"></span></a>
+                                        </template>
+                                        <span x-show="line.inProcessCount === 0" class="text-muted small">—</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        <template x-for="item in line.ITEM.filter(i => i.status === 'ORDERED')" :key="item.id">
+                                            <a :href="'/items/' + item.id" class="btn btn-sm btn-success">#<span x-text="item.id"></span></a>
+                                        </template>
+                                        <span x-show="line.orderedCount === 0" class="text-muted small">—</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        <template x-for="item in line.ITEM.filter(i => i.status === 'CANCELLED')" :key="item.id">
+                                            <a :href="'/items/' + item.id" class="btn btn-sm btn-danger">#<span x-text="item.id"></span></a>
+                                        </template>
+                                        <span x-show="line.ITEM.filter(i => i.status === 'CANCELLED').length === 0" class="text-muted small">—</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <a href="/orders" class="btn btn-primary">← Return</a>
+                    <button x-show="order.status == 'PROCESS'" class="btn btn-danger" @click="cancelOrder()">Cancel</button>
+                </div>
+            </div>
         </div>
 
-        <table class="table table-striped table-hover align-middle">
-            <thead>
-                <tr>
-                    <th>Color</th>
-                    <th class="text-center">Received / Requested</th>
-                    <th>Status</th>
-                    <th>Pending</th>
-                    <th>Received</th>
-                    <th>Cancelled</th>
-                </tr>
-            </thead>
-            <tbody>
-                <template x-for="line in order.ORDER_LINE" :key="line.id">
-                    <tr>
-                        <td class="fw-bold">
-                            <div class="d-flex align-items-center">
-                                <span class="p-2 border rounded-circle me-2" :style="{ backgroundColor: line.COLOR.hex }"></span>
-                                <span x-text="line.COLOR.name"></span>
-                            </div>
-                        </td>
-                        <td class="text-center">
-                            <span class="badge rounded-pill" 
-                                :class="line.orderedCount >= line.quantity ? 'bg-success' : 'bg-warning text-dark'">
-                                <span x-text="line.orderedCount"></span> / <span x-text="line.quantity"></span>
-                            </span>
-                        </td>
-                        <td>
-                            <span class="badge rounded-pill" x-text="line.status" 
-                                :class="{
-                                    'bg-success' : line.status === 'COMPLETED',
-                                    'bg-danger'  : line.status === 'CANCELLED',
-                                    'bg-info'    : line.status === 'IN_PROCESS'
-                                }">
-                            </span>
-                        </td>
-                        <td>
-                            <div class="d-flex flex-wrap gap-1">
-                                <template x-for="item in line.ITEM.filter(i => i.status === 'IN_PROCESS')" :key="item.id">
-                                    <a :href="'/items/' + item.id" class="btn btn-sm btn-outline-info">#<span x-text="item.id"></span></a>
-                                </template>
-                                <span x-show="line.inProcessCount === 0" class="text-muted small">—</span>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="d-flex flex-wrap gap-1">
-                                <template x-for="item in line.ITEM.filter(i => i.status === 'ORDERED')" :key="item.id">
-                                    <a :href="'/items/' + item.id" class="btn btn-sm btn-outline-success">#<span x-text="item.id"></span></a>
-                                </template>
-                                <span x-show="line.orderedCount === 0" class="text-muted small">—</span>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="d-flex flex-wrap gap-1">
-                                <template x-for="item in line.ITEM.filter(i => i.status === 'CANCELLED')" :key="item.id">
-                                    <a :href="'/items/' + item.id" class="btn btn-sm btn-outline-danger">#<span x-text="item.id"></span></a>
-                                </template>
-                                <span x-show="line.ITEM.filter(i => i.status === 'CANCELLED').length === 0" class="text-muted small">—</span>
-                            </div>
-                        </td>
-                    </tr>
-                </template>
-            </tbody>
-        </table>
+        <!-- Loader -->
+        <div x-show="!order" class="text-center mt-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p>Loading...</p>
+        </div>
     </div>
-
-    <!-- Loader -->
-    <div x-show="!order" class="text-center mt-5">
-        <div class="spinner-border text-primary" role="status"></div>
-        <p>Loading...</p>
-    </div>
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <a href="/orders" class="btn">← Return</a>
-        <button x-show="order.status == 'IN_PROCESS'" class="btn btn-danger" @click="cancelOrder()">Cancel</button>
-    </div>
-</div>
 
 <script>
 document.addEventListener('alpine:init', () => {

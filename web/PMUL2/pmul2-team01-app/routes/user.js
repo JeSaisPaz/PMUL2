@@ -11,7 +11,7 @@ router.get('/orders', function(req, res, next) {
 
 router.get('/orders/:id', function(req, res) {
   res.render('orderDetails', { 
-      title: "Commande #" + req.params.id,
+      title: "Order #" + req.params.id,
       id: req.params.id 
   });
 });

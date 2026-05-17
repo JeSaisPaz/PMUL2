@@ -1,23 +1,25 @@
 {% extends "layout.twig" %}
 
 {% block body %}
-<div class="table-responsive p-3">
-    <h1>{{title}}</h1>
-    <table id="itemsTable" class="table table-striped border">
-        <thead>
-            <tr>
-                <th>Scanned at</th>
-                <th>ID</th>
-                <th>Color</th>
-                <th>Team</th>
-                <th>Status</th>
-                <th>Decision</th>
-                <th>Decision status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
+<div class="card">
+    <div class="card-header"> <h1>{{title}}</h1> </div>
+    <div class="card-body p-3">
+        <table id="itemsTable" class="table table-striped border" width="100%">
+            <thead>
+                <tr>
+                    <th>Scanned at</th>
+                    <th>ID</th>
+                    <th>Color</th>
+                    <th>Team</th>
+                    <th>Status</th>
+                    <th>Decision</th>
+                    <th>Decision status</th>
+                    <th data-orderable="false" class="all"></th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
 </div>
 
 <script>
@@ -28,11 +30,12 @@ $(document).ready(function() {
             url: '/api/items', 
             dataSrc: '' 
         },
+        responsive: true,
         autoWidth: false,
         columns: [
             { 
                 data: 'READ_CYCLE.scannedAt', 
-                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '---' 
+                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>' 
             },
             { 
                 data: 'id',
@@ -49,11 +52,15 @@ $(document).ready(function() {
                         </span>
                         <span>${color.name}</span>
                     </div>
-                ` : '---'
+                ` : '<span class="text-muted">—</span>'
             },
             { 
                 data: 'team',
-                render: (team) => team ?? '---'
+                render: (data) => {
+                    if (!data) return '<span class="text-muted">—</span>';
+                    const badgeClass = (data === 'TEAM01') ? 'badge bg-success' : 'badge bg-secondary';
+                    return `<span class="${badgeClass}">${data}</span>`
+                }
             },
             {
                 data: 'status',
@@ -61,7 +68,7 @@ $(document).ready(function() {
                     const badges = {
                         'AVAILABLE':  'bg-success',
                         'EXTERNAL':  'bg-warning',
-                        'IN_PROCESS': 'bg-info',
+                        'PROCESS': 'bg-info',
                         'ORDERED':  'bg-primary',
                         'CANCELLED':  'bg-danger',
                     }
@@ -69,8 +76,17 @@ $(document).ready(function() {
                     return `<span class="badge rounded-pill ${badge}">${status}</span>`
                 }
             },
-            { 
-                data: 'decision'
+            {
+                data: 'decision',
+                render: (decision) => {
+                    const classes = {
+                        'ORDER': 'bg-info',
+                        'STOCK': 'bg-primary',
+                        'PASS':  'bg-warning'
+                    }
+                    const badge = classes[decision] ?? 'bg-secondary'
+                    return `<span class="badge rounded-pill ${badge}">${decision}</span>`
+                }
             },
             {
                 data: 'decisionStatus',
@@ -78,7 +94,7 @@ $(document).ready(function() {
                     const badges = {
                         'CONFIRMED':  'bg-success',
                         'FAILED':  'bg-danger',
-                        'IN_PROCESS': 'bg-info',
+                        'PROCESS': 'bg-info',
                     }
                     const badge = badges[status] ?? 'bg-secondary'
                     return `<span class="badge rounded-pill ${badge}">${status}</span>`
@@ -86,7 +102,7 @@ $(document).ready(function() {
             },
             {
                 data: 'id',
-                render: (id) => `<button class="btn btn-sm btn-danger" onclick="deleteItem(${id})">Delete</button>`
+                render: (id) => `<button class="btn btn-sm btn-danger" onclick="deleteItem(${id})">X</button>`
             }
         ],
         order: [[0, 'desc']]
