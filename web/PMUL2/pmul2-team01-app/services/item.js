@@ -18,8 +18,8 @@ async function deleteItem(id) {
     if (!item) throw { code: 404, message: "Item not found" };
 
     if (
-        item.status === ITEM_STATUS.IN_PROCESS ||
-        item.ORDER_LINE?.status === ORDER_STATUS.IN_PROCESS ||
+        item.status === ITEM_STATUS.PROCESS ||
+        item.ORDER_LINE?.status === ORDER_STATUS.PROCESS ||
         item.ORDER_LINE?.status === ORDER_STATUS.COMPLETED
     ) {
         throw { code: 400, message: "Item cannot be deleted" };
@@ -38,7 +38,7 @@ async function updateItemStatus(id, status) {
     if (!Object.values(DECISION_STATUS).includes(status.status)) {
         throw { code: 400, message: "Invalid status" };
     }
-    if (item.decisionStatus !== DECISION_STATUS.IN_PROCESS || item.status !== ITEM_STATUS.IN_PROCESS) {
+    if (item.decisionStatus !== DECISION_STATUS.PROCESS || item.status !== ITEM_STATUS.PROCESS) {
         throw { code: 400, message: "Item is not in a processable state" };
     }
 
@@ -85,7 +85,7 @@ async function updateItemStatus(id, status) {
                 });
 
                 const pendingLines = await prisma.oRDER_LINE.count({
-                    where: { ORDER_id: currentLine.ORDER_id, status: ORDER_STATUS.IN_PROCESS }
+                    where: { ORDER_id: currentLine.ORDER_id, status: ORDER_STATUS.PROCESS }
                 });
 
                 if (pendingLines === 0) {
