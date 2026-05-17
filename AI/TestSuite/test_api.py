@@ -135,9 +135,11 @@ if colors and len(colors) > 0:
         check("GET", f"/orders/{oid}/details", 200)
 
         # scan avec commande active -> ORDER
-        check("POST", "/scans", 201, body={
+        r = check("POST", "/scans", 201, body={
             "scan": {"qrValue": "TEAM01", "hue": 95, "saturation": 200, "value": 150}
         }, label="POST /scans (TEAM01 + commande -> ORDER)")
+        if r is None:
+            print("  NOTE: scan echoue, probablement Prisma enum bug (IN_PROCESS=undefined)")
 
         # scan autre team -> PASS
         check("POST", "/scans", 201, body={

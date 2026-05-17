@@ -107,7 +107,8 @@ except Exception as e:
     sys.exit(1)
 
 if r.status_code != 201:
-    nok("POST /scans", f" -> HTTP {r.status_code}: {r.text}")
+    nok("POST /scans", f" -> HTTP {r.status_code}")
+    print("  NOTE: Prisma enum bug probable (IN_PROCESS=undefined dans services/scan.js)")
     sys.exit(1)
 
 data = r.json()
