@@ -12,7 +12,6 @@ found = None
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SUITE = os.path.join(ROOT, "AI", "TestSuite")
 WEB   = os.path.join(ROOT, "web", "PMUL2", "pmul2-team01-app")
-PI    = os.path.join(ROOT, "raspberry-pi", "script-final")
 
 results = {}
 
@@ -39,8 +38,19 @@ def run(label, cmd, cwd=None, docker_exec=None):
         results[label] = f"CRASH: {e}"
         print(f"  CRASH: {e}")
 
-# 0. seed couleurs dans la DB (via Prisma dans le container Docker)
-# le container ne monte que pmul2-team01-app donc on copie le script dedans
+def run_section(label, fn):
+    global results, PORT, found
+    print(f"\n{'='*50}")
+    print(f"  {label}")
+    print(f"{'='*50}")
+    try:
+        fn()
+        results[label] = "OK"
+    except Exception as e:
+        results[label] = f"FAIL: {e}"
+        print(f"  FAIL: {e}")
+
+# 0. seed couleurs
 seed_src = os.path.join(SUITE, "seed_colors.js")
 seed_dst = os.path.join(WEB, "seed_colors.js")
 try:
@@ -53,19 +63,19 @@ except Exception as e:
     results["0. Seed couleurs"] = f"CRASH: {e}"
     print(f"  CRASH: {e}")
 
-# 1. SerialTransfer (pas de hardware)
+# 1. SerialTransfer
 run("1. SerialTransfer (COBS/CRC8)",
     f'python "{SUITE}/test_serial_transfer.py"')
 
-# 2. API REST (backend doit tourner)
+# 2. API REST
 run("2. API REST (tous les endpoints)",
     f'python "{SUITE}/test_api.py" --host {HOST}')
 
-# 3. E2E (scan complet)
+# 3. E2E
 run("3. E2E (scan -> tri -> confirmation)",
     f'python "{SUITE}/test_e2e.py" --host {HOST}')
 
-# 4. Database (Prisma schema) - dans le container Docker
+# 4. Database
 db_src = os.path.join(SUITE, "test_database.js")
 db_dst = os.path.join(WEB, "test_database.js")
 try:
@@ -78,32 +88,125 @@ except Exception as e:
     results["4. Database"] = f"CRASH: {e}"
     print(f"  CRASH: {e}")
 
-# 5. ping Arduino (si port serie dispo)
-if PORT:
-    run(f"5. Arduino ping ({PORT})",
-        f'python "{PI}/ping-test.py"')
-else:
-    # auto-detect le port
-    ports = ["/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyACM0", "/dev/ttyACM1"]
-    for p in ports:
-        if os.path.exists(p):
-            found = p
-            break
-    if found:
-        run(f"5. Arduino ping ({found})",
-            f'python "{PI}/ping-test.py"')
+# 5. Arduino ping (inline, pas de fichier externe)
+def do_arduino_ping():
+    global found
+    if not PORT:
+        for p in ["/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyACM0", "/dev/ttyACM1"]:
+            if os.path.exists(p):
+                found = p
+                break
+        if not found:
+            results["5. Arduino ping"] = "SKIP (pas de port)"
+            print("  SKIP  pas de port serie trouve")
+            return
+        p = found
     else:
-        results["5. Arduino ping"] = "SKIP (pas de port)"
-        print("\n  SKIP  pas de port serie trouve")
+        p = PORT
 
-# 6. diag complet
-if PORT or found:
+    import serial
+    sys.path.insert(0, os.path.join(ROOT, "raspberry-pi", "script-final"))
+    from serial_transfer import SerialTransfer
+
+    print(f"  Port: {p}")
+    s = serial.Serial(p, 9600, timeout=0.5)
+
+    t0 = time.time()
+    ready = False
+    while time.time() - t0 < 10:
+        if s.in_waiting and s.read(1) == b'R':
+            ready = True
+            break
+        time.sleep(0.1)
+
+    if not ready:
+        raise Exception("pas de signal R de l'Arduino - branche ? flashe ?")
+
+    st = SerialTransfer(s)
+    st.send(SerialTransfer.PID_PING, b"\x01")
+
+    t0 = time.time()
+    while time.time() - t0 < 3:
+        result = st.available()
+        if result and result[0] == SerialTransfer.PID_PING:
+            print("  Arduino pret ! Pong recu.")
+            s.close()
+            return
+        time.sleep(0.05)
+
+    s.close()
+    raise Exception("pas de reponse au ping en 3s")
+
+run_section("5. Arduino ping", do_arduino_ping)
+
+# 6. Diagnostic complet (inline)
+def do_diag():
     p = PORT or found
-    run(f"6. Diagnostic complet ({p})",
-        f'python "{PI}/diag.py"')
-else:
-    results["6. Diagnostic"] = "SKIP (pas de port)"
-    print("\n  SKIP  pas de port serie")
+    if not p:
+        results["6. Diagnostic"] = "SKIP (pas de port)"
+        print("  SKIP  pas de port serie")
+        return
+
+    import requests, socketio
+
+    # health HTTP
+    try:
+        r = requests.get(f"http://{HOST}/api/health", timeout=3)
+        if r.status_code == 200:
+            print(f"  [OK] Backend HTTP UP")
+        else:
+            print(f"  [!!] Backend HTTP {r.status_code}")
+    except Exception as e:
+        print(f"  [!!] Backend HTTP: {e}")
+
+    # Socket.IO
+    try:
+        sio = socketio.Client()
+        connected = [False]
+        @sio.on('connect')
+        def on_connect():
+            connected[0] = True
+        sio.connect(f"http://{HOST}", wait_timeout=3)
+        sio.disconnect()
+        print(f"  [OK] Backend Socket.IO")
+    except Exception as e:
+        print(f"  [!!] Backend Socket.IO: {e}")
+
+    # Arduino ping
+    try:
+        import serial
+        sys.path.insert(0, os.path.join(ROOT, "raspberry-pi", "script-final"))
+        from serial_transfer import SerialTransfer
+
+        s = serial.Serial(p, 9600, timeout=0.5)
+        t0 = time.time()
+        ready = False
+        while time.time() - t0 < 10:
+            if s.in_waiting and s.read(1) == b'R':
+                ready = True
+                break
+            time.sleep(0.1)
+        if ready:
+            st = SerialTransfer(s)
+            st.send(SerialTransfer.PID_PING, b"\x01")
+            t0 = time.time()
+            while time.time() - t0 < 3:
+                result = st.available()
+                if result and result[0] == SerialTransfer.PID_PING:
+                    print(f"  [OK] Arduino ping ({p})")
+                    break
+                time.sleep(0.05)
+            else:
+                print(f"  [!!] Arduino pas de pong")
+        else:
+            print(f"  [!!] Arduino pas pret (R)")
+        s.close()
+    except Exception as e:
+        print(f"  [!!] Arduino: {e}")
+
+    results["6. Diagnostic"] = "OK"
+
+run_section("6. Diagnostic complet", do_diag)
 
 # resume
 print(f"\n{'='*50}")
