@@ -2,11 +2,9 @@
 
 {% block body %}
 <div class="card">
-    <div class="card-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h1>{{title}}</h1>
-            <a href="/neworder" class="btn btn-primary">✚ Order</a>
-        </div>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h1>{{title}}</h1>
+        <a href="/neworder" class="btn btn-primary">✚ Order</a>
     </div>
     <div class="card-body p-3">
         <table id="ordersTable" class="table table-striped border" width="100%">
