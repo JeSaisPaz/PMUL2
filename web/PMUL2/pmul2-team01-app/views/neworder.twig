@@ -25,7 +25,7 @@
                             <div class="fw-bold" x-text="color.name"></div>
                             <div class="input-group input-group-sm mt-auto">
                                 <button class="btn btn-outline-secondary" @click="decrement(color.id)" :disabled="quantities[color.id] === 0">−</button>
-                                <input type="number" class="form-control text-center" min="0" max="9999"
+                                <input type="number" class="form-control text-center" min="0" max="10"
                                        :value="quantities[color.id]"
                                        @input="setQuantity(color.id, $event.target.value)"
                                        @focus="$event.target.select()">
@@ -39,11 +39,8 @@
 
         <button class="btn btn-warning fw-bold"
                 @click="submitOrder()"
-                :disabled="selectedCount() === 0 || submitting">
-            <span x-show="!submitting">Order</span>
-            <span x-show="submitting">
-                <span class="spinner-border spinner-border-sm me-1"></span>Envoi...
-            </span>
+                :disabled="selectedCount() === 0">
+            Order
         </button>
 
     </div>
@@ -54,7 +51,6 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('orderCreate', () => ({
         colors: null,
         quantities: {},
-        submitting: false,
 
         async init() {
             try {
@@ -64,7 +60,7 @@ document.addEventListener('alpine:init', () => {
                 this.colors = data.filter(c => c.status);
                 this.colors.forEach(c => this.quantities[c.id] = 0);
             } catch (e) {
-                console.error(e.message);
+                alert('Loading error.');
             }
         },
 
@@ -83,8 +79,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         async submitOrder() {
-            if (this.selectedCount() === 0 || this.submitting) return;
-            this.submitting = true;
+            if (this.selectedCount() === 0) return;
             try {
                 const lines = this.colors
                     .filter(c => this.getQuantity(c.id) > 0)
@@ -95,11 +90,13 @@ document.addEventListener('alpine:init', () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ lines }),
                 });
-                if (!res.ok) throw new Error(res.status);
+                if (res.ok){
+                    const data = await res.json();
+                    window.location.href = `/orders/${data.id}`;
+                }
+                else        alert('Error.');
             } catch (e) {
-                console.error(e.message);
-            } finally {
-                this.submitting = false;
+                alert('Server unreachable');
             }
         },
     }));
