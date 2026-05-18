@@ -51,6 +51,15 @@ void Pmul2Com::sendPong() {
     _transfer.sendData(1, PID_PING);
 }
 
+Implemevoid Pmul2Com::sendSensorStatus(uint8_t ir1, uint8_t ir2, uint8_t ir3, uint8_t ir4, uint8_t ir5) {
+    uint8_t mask = (ir1 ? 0x01 : 0x00)
+                 | (ir2 ? 0x02 : 0x00)
+                 | (ir3 ? 0x04 : 0x00)
+                 | (ir4 ? 0x08 : 0x00)
+                 | (ir5 ? 0x10 : 0x00);
+    _transfer.packet.txBuff[0] = mask;
+    _transfer.sendData(1, PID_SENSOR_STATUS);
+}
 void Pmul2Com::sendScanResult(uint16_t itemId, ItemStatus status) {
     _transfer.packet.txBuff[0] = (itemId >> 8) & 0xFF;
     _transfer.packet.txBuff[1] = itemId & 0xFF;
@@ -70,15 +79,20 @@ void Pmul2Com::sendLocalOrder(uint8_t lineCount, const uint8_t* colors, const ui
 
 // lecture Pi vers Arduino
 
-bool Pmul2Com::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId) {
+bool Pmul2Com::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId,
+                            uint8_t& hue, uint8_t& saturation, uint8_t& value, uint8_t& team) {
     if (!_checkPacket(PID_ITEM_INFO)) return false;
 
-    // payload: itemId (2 bytes big-endian) + decision (1 byte) + orderId (1 byte) = 4 bytes
+    // payload: itemId (2B) + decision (1B) + orderId (1B) + hue (1B) + sat (1B) + val (1B) + team (1B) = 8 bytes
     uint8_t high, low, rawDecision;
     _transfer.packet.rxObj(high, 0);
     _transfer.packet.rxObj(low, 1);
     _transfer.packet.rxObj(rawDecision, 2);
     _transfer.packet.rxObj(orderId, 3);
+    _transfer.packet.rxObj(hue, 4);
+    _transfer.packet.rxObj(saturation, 5);
+    _transfer.packet.rxObj(value, 6);
+    _transfer.packet.rxObj(team, 7);
 
     _consumePacket();
 

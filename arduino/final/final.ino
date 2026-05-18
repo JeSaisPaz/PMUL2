@@ -36,6 +36,7 @@ long attenteServo = 500;
 uint16_t    currentItemId = 0;
 ItemDecision currentDecision = ItemDecision::PASS;
 uint8_t     currentOrderId  = 0;
+uint8_t     currentHue = 0, currentSaturation = 0, currentValue = 0, currentTeam = 0;
 
 // keypad + encodeur
 Pmul2Keypad  keypad;
@@ -149,6 +150,7 @@ void loop() {
       Serial1.print(i + 1);
       Serial1.print(": ");
       Serial1.println(etatsIR[i] ? "1" : "0");
+      objetPmul.sendSensorStatus(etatsIR[0], etatsIR[1], etatsIR[2], etatsIR[3], etatsIR[4]);
     }
   }
 
@@ -168,7 +170,8 @@ void loop() {
         scanRequested = true;
       }
 
-      if (objetPmul.readItemInfo(currentItemId, currentDecision, currentOrderId)) {
+      if (objetPmul.readItemInfo(currentItemId, currentDecision, currentOrderId,
+                                   currentHue, currentSaturation, currentValue, currentTeam)) {
         scanRequested = false;
 
         switch (currentDecision) {
@@ -373,10 +376,36 @@ void updateLCD() {
 
   // mode SCAN normal
   if (etapeActu >= 2 && currentDecision == ItemDecision::ORDER) {
-    lcd.print("Commande #");
-    lcd.print(currentOrderId);
+    lcd.print("H");
+    lcd.print(currentHue);
+    lcd.print(" S");
+    lcd.print(currentSaturation);
+    lcd.print(" V");
+    lcd.print(currentValue);
     lcd.setCursor(0, 1);
-    lcd.print("Tri en cours...");
+    if (currentTeam >= 0x01 && currentTeam <= 0x05) {
+      lcd.print("T0");
+      lcd.print(currentTeam);
+    } else {
+      lcd.print("T?");
+    }
+    lcd.print(" ORDER #");
+    lcd.print(currentOrderId);
+  } else if (etapeActu >= 2 && currentDecision == ItemDecision::STOCK) {
+    lcd.print("H");
+    lcd.print(currentHue);
+    lcd.print(" S");
+    lcd.print(currentSaturation);
+    lcd.print(" V");
+    lcd.print(currentValue);
+    lcd.setCursor(0, 1);
+    if (currentTeam >= 0x01 && currentTeam <= 0x05) {
+      lcd.print("T0");
+      lcd.print(currentTeam);
+    } else {
+      lcd.print("T?");
+    }
+    lcd.print(" STOCK");
   } else {
     lcd.print("Total Tries: ");
     lcd.setCursor(0, 1);

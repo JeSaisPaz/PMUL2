@@ -17,6 +17,7 @@ import numpy as np
 from pyzbar.pyzbar import decode
 from picamera2 import Picamera2, Preview
 from serial_transfer import SerialTransfer
+import re
 import socketio
 
 # config
@@ -140,16 +141,35 @@ def handleScanNeeded():
         itemId   = data["itemId"]
         decision = data["decision"]
         orderId  = data.get("orderId") or 0
+        # le backend renvoie hsv en string: "h:120, s:150, v:200"
+        hsv_str  = data.get("hsv", "")
+        m = re.match(r'h:(\d+),\s*s:(\d+),\s*v:(\d+)', str(hsv_str))
+        if m:
+            hue = int(m.group(1)) & 0xFF
+            sat = int(m.group(2)) & 0xFF
+            val = int(m.group(3)) & 0xFF
+        else:
+            hue = sat = val = 0
+        team_raw = data.get("team")
+        if team_raw and team_raw.startswith("TEAM"):
+            team_byte = max(0, min(5, int(team_raw[4:]) - 1)) + 1
+        else:
+            team_byte = 0x00
 
-        print(f"  [BACKEND] Item #{itemId} decision={decision} orderId={orderId}")
+        print(f"  [BACKEND] Item #{itemId} decision={decision} orderId={orderId}"
+              f" H={hue} S={sat} V={val} team={team_raw} ({int(team_byte)})")
 
-        # envoie l'info a l'Arduino pour l'aiguillage
+        # envoie l'info a l'Arduino pour l'aiguillage + affichage HSV/team
         decisionByte = {"ORDER": 0x01, "STOCK": 0x02}.get(decision, 0x00)
         payload = bytes([
             (itemId >> 8) & 0xFF,
             itemId & 0xFF,
             decisionByte,
             orderId & 0xFF,
+            hue,
+            sat,
+            val,
+            team_byte,
         ])
         st.send(SerialTransfer.PID_ITEM_INFO, payload)
 
@@ -204,6 +224,23 @@ def handleLocalOrder(payload):
     except Exception as e:
         print(f"  [!] Backend injoignable: {e}")
 
+def handleSensorStatus(payload):
+    """L'Arduino envoie l'etat des capteurs IR - on POST au backend."""
+    if len(payload) < 1:
+        return
+    mask = payload[0]
+    sensors = {
+        "ir1": 1 if mask & 0x01 else 0,
+        "ir2": 1 if mask & 0x02 else 0,
+        "ir3": 1 if mask & 0x04 else 0,
+        "ir4": 1 if mask & 0x08 else 0,
+        "ir5": 1 if mask & 0x10 else 0,
+    }
+    try:
+        requests.post(f"{BACKEND_URL}/api/sensors", json={"sensors": sensors}, timeout=2)
+    except Exception:
+        pass  # backend down, tant pis
+
 def handleArduinoFrame():
     """Lit et dispatche une trame entrante de l'Arduino."""
     result = st.available()
@@ -227,6 +264,9 @@ def handleArduinoFrame():
 
     elif pid == SerialTransfer.PID_SCAN_RESULT:
         handleScanResult(payload)
+
+    elif pid == SerialTransfer.PID_SENSOR_STATUS:
+        handleSensorStatus(payload)
 
     elif pid == SerialTransfer.PID_LOCAL_ORDER:
         handleLocalOrder(payload)

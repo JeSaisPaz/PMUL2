@@ -9,12 +9,13 @@ class SerialTransfer:
     MAX_PACKET_SIZE = 0xFE  # 254 bytes max de payload
 
     # IDs des packets (miroir de pmul2-com.h)
-    PID_PING         = 0x00  # diag
-    PID_LOCAL_ORDER  = 0x04  # Arduino vers Pi: commande keypad
-    PID_COLOR_LIST   = 0x05  # Pi vers Arduino: couleurs actives
-    PID_ITEM_INFO    = 0x10  # Pi vers Arduino: info sur le bloc scanne
-    PID_SCAN_RESULT  = 0x11  # Arduino vers Pi: resultat du tri
-    PID_STATUS       = 0xFE  # status Arduino
+    PID_PING          = 0x00  # diag
+    PID_LOCAL_ORDER   = 0x04  # Arduino vers Pi: commande keypad
+    PID_COLOR_LIST    = 0x05  # Pi vers Arduino: couleurs actives
+    PID_ITEM_INFO     = 0x10  # Pi vers Arduino: info sur le bloc scanne
+    PID_SCAN_RESULT   = 0x11  # Arduino vers Pi: resultat du tri
+    PID_SENSOR_STATUS = 0x12  # Arduino vers Pi: etat capteurs IR
+    PID_STATUS        = 0xFE  # status Arduino
 
     # Codes de status internes (miroir de pmul2-com.cpp)
     STATUS_READY       = 0x00

@@ -45,12 +45,17 @@ void Pmul2Lib::sendScanResult(uint16_t itemId, ItemStatus status) {
     _com.sendScanResult(itemId, status);
 }
 
+void Pmul2Lib::sendSensorStatus(uint8_t ir1, uint8_t ir2, uint8_t ir3, uint8_t ir4, uint8_t ir5) {
+    _com.sendSensorStatus(ir1, ir2, ir3, ir4, ir5);
+}
+
 void Pmul2Lib::sendLocalOrder(uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys) {
     _com.sendLocalOrder(lineCount, colors, qtys);
 }
 
-bool Pmul2Lib::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId) {
-    return _com.readItemInfo(itemId, decision, orderId);
+bool Pmul2Lib::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId,
+                            uint8_t& hue, uint8_t& saturation, uint8_t& value, uint8_t& team) {
+    return _com.readItemInfo(itemId, decision, orderId, hue, saturation, value, team);
 }
 
 bool Pmul2Lib::readColorList(uint8_t* colors, uint8_t& count) {
