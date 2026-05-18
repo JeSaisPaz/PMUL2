@@ -1,4 +1,5 @@
 const { prisma, ORDER_STATUS, ITEM_STATUS, DECISION, TEAM } = require("../routes/adapter");
+const { incrementColorStat } = require("../services/stats");
 
 async function getScans() {
     return prisma.rEAD_CYCLE.findMany({
@@ -30,8 +31,11 @@ async function createScan(scan) {
             valueMin: { lte: scan.value }, valueMax: { gte: scan.value },
         }
     });
-
-    const validColor = (color && color.status === true) ? color : null;
+    let validColor = null;
+    if(color){
+        incrementColorStat(color);
+        validColor = (color.status === true) ? color : null;
+    }
 
     if (scan.qrValue === TEAM.TEAM01) {
         //on récupère toutes les lignes de commandes contenant la couleur et en incluant les items ordered ou in process
@@ -67,7 +71,9 @@ async function createScan(scan) {
         return{
             itemId: newItem.id,
             decision: newItem.decision,
-            orderId: orderLineInNeed ? orderLineInNeed.ORDER_id : null
+            orderId: orderLineInNeed ? orderLineInNeed.ORDER_id : null,
+            team: newItem.team,
+            hsv: `h:${readCycle.hue}, s:${readCycle.saturation}, v:${readCycle.value}`
         }
     } else {
         const validTeam = Object.values(TEAM).includes(scan.qrValue);
@@ -84,7 +90,9 @@ async function createScan(scan) {
         return {
             itemId: newItem.id,
             decision: newItem.decision,
-            orderId: null
+            orderId: null,
+            team: validTeam ? newItem.team : null,
+            hsv: `h:${readCycle.hue}, s:${readCycle.saturation}, v:${readCycle.value}`
         };
     }
 }
