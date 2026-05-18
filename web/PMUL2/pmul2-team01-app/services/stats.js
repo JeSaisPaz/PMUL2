@@ -34,7 +34,7 @@ async function getStats() {
   return {
     colorStats: Object.values(colorStats),
     totalOrders,
-    totalRequested,
+    totalRequested: totalRequested._sum.quantity ?? 0,
     totalAcquired
   };
 }

@@ -73,7 +73,7 @@ async function createScan(scan) {
             decision: newItem.decision,
             orderId: orderLineInNeed ? orderLineInNeed.ORDER_id : null,
             team: newItem.team,
-            hsv: `h:${readCycle.hue}, s:${readCycle.saturation}, v:${readCycle.value}`
+            color: color ? color.name : null
         }
     } else {
         const validTeam = Object.values(TEAM).includes(scan.qrValue);
@@ -92,7 +92,7 @@ async function createScan(scan) {
             decision: newItem.decision,
             orderId: null,
             team: validTeam ? newItem.team : null,
-            hsv: `h:${readCycle.hue}, s:${readCycle.saturation}, v:${readCycle.value}`
+            color: color ? color.name : null
         };
     }
 }

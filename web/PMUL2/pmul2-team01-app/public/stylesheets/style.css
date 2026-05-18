@@ -17,8 +17,8 @@ main {
 
 
 /*meilleur scroll bar*/
-/** {
-  /*scrollbar fine
+
+* {
   scrollbar-width: thin;
   scrollbar-color: rgba(64, 60, 70, 0.35) transparent;
-}*/
+}

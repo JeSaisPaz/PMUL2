@@ -28,7 +28,7 @@ def main():
     print(f"  Status     : {item['status']}")
     print(f"  Dec. status: {item['decisionStatus']}")
 
-    if item['decisionStatus'] != 'IN_PROCESS':
+    if item['decisionStatus'] != 'PROCESS':
         print("\nItem already processed.")
         return
 
