@@ -4,7 +4,8 @@ var router = express.Router();
 const { getScans, createScan, deleteScan } = require("../services/scan");
 const { getOrders, getOrderDetails, createOrder, deleteOrder, cancelOrder } = require("../services/order");
 const { getItems, deleteItem, updateItemStatus } = require("../services/item");
-const { getColors, updateColors } = require("../services/color");
+const { getColors, updateColors, initColors } = require("../services/color");
+const { getStats, resetColorStats, incrementColorStat } = require("../services/stats");
 
 module.exports = function (io) {
 
@@ -36,9 +37,8 @@ module.exports = function (io) {
     }));
 
     router.post('/neworder', handle(async (req, res) => {
-        await createOrder(req.body.lines);
+        res.json(await createOrder(req.body.lines));
         notifyClients();
-        res.sendStatus(204);
     }));
 
     router.patch('/orders/:id/cancel', handle(async (req, res) => {
@@ -83,9 +83,15 @@ module.exports = function (io) {
         res.sendStatus(204);
     }));
 
+    router.post('/colors/init', handle(async (req, res) => {
+        await initColors();
+        notifyClients();
+        res.sendStatus(204);
+    }));
+
     //Scans
 
-    router.get('/scans', handle(async (req, res) => { // à retirer car le post envoie dans sa confirmation itemId, decision et orderId si Order
+    router.get('/scans', handle(async (req, res) => { 
         res.json(await getScans());
     }));
 
@@ -99,6 +105,18 @@ module.exports = function (io) {
         notifyClients();
         res.sendStatus(204);
     }));
+
+    //Stats
+
+    router.get('/stats', handle(async (req, res) => { 
+        res.json(await getStats());
+    }));
+
+    router.post('/stats/reset', (req, res) => {
+        resetColorStats();
+        notifyClients();
+        res.sendStatus(204);
+    });
 
     return router;
 };
