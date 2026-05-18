@@ -1,0 +1,42 @@
+const { prisma, ORDER_STATUS, ITEM_STATUS, DECISION, TEAM } = require("../routes/adapter");
+
+let colorStats = {}; //garde en mémoire le nombre de fois qu'une couleur a été vue depuis le dernier restart
+
+function resetColorStats() {//Reset couleurs vue depuis dernier restart
+  colorStats = {};
+}
+
+function incrementColorStat(color) {//Increment à chaque scan 
+  if (!colorStats[color.id]) {
+    colorStats[color.id] = { name: color.name, hex: color.hex, count: 0 };
+  }
+  colorStats[color.id].count++;
+}
+
+async function getStats() {
+  const [totalOrders, totalRequested, totalAcquired] = await Promise.all([ //promise all pour faire plusieurs requetes en parrallèle
+    prisma.oRDER.count(),
+    prisma.oRDER_LINE.aggregate({// aggregate pour faire la somme de la valeur de chaque quantity
+      _sum: { quantity: true },
+      where: {
+        ORDER: { status: ORDER_STATUS.PROCESS },
+        status: ORDER_STATUS.PROCESS,
+      },
+    }),
+    prisma.iTEM.count({// count pour compter chaque items ORDERED
+      where: {
+        ORDER_LINE_id: { not: null },
+        status: ITEM_STATUS.ORDERED,
+      },
+    }),
+  ]);
+
+  return {
+    colorStats: Object.values(colorStats),
+    totalOrders,
+    totalRequested,
+    totalAcquired
+  };
+}
+
+module.exports = { getStats, resetColorStats, incrementColorStat };
