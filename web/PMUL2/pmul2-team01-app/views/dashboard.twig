@@ -6,18 +6,34 @@
     <h1>{{ title }}</h1>
   </div>
   <div class="card-body p-3">
+    <div class="card p-4">
+      <button class="btn btn-outline-danger" onclick="resetStats()">Reset</button>
+      <div style="position: relative; height: 450px; width: 100%;">
+        <canvas id="allColors"></canvas>
+      </div>
+    </div>
+
+      <div class="card p-4">
+      <div style="position: relative; height: 450px; width: 100%;">
+        <canvas id="requestedReceived"></canvas>
+      </div>
+    </div>
 
   </div>
 </div>
 
 <script src="/js/chart.js"></script>
 <script>
+  let stats =  null;
+  let chartColor = null;
+  let chartQuantity = null;
+
   async function load() {
     try {
       const res = await fetch('/api/stats');
       if (!res.ok) throw new Error();
-      const stats = await res.json();
-
+      stats = await res.json();
+      drawChart();
     } catch (e) {
       console.error(e);
     }
@@ -25,6 +41,52 @@
 
   async function resetStats() {
     await fetch('/api/stats/reset', { method: 'POST' });
+    load();
+  }
+
+  async function drawChart() {
+    if (!stats || !stats.colorStats) return;
+
+    if (chartColor) chartColor.destroy();
+
+    chartColor = new Chart(document.getElementById('allColors'), {
+      type: 'bar',
+      data: {
+        labels: stats.colorStats.map(item => item.name),
+        datasets: [{
+          label: 'Seen # times',
+          data: stats.colorStats.map(item => item.count),
+          backgroundColor: stats.colorStats.map(item => item.hex),
+          borderColor: stats.colorStats.map(item => item.hex),
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+
+    if (chartQuantity) chartQuantity.destroy();
+
+    chartQuantity = new Chart(document.getElementById('requestedReceived'), {
+      type: 'bar',
+      data: {
+        // Les étiquettes sur l'axe X
+        labels: ['Total Requested', 'Total Acquired'],
+        datasets: [{
+          label: 'Requested/Acquired',
+          data: [stats.totalRequested, stats.totalAcquired],
+          backgroundColor: ['#ffc107', '#198754'], 
+          borderColor: ['#ffc107', '#198754'],
+          borderWidth: 1,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
   }
 
   load();

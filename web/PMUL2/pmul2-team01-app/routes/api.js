@@ -17,7 +17,6 @@ module.exports = function (io) {
             await fn(req, res);
         } catch (error) {
             const code = error.code || 500;
-            res.status(code).json({ error: error.message});
             console.log(error.message)
         }
     };
@@ -112,11 +111,11 @@ module.exports = function (io) {
         res.json(await getStats());
     }));
 
-    router.post('/stats/reset', (req, res) => {
+    router.post('/stats/reset', handle (async(req, res) => {
         resetColorStats();
         notifyClients();
         res.sendStatus(204);
-    });
+    }));
 
     return router;
 };
