@@ -51,7 +51,7 @@ void Pmul2Com::sendPong() {
     _transfer.sendData(1, PID_PING);
 }
 
-Implemevoid Pmul2Com::sendSensorStatus(uint8_t ir1, uint8_t ir2, uint8_t ir3, uint8_t ir4, uint8_t ir5) {
+void Pmul2Com::sendSensorStatus(uint8_t ir1, uint8_t ir2, uint8_t ir3, uint8_t ir4, uint8_t ir5) {
     uint8_t mask = (ir1 ? 0x01 : 0x00)
                  | (ir2 ? 0x02 : 0x00)
                  | (ir3 ? 0x04 : 0x00)
