@@ -13,8 +13,7 @@ cam = Picamera2()
 
 config = cam.create_preview_configuration()
 config["main"]["size"] = (640, 480)
-# Requesting "RGB888" physically hands us BGR array bytes due to libcamera driver mapping
-config["main"]["format"] = "RGB888"  
+config["main"]["format"] = "RGB888"  # Native RGB output
 
 cam.configure(config)
 cam.start()
@@ -22,11 +21,14 @@ cam.start()
 # Let the sensor turn on
 time.sleep(0.5)
 
-# HARD OVERRIDE: Disable dynamic auto-white-balance to stop the camera
-# from deleting the blue spectrum. We lock the Red and Blue channels manually.
+# ---------------------------------------------------------------------------
+# HARDWARE SENSOR FIX for "Magenta showing as Red":
+# We aggressively boost the Blue channel (2.5x) and suppress Red (0.9x) 
+# to force the camera to "see" the blue half of the Magenta block.
+# ---------------------------------------------------------------------------
 cam.set_controls({
     "AwbEnable": False,
-    "ColourGains": (1.4, 1.4)  # (Red Gain, Blue Gain). Equal values preserve Magenta.
+    "ColourGains": (0.9, 2.5)  # (Red Gain, Blue Gain). Tweak these if it's too intense.
 })
 
 # Let the auto-exposure settle with our locked color settings
@@ -38,16 +40,13 @@ if raw_frame is None or raw_frame.size == 0:
     print("[ERROR] Camera stream frame is empty.")
     sys.exit(1)
 
-# CORRECT THE CHANNEL FLIP: Picamera2 outputs BGR data here. 
-# We fix it immediately so 'frame' is TRUE RGB for PyZbar and HSV parsing.
-bgr_frame = np.ascontiguousarray(raw_frame[:, :, :3])
-frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB) 
-
+# Ensure contiguous memory array (native RGB)
+frame = np.ascontiguousarray(raw_frame[:, :, :3])
 h, w = frame.shape[:2]
 
-# Standard OpenCV conversions now map to the exact colors you expect!
+# Standard OpenCV conversions based on true RGB input
 hsv_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
-bgr_display = bgr_frame.copy() 
+bgr_display = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR) 
 
 # ---------------------------------------------------------------------------
 # 2. ROBUST HUE-RANGE COLOR IDENTIFICATION
@@ -57,19 +56,17 @@ def identify_closest_color(h_val, s_val, v_val):
     Identifies color using explicit Hue threshold bands.
     This eliminates lighting intensity (Value) dependencies.
     """
-    # If the color is too dark or completely washed out, reject it
+    # Reject colors that are too dark/washed out
     if v_val < 40 or s_val < 40:
         return "Unknown"
 
-    # 1. Handle Orange vs Brown (They share the exact same Hue space)
+    # Orange vs Brown
     if 5 <= h_val < 18:
-        # Brown is simply a low-vibrancy, dark version of Orange
         if v_val < 110 or s_val < 120:
             return "Brown"
         return "Orange"
 
-    # 2. Check remaining structural Hue bands (OpenCV Hue is 0-179)
-    # Shifting the Magenta/Red border from 165 to 170 to give Magenta breathing room
+    # Core Color Bands (OpenCV Hue is 0-179)
     if (0 <= h_val < 5) or (170 <= h_val <= 179):
         return "Red"  
     elif 18 <= h_val < 38:
@@ -93,7 +90,7 @@ if not qr_codes:
     sys.exit(0)
 
 annotated = bgr_display.copy()
-patch_size = 16  # Slightly larger patch for a better median sample
+patch_size = 16  # Good sample size for taking the median
 
 for obj in qr_codes:
     try:
@@ -107,10 +104,9 @@ for obj in qr_codes:
     cy = ry + (rh // 2)
 
     # Tighten your sample zone: place patches exactly 15 pixels outside the QR borders
-    # to guarantee we stay safely inside the colored block perimeter.
     test_points = [
-        (rx - 15 - patch_size, cy - (patch_size // 2)),  # Left side sample
-        (rx + rw + 15, cy - (patch_size // 2))           # Right side sample
+        (rx - 15 - patch_size, cy - (patch_size // 2)),  # Left side
+        (rx + rw + 15, cy - (patch_size // 2))           # Right side
     ]
 
     votes = []
@@ -120,7 +116,7 @@ for obj in qr_codes:
         if (0 <= sx <= w - patch_size) and (0 <= sy <= h - patch_size):
             patch = hsv_frame[sy : sy + patch_size, sx : sx + patch_size]
             
-            # Use MEDIAN instead of MEAN to completely ignore noise/speckles
+            # Use MEDIAN to completely ignore noise/speckles
             median_h = int(np.median(patch[:, :, 0]))
             median_s = int(np.median(patch[:, :, 1]))
             median_v = int(np.median(patch[:, :, 2]))
