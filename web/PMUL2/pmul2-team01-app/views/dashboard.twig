@@ -12,28 +12,28 @@
 
         <div class="col-md-4">
           <div class="card p-3 h-100">
-            <h6 class="card-title">Total Orders</h6>
-            <p class="display-6 mb-0" x-text="stats.totalOrders ?? '—'"></p>
+            <h5 class="card-title">Total Orders</h5>
+            <p class="display-6 mb-0 text-primary" x-text="stats.totalOrders ?? '—'"></p>
           </div>
         </div>
 
         <div class="col-md-4">
           <div class="card p-3 h-100">
-            <h6 class="card-title">Total Requested</h6>
-            <p class="display-6 mb-0" x-text="stats.totalRequested ?? '—'"></p>
+            <h5 class="card-title">Total Requested</h5>
+            <p class="display-6 mb-0 text-warning" x-text="stats.totalRequested ?? '—'"></p>
           </div>
         </div>
 
         <div class="col-md-4">
           <div class="card p-3 h-100">
-            <h6 class="card-title">Total Acquired</h6>
-            <p class="display-6 mb-0" x-text="stats.totalAcquired ?? '—'"></p>
+            <h5 class="card-title">Total Acquired</h5>
+            <p class="display-6 mb-0 text-success" x-text="stats.totalAcquired ?? '—'"></p>
           </div>
         </div>
 
       </div>
 
-      <div class="row g-3">
+      <div class="row g-3 mb-3">
 
         <div class="col-md-6">
           <div class="card p-3 h-100">
@@ -53,6 +53,27 @@
         </div>
 
       </div>
+
+      <div class="row g-3">
+        <div class="col-md-12">
+          <div class="card p-3">
+            <h5 class="card-title">Sensors</h5>
+            <div class="row g-3">
+              <template x-for="sensor in stats.sensors ?? []">
+                <div class="col">
+                  <div class="card p-3 text-center h-100" :class="sensor.state ? 'border-success' : 'border-danger'">
+                    <h6 class="card-title" x-text="sensor.name"></h6>
+                    <span class="badge fs-6" :class="sensor.state ? 'bg-success' : 'bg-danger'"
+                          x-text="sensor.state ? '1' : '0'">
+                    </span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -114,7 +135,7 @@
               label: 'Requested/Acquired',
               data: [this.stats.totalRequested, this.stats.totalAcquired],
               backgroundColor: ['#ffc107', '#198754'],
-              borderColor: ['#ffc107', '#198754'],
+              borderColor: '#252525',
               borderWidth: 1
             }]
           },

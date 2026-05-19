@@ -4,7 +4,10 @@
 <div class="card" x-data="colorsApp()" x-init="init()">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h1>{{title}}</h1>
-        <button class="btn btn-primary" @click="initColors()">Init colors</button>
+        <div>
+            <button class="btn btn-primary" @click="saveAsJson()">Save as JSON</button>
+            <button class="btn btn-primary" @click="initColors()">Init colors</button>
+        </div>
     </div>
     <div class="card-body p-3">
 
@@ -151,6 +154,15 @@ document.addEventListener('alpine:init', () => {
         async initColors(){
             try{
                 const res = await fetch(`/api/colors/init`, { method: 'POST' });
+                if(res.ok) alert('Success.');
+                else alert('Error.');
+            }catch(error){
+                console.log(error.message);
+            }
+        },
+        async saveAsJson(){
+            try{
+                const res = await fetch(`/api/colors/json`, { method: 'POST' });
                 if(res.ok) alert('Success.');
                 else alert('Error.');
             }catch(error){

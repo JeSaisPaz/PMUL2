@@ -1,4 +1,9 @@
 const { prisma } = require("../routes/adapter");
+const fs = require('fs');
+const path = require('path');
+
+const JSON_PATH = path.join(__dirname, '../colorbook/colorbook.json');
+const colors = require(JSON_PATH);
 
 async function getColors() {
     return prisma.cOLOR.findMany();
@@ -13,19 +18,22 @@ async function updateColors(color){
     });
 }
 
-async function initColors(color){
-    await prisma.cOLOR.createMany({
-        skipDuplicates: true, //permet de ne pas créer de couleur si elles existes déja 
-        data: [
-            // echelle OpenCV: H(0-179), S(0-255), V(0-255)
-            // orange vs brun = meme bande Hue, differencies par saturation
-            { id: 1, name: 'Yellow',   hueMin: 18,  hueMax: 37,  saturationMin: 40,  saturationMax: 255, valueMin: 40,  valueMax: 255, hex: '#FFFF00', status: false },
-            { id: 2, name: 'Orange',  hueMin: 5,   hueMax: 17,  saturationMin: 120, saturationMax: 255, valueMin: 110, valueMax: 255, hex: '#FF8000', status: false },
-            { id: 3, name: 'Brown',    hueMin: 5,   hueMax: 17,  saturationMin: 40,  saturationMax: 119, valueMin: 40,  valueMax: 255, hex: '#8B4513', status: false },
-            { id: 4, name: 'Blue',    hueMin: 85,  hueMax: 134, saturationMin: 40,  saturationMax: 255, valueMin: 40,  valueMax: 255, hex: '#0000FF', status: false },
-            { id: 5, name: 'Magenta', hueMin: 135, hueMax: 179, saturationMin: 40,  saturationMax: 255, valueMin: 40,  valueMax: 255, hex: '#FF00FF', status: false },
-        ]
-    });
+async function initColors() {
+    await Promise.all(
+        colors.map(color =>
+            prisma.cOLOR.upsert({
+                where: { name: color.name },
+                update: color,
+                create: color,
+            })
+        )
+    );
 }
 
-module.exports = { getColors, updateColors, initColors };
+async function saveAsJson(color){
+    const allColors = await getColors();
+    const jsonContent = JSON.stringify(allColors, null, 2);   
+    fs.writeFileSync(JSON_PATH, jsonContent, 'utf8');
+}
+
+module.exports = { getColors, updateColors, initColors, saveAsJson };

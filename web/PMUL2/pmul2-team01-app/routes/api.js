@@ -4,8 +4,8 @@ var router = express.Router();
 const { getScans, createScan, deleteScan } = require("../services/scan");
 const { getOrders, getOrderDetails, createOrder, deleteOrder, cancelOrder } = require("../services/order");
 const { getItems, deleteItem, updateItemStatus } = require("../services/item");
-const { getColors, updateColors, initColors } = require("../services/color");
-const { getStats, resetColorStats, incrementColorStat } = require("../services/stats");
+const { getColors, updateColors, initColors, saveAsJson } = require("../services/color");
+const { getStats, resetColorStats, incrementColorStat, setSensors } = require("../services/stats");
 
 module.exports = function (io) {
 
@@ -88,6 +88,12 @@ module.exports = function (io) {
         res.sendStatus(204);
     }));
 
+    router.post('/colors/json', handle(async (req, res) => {
+        await saveAsJson();
+        notifyClients();
+        res.sendStatus(204);
+    }));
+
     //Scans
 
     router.get('/scans', handle(async (req, res) => { 
@@ -113,6 +119,13 @@ module.exports = function (io) {
 
     router.post('/stats/reset', handle (async(req, res) => {
         resetColorStats();
+        notifyClients();
+        res.sendStatus(204);
+    }));
+
+    router.post('/stats/sensors', handle (async(req, res) => {
+        const { sensors } = req.body;
+        setSensors(sensors);
         notifyClients();
         res.sendStatus(204);
     }));

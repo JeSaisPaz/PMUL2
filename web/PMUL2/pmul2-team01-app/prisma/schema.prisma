@@ -9,7 +9,7 @@ datasource db {
 
 model ITEM {
   id                Int                       @id @default(autoincrement())
-  team              TEAM?
+  team              String?                   @db.VarChar(10)
   decision          DECISION
   orderedAt         DateTime?                 @db.Timestamp(0)
   status            ITEM_STATUS               @default(PROCESS)
@@ -126,12 +126,4 @@ enum ITEM_STATUS {
   PROCESS
   EXTERNAL
   CANCELLED
-}
-
-enum TEAM {
-  TEAM01
-  TEAM02
-  TEAM03
-  TEAM04
-  TEAM05
 }

@@ -6,16 +6,16 @@ import json
 BASE_URL = "http://localhost:3000/api"
 
 # Liste des équipes (nettoyée de la chaîne de test trop longue pour la lisibilité)
-TEAMS = ["TEAM01", "TEAM02", "TEAM03", "TEAM04", "TEAM05"]
+TEAMS = ["TEAM 01", "TEAM 02", "TEAM 03", "TEAM 04", "TEAM 05"]
 
 # Tes nouvelles plages de couleurs basées sur les données fournies
 COLOR_RANGES = [
-    { "name": "Red",     "h": (0, 10),   "s": (50, 100), "v": (50, 100) },
-    { "name": "Orange",  "h": (11, 25),  "s": (50, 100), "v": (50, 100) },
-    { "name": "Yellow",  "h": (26, 35),  "s": (50, 100), "v": (50, 100) },
-    { "name": "Green",   "h": (36, 150), "s": (50, 100), "v": (50, 100) },
-    { "name": "Blue",    "h": (151, 260),"s": (50, 100), "v": (50, 100) },
-    { "name": "Magenta", "h": (261, 360),"s": (50, 100), "v": (50, 100) },
+    { "name": "Red",     "h": (0, 10),    "s": (50, 255), "v": (50, 255) },
+    { "name": "Orange",  "h": (11, 25),   "s": (50, 255), "v": (50, 255) },
+    { "name": "Yellow",  "h": (26, 35),   "s": (50, 255), "v": (50, 255) },
+    { "name": "Green",   "h": (36, 85),   "s": (50, 255), "v": (50, 255) },
+    { "name": "Blue",    "h": (86, 130),  "s": (50, 255), "v": (50, 255) },
+    { "name": "Magenta", "h": (131, 179), "s": (50, 255), "v": (50, 255) },
 ]
 
 def random_scan():

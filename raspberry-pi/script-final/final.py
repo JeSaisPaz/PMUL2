@@ -277,15 +277,16 @@ def handleSensorStatus(payload):
     if len(payload) < 1:
         return
     mask = payload[0]
-    sensors = {
-        "ir1": 1 if mask & 0x01 else 0,
-        "ir2": 1 if mask & 0x02 else 0,
-        "ir3": 1 if mask & 0x04 else 0,
-        "ir4": 1 if mask & 0x08 else 0,
-        "ir5": 1 if mask & 0x10 else 0,
-    }
+    #on envoie un tableau pour simplifier en web
+    sensors = [
+        {"name": "IR 1", "state": 1 if mask & 0x01 else 0},
+        {"name": "IR 2", "state": 1 if mask & 0x02 else 0},
+        {"name": "IR 3", "state": 1 if mask & 0x04 else 0},
+        {"name": "IR 4", "state": 1 if mask & 0x08 else 0},
+        {"name": "IR 5", "state": 1 if mask & 0x10 else 0},
+    ]
     try:
-        requests.post(f"{BACKEND_URL}/api/sensors", json={"sensors": sensors}, timeout=2)
+        requests.post(f"{BACKEND_URL}/api/stats/sensors", json={"sensors": sensors}, timeout=2)
     except Exception:
         pass  # backend down, tant pis
 

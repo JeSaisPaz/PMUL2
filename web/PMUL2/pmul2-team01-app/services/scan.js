@@ -1,4 +1,4 @@
-const { prisma, ORDER_STATUS, ITEM_STATUS, DECISION, TEAM } = require("../routes/adapter");
+const { prisma, ORDER_STATUS, ITEM_STATUS, DECISION} = require("../routes/adapter");
 const { incrementColorStat } = require("../services/stats");
 
 async function getScans() {
@@ -37,7 +37,7 @@ async function createScan(scan) {
         validColor = (color.status === true) ? color : null;
     }
 
-    if (scan.qrValue === TEAM.TEAM01) {
+    if (scan.qrValue === "TEAM 01") {
         //on récupère toutes les lignes de commandes contenant la couleur et en incluant les items ordered ou in process
         let orderLineInNeed = null;
         if(validColor){
@@ -76,7 +76,8 @@ async function createScan(scan) {
             color: color ? color.name : null
         }
     } else {
-        const validTeam = Object.values(TEAM).includes(scan.qrValue);
+        const TEAMS = ["TEAM 01", "TEAM 02", "TEAM 03", "TEAM 04", "TEAM 05"];
+        const validTeam = TEAMS.includes(scan.qrValue);
         const newItem = await prisma.iTEM.create({
             data: {
                 team: validTeam ? scan.qrValue : null,

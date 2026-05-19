@@ -1,6 +1,17 @@
-const { prisma, ORDER_STATUS, ITEM_STATUS, DECISION, TEAM } = require("../routes/adapter");
+const { prisma, ORDER_STATUS, ITEM_STATUS, DECISION} = require("../routes/adapter");
 
+let sensors = [
+  { name: "IR 1", state: 0 },
+  { name: "IR 2", state: 0 },
+  { name: "IR 3", state: 0 },
+  { name: "IR 4", state: 0 },
+  { name: "IR 5", state: 0 },
+];
 let colorStats = {}; //garde en mémoire le nombre de fois qu'une couleur a été vue depuis le dernier restart
+
+function setSensors(newSensors) {
+  sensors = newSensors;
+}
 
 function resetColorStats() {//Reset couleurs vue depuis dernier restart
   colorStats = {};
@@ -35,8 +46,9 @@ async function getStats() {
     colorStats: Object.values(colorStats),
     totalOrders,
     totalRequested: totalRequested._sum.quantity ?? 0,
-    totalAcquired
+    totalAcquired,
+    sensors
   };
 }
 
-module.exports = { getStats, resetColorStats, incrementColorStat };
+module.exports = { getStats, resetColorStats, incrementColorStat, setSensors };
