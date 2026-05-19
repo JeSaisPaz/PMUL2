@@ -93,6 +93,12 @@ async function updateItemStatus(id, status) {
                         where: { id: currentLine.ORDER_id },
                         data: { status: ORDER_STATUS.COMPLETED, completedAt: new Date() }
                     });
+
+                    const completedOrdersCount = await prisma.oRDER.count({
+                        where: { status: ORDER_STATUS.COMPLETED }
+                    });
+
+                    return { completedOrdersCount };
                 }
             }
         } else {

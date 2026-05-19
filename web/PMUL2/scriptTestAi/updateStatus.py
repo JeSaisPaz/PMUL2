@@ -2,16 +2,19 @@ import requests
 
 BASE_URL = "http://localhost:3000/api"
 
-def get_item(id):
+def get_items():
     response = requests.get(f"{BASE_URL}/items")
-    items = response.json()
+    return response.json()
+
+def get_item(id):
+    items = get_items()
     return next((i for i in items if i['id'] == int(id)), None)
 
 def update_status(id, status):
-    response = requests.patch(f"{BASE_URL}/items/{id}/status", 
+    response = requests.patch(f"{BASE_URL}/items/{id}/status",
         json={ "status": { "status": status } }
     )
-    return response.status_code
+    return response.status_code, response.json() if response.content else None
 
 def main():
     id = input("Item ID: ")
@@ -37,14 +40,19 @@ def main():
     choice = input("Choice: ")
 
     if choice == '1':
-        code = update_status(id, 'CONFIRMED')
+        code, result = update_status(id, 'CONFIRMED')
     elif choice == '2':
-        code = update_status(id, 'FAILED')
+        code, result = update_status(id, 'FAILED')
     else:
         print("Invalid choice.")
         return
 
-    print("Done." if code == 204 else f"Error: {code}")
+    if code in (200, 204):
+        print("\nDone.")
+        if result:
+            print(f"Result: {result}")
+    else:
+        print(f"\nError {code}: {result}")
 
 if __name__ == "__main__":
     main()

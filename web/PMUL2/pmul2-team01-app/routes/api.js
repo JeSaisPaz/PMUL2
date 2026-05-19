@@ -65,9 +65,9 @@ module.exports = function (io) {
     }));
 
     router.patch('/items/:id/status', handle(async (req, res) => {
-        await updateItemStatus(parseInt(req.params.id), req.body.status);
+        result = await updateItemStatus(parseInt(req.params.id), req.body.status)
+        res.json(result)
         notifyClients();
-        res.sendStatus(204);
     }));
 
     //Colors
