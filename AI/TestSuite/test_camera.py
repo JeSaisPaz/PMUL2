@@ -114,10 +114,9 @@ def detect_block_color(hsv, obj, frame_h, frame_w):
 print("[CAM] Initialisation...")
 cam = Picamera2()
 
-# Capture in RGB888 format to eliminate the vertical barcode streaming noise
-cam.configure(cam.create_preview_configuration(
-    main={"size": (640, 480), "format": "RGB888"}
-))
+# CORE FIX: Configure the camera to standard video preset (natively YUV420)
+# This bypasses the Pi hardware bugs causing the red/brown barcode corruption patterns.
+cam.configure(cam.create_video_configuration(main={"size": (640, 480)}))
 cam.start()
 time.sleep(2)
 
@@ -133,9 +132,8 @@ if raw is None:
     print("[CAM] Pas de frame, abandon.")
     sys.exit(1)
 
-# FIX: Interpret array directly to stop the Red/Blue channel flip.
-# This ensures Magenta stays Magenta instead of flipping to Blue.
-frame = np.ascontiguousarray(raw[:, :, :3]).copy()
+# CORE FIX: Convert the reliable camera YUV data format over to standard OpenCV BGR
+frame = cv2.cvtColor(raw, cv2.COLOR_YUV2BGR_I420)
 
 h, w  = frame.shape[:2]
 hsv   = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -179,8 +177,7 @@ for obj in qr_results:
     # Cross-hair at QR centre
     cv2.drawMarker(annotated, (cx, cy), (0, 255, 255), cv2.MARKER_CROSS, 16, 2)
 
-    # NOTE: This line draws the tracking guide line across the image.
-    # If you want to remove the line completely, delete or comment out the line below:
+    # Tracking guide line (shows the side-to-side scan row)
     cv2.line(annotated, (0, cy), (w, cy), (0, 140, 255), 1, cv2.LINE_AA)
 
     # Sample patch overlays
