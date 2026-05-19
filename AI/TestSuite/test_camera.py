@@ -43,7 +43,7 @@ def sample_patch(hsv, x, y):
 def detect_block_color(hsv, obj, frame_h, frame_w):
     rect = obj.rect
     cy = rect.top + rect.height // 2
-    offset = max(50, rect.width // 3)
+    offset = max(80, rect.width // 2)  # increased from max(50, width//3)
 
     positions = [
         (rect.left - offset, cy),
@@ -136,16 +136,27 @@ for obj in qr_results:
     pts = pts.reshape((-1, 1, 2))
     cv2.polylines(annotated, [pts], True, (0, 255, 0), 2)
 
+    # Purple colour in BGR
+    PURPLE = (180, 0, 180)
+    PATCH = 10  # sample patch size
+
     for sx, sy, sh, ss, sv, sname, sborder in samples:
-        if sx < 0 or sy < 0 or sx + 10 >= w or sy + 10 >= h:
+        if sx < 0 or sy < 0 or sx + PATCH >= w or sy + PATCH >= h:
             continue
+
+        # --- Purple filled overlay for the scanned zone ---
+        overlay = annotated.copy()
+        cv2.rectangle(overlay, (sx, sy), (sx + PATCH, sy + PATCH), PURPLE, -1)
+        cv2.addWeighted(overlay, 0.45, annotated, 0.55, 0, annotated)
+
+        # --- Coloured border indicating classification result ---
         if sname and not sborder:
-            rc = (0, 255, 0)
+            rc = (0, 255, 0)    # green  → valid colour found
         elif sborder:
-            rc = (0, 0, 255)
+            rc = (0, 0, 255)    # red    → border hit
         else:
-            rc = (255, 255, 0)
-        cv2.rectangle(annotated, (sx, sy), (sx + 10, sy + 10), rc, 2)
+            rc = (255, 255, 0)  # cyan   → unclassified
+        cv2.rectangle(annotated, (sx, sy), (sx + PATCH, sy + PATCH), rc, 2)
         cv2.putText(annotated, f"H{sh}S{ss}V{sv}",
                     (sx, sy - 5),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.35, rc, 1)
