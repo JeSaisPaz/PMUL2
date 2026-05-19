@@ -19,11 +19,18 @@ config["main"]["format"] = "RGB888"
 cam.configure(config)
 cam.start()
 
-# Allow camera AGC and gains to settle
-time.sleep(1.5)
+# Let the sensor turn on
+time.sleep(0.5)
 
-cam.set_controls({"AwbMode": 3})
+# HARD OVERRIDE: Disable dynamic auto-white-balance to stop the camera
+# from deleting the blue spectrum. We lock the Red and Blue channels manually.
+cam.set_controls({
+    "AwbEnable": False,
+    "ColourGains": (1.4, 1.4)  # (Red Gain, Blue Gain). Equal values preserve Magenta.
+})
 
+# Let the auto-exposure settle with our locked color settings
+time.sleep(1.0)
 raw_frame = cam.capture_array()
 cam.stop()
 
@@ -62,7 +69,8 @@ def identify_closest_color(h_val, s_val, v_val):
         return "Orange"
 
     # 2. Check remaining structural Hue bands (OpenCV Hue is 0-179)
-    if (0 <= h_val < 5) or (165 <= h_val <= 179):
+    # Shifting the Magenta/Red border from 165 to 170 to give Magenta breathing room
+    if (0 <= h_val < 5) or (170 <= h_val <= 179):
         return "Red"  
     elif 18 <= h_val < 38:
         return "Yellow"
@@ -70,7 +78,7 @@ def identify_closest_color(h_val, s_val, v_val):
         return "Green"
     elif 85 <= h_val < 135:
         return "Blue"
-    elif 135 <= h_val < 165:
+    elif 135 <= h_val < 170:
         return "Magenta"
 
     return "Unknown"
