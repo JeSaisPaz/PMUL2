@@ -21,7 +21,7 @@ COLOR_RANGES = [
     ("Brown",   [(8,  19)],   (60,  220), (20,  149), False),
     ("Green",   [(40, 85)],   (40,  255), (40,  255), False),
     ("Blue",    [(100, 130)], (80,  255), (40,  255), False),
-    ("Magenta", [(131, 175)], (70,  255), (40,  255), False), # Marginally widened Hue/Sat for real world variance
+    ("Magenta", [(131, 175)], (70,  255), (40,  255), False), 
 ]
 
 TARGET_COLORS = {r[0] for r in COLOR_RANGES}
@@ -77,7 +77,6 @@ def detect_block_color(hsv, obj, frame_h, frame_w):
     cy = rect.top  + rect.height // 2
 
     # DYNAMIC CONFIGURATION: Base the offset purely on the size of the QR code
-    # This keeps the sample squarely on the block's physical face.
     base_offset_px = int(rect.width * 1.2)
 
     color       = None
@@ -116,8 +115,12 @@ def detect_block_color(hsv, obj, frame_h, frame_w):
 print("[CAM] Initialisation...")
 cam = Picamera2()
 
-# Configure using standard video profiles to enforce standard driver layout bounds (YUV420)
-cam.configure(cam.create_video_configuration(main={"size": (640, 480)}))
+# FIXED: Corrected property assignment format for creating video configs
+video_config = cam.create_video_configuration()
+video_config.main.size = (640, 480)
+video_config.main.format = "YUV420"
+
+cam.configure(video_config)
 cam.start()
 time.sleep(2)
 
