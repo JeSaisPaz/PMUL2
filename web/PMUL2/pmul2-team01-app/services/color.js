@@ -17,12 +17,13 @@ async function initColors(color){
     await prisma.cOLOR.createMany({
         skipDuplicates: true, //permet de ne pas créer de couleur si elles existes déja 
         data: [
-            { id: 1, name: 'Red',     hueMin: 0,   hueMax: 10,  saturationMin: 50, saturationMax: 100, valueMin: 50, valueMax: 100, hex: '#FF0000', status: false },
-            { id: 2, name: 'Orange',  hueMin: 11,  hueMax: 25,  saturationMin: 50, saturationMax: 100, valueMin: 50, valueMax: 100, hex: '#FF8000', status: false },
-            { id: 3, name: 'Yellow',  hueMin: 26,  hueMax: 35,  saturationMin: 50, saturationMax: 100, valueMin: 50, valueMax: 100, hex: '#FFFF00', status: false },
-            { id: 4, name: 'Green',   hueMin: 36,  hueMax: 150, saturationMin: 50, saturationMax: 100, valueMin: 50, valueMax: 100, hex: '#00FF00', status: false },
-            { id: 5, name: 'Blue',    hueMin: 151, hueMax: 260, saturationMin: 50, saturationMax: 100, valueMin: 50, valueMax: 100, hex: '#0000FF', status: false },
-            { id: 6, name: 'Magenta', hueMin: 261, hueMax: 360, saturationMin: 50, saturationMax: 100, valueMin: 50, valueMax: 100, hex: '#FF00FF', status: false },
+            // echelle OpenCV: H(0-179), S(0-255), V(0-255)
+            // orange vs brun = meme bande Hue, differencies par saturation
+            { id: 1, name: 'Yellow',   hueMin: 18,  hueMax: 37,  saturationMin: 40,  saturationMax: 255, valueMin: 40,  valueMax: 255, hex: '#FFFF00', status: false },
+            { id: 2, name: 'Orange',  hueMin: 5,   hueMax: 17,  saturationMin: 120, saturationMax: 255, valueMin: 110, valueMax: 255, hex: '#FF8000', status: false },
+            { id: 3, name: 'Brown',    hueMin: 5,   hueMax: 17,  saturationMin: 40,  saturationMax: 119, valueMin: 40,  valueMax: 255, hex: '#8B4513', status: false },
+            { id: 4, name: 'Blue',    hueMin: 85,  hueMax: 134, saturationMin: 40,  saturationMax: 255, valueMin: 40,  valueMax: 255, hex: '#0000FF', status: false },
+            { id: 5, name: 'Magenta', hueMin: 135, hueMax: 179, saturationMin: 40,  saturationMax: 255, valueMin: 40,  valueMax: 255, hex: '#FF00FF', status: false },
         ]
     });
 }

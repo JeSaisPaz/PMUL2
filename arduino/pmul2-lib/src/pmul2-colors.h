@@ -7,9 +7,8 @@
 const uint8_t COLOR_YELLOW  = 0x01;
 const uint8_t COLOR_BLUE    = 0x02;
 const uint8_t COLOR_MAGENTA = 0x03;
-const uint8_t COLOR_GREEN   = 0x04;
-const uint8_t COLOR_RED     = 0x05;
-const uint8_t COLOR_ORANGE  = 0x06;
+const uint8_t COLOR_BROWN   = 0x04;
+const uint8_t COLOR_ORANGE  = 0x05;
 
 // table de lookup: byte ID -> nom affichable sur LCD
 struct ColorEntry {
@@ -18,11 +17,10 @@ struct ColorEntry {
 };
 
 const ColorEntry COLOR_TABLE[] = {
-    {COLOR_YELLOW,  "Jaune"},
-    {COLOR_BLUE,    "Bleu"},
-    {COLOR_MAGENTA, "Magenta"},  // pink
-    {COLOR_GREEN,   "Vert"},
-    {COLOR_RED,     "Rouge"},
+    {COLOR_YELLOW,  "Yellow"},
+    {COLOR_BLUE,    "Blue"},
+    {COLOR_MAGENTA, "Magenta"},
+    {COLOR_BROWN,   "Brown"},
     {COLOR_ORANGE,  "Orange"},
 };
 const uint8_t COLOR_TABLE_SIZE = sizeof(COLOR_TABLE) / sizeof(COLOR_TABLE[0]);

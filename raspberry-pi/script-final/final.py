@@ -53,11 +53,32 @@ else:
 
 st = SerialTransfer(s)
 
-# init camera
+# init camera (RGB888 = BGR en sortie, on corrige dans decodeFrame)
+print("[CAM] Initialising Sensor...")
 cam = Picamera2()
-cam.configure(cam.create_preview_configuration(main={"size": (640, 480)}))
+
+config = cam.create_preview_configuration()
+config["main"]["size"] = (640, 480)
+config["main"]["format"] = "RGB888"
+
+cam.configure(config)
 cam.start()
-time.sleep(2)
+
+# delay pour que le capteur demarre
+time.sleep(0.5)
+
+# desactive l'auto white balance pour eviter que le canal bleu soit
+# detruit par la camera. On lock les gains rouge/bleu manuellement
+cam.set_controls({
+    "AwbEnable": False,
+    "ExposureTime": 9000,
+    "AnalogueGain": 1.0,
+    "ColourGains": (1.3, 1.7),
+    "Saturation": 0.9
+})
+
+# laisse l'auto-exposure se stabiliser avec nos parametres
+time.sleep(1.0)
 
 # etat minimal
 running = True
@@ -75,33 +96,60 @@ def cleanup(signum=None, frame=None):
 signal.signal(signal.SIGINT, cleanup)
 signal.signal(signal.SIGTERM, cleanup)
 
-# detection QR + couleur depuis un frame
+# identification couleur par plages de Hue (OpenCV Hue = 0-179)
+# independant de l'intensite lumineuse grace aux seuils S et V
+# desormais gere cote backend — le Pi ne fait que transmettre les valeurs HSV brutes
+
+# detection QR + echantillonnage couleur avec mediane (ignore le bruit)
 
 def decodeFrame(frame_bgr):
-    hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
-    qr_results = decode(frame_bgr)
+    # picamera2 sort du BGR, on corrige en RGB pour pyzbar et HSV
+    bgr = np.ascontiguousarray(frame_bgr[:, :, :3])
+    frame = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+    h, w = frame.shape[:2]
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+
+    qr_results = decode(frame)
     if not qr_results:
         return None, None, None, None
 
     obj = qr_results[0]
-    h, w = frame_bgr.shape[:2]
-
-    # patch a droite du QR
-    px = min(obj.rect.left + obj.rect.width + 3, w - 15)
-    py = min(obj.rect.top + (obj.rect.height // 2), h - 15)
-    patch = hsv[py:py + 10, px:px + 10]
-
-    avgHue = np.mean(patch[:, :, 0])
-    avgSat = np.mean(patch[:, :, 1])
-    avgVal = np.mean(patch[:, :, 2])
-
-    # pas de match couleur local - le backend fait tout via la DB
     try:
         qr_text = obj.data.decode("utf-8")
     except Exception:
         return None, None, None, None
 
-    return qr_text, int(avgHue), int(avgSat), int(avgVal)
+    rx, ry, rw, rh = obj.rect.left, obj.rect.top, obj.rect.width, obj.rect.height
+    cy = ry + (rh // 2)
+    patch_size = 16
+
+    # zones d'echantillonnage a gauche et a droite du QR
+    # 15 pixels de marge pour rester dans le bloc colore
+    test_points = [
+        (rx - 15 - patch_size, cy - (patch_size // 2)),  # gauche
+        (rx + rw + 15, cy - (patch_size // 2))           # droite
+    ]
+
+    hues, sats, vals = [], [], []
+    for sx, sy in test_points:
+        # securite: on reste dans les limites du frame
+        if (0 <= sx <= w - patch_size) and (0 <= sy <= h - patch_size):
+            patch = hsv[sy:sy + patch_size, sx:sx + patch_size]
+            # mediane plutot que moyenne pour ignorer les speckles
+            hues.append(int(np.median(patch[:, :, 0])))
+            sats.append(int(np.median(patch[:, :, 1])))
+            vals.append(int(np.median(patch[:, :, 2])))
+
+    if not hues:
+        return qr_text, 0, 0, 0
+
+    # moyenne des medianes de gauche et droite
+    avgHue = int(np.mean(hues))
+    avgSat = int(np.mean(sats))
+    avgVal = int(np.mean(vals))
+
+    return qr_text, avgHue, avgSat, avgVal
 
 # handlers des trames Arduino
 
@@ -200,7 +248,7 @@ def handleLocalOrder(payload):
     lineCount = payload[0]
     if lineCount == 0 or len(payload) < 1 + lineCount * 2:
         return
-    color_names = {0x01: "jaune", 0x02: "bleu", 0x03: "magenta", 0x04: "vert", 0x05: "rouge", 0x06: "orange"}
+    color_names = {0x01: "jaune", 0x02: "bleu", 0x03: "magenta", 0x04: "brun", 0x05: "orange"}
     print(f"[ARDUINO] Commande keypad")
     try:
         r_colors = requests.get(f"{BACKEND_URL}/api/colors", timeout=5)
@@ -291,9 +339,8 @@ def fetchAndSendColors():
             return
         name_to_byte = {"jaune": 0x01, "yellow": 0x01, "bleu": 0x02, "blue": 0x02,
                         "magenta": 0x03, "pink": 0x03,
-                        "vert": 0x04, "green": 0x04,
-                        "rouge": 0x05, "red": 0x05,
-                        "orange": 0x06}
+                        "brun": 0x04, "brown": 0x04,
+                        "orange": 0x05}
         active = []
         for c in r.json():
             # le backend filtre deja status:true, mais on double-check
@@ -303,7 +350,7 @@ def fetchAndSendColors():
                     active.append(bid)
         if active:
             st.send(SerialTransfer.PID_COLOR_LIST, bytes([len(active)] + active))
-            names = {0x01:"Jaune",0x02:"Bleu",0x03:"Magenta",0x04:"Vert",0x05:"Rouge",0x06:"Orange"}
+            names = {0x01:"Jaune",0x02:"Bleu",0x03:"Magenta",0x04:"Brun",0x05:"Orange"}
             print(f"[COLORS] {len(active)} actives envoyees: "
                   f"{[names.get(b,'?') for b in active]}")
     except Exception:
