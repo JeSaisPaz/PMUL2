@@ -115,10 +115,8 @@ def detect_block_color(hsv, obj, frame_h, frame_w):
 print("[CAM] Initialisation...")
 cam = Picamera2()
 
-# FIXED: Corrected property assignment format for creating video configs
-video_config = cam.create_video_configuration()
-video_config.main.size = (640, 480)
-video_config.main.format = "YUV420"
+# FIXED: Native video configuration passed properly as keyword arguments to avoid property crashes
+video_config = cam.create_video_configuration(main={"size": (640, 480), "format": "YUV420"})
 
 cam.configure(video_config)
 cam.start()
