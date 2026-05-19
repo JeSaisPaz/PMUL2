@@ -32,18 +32,17 @@ print("-" * 40)
 last_qr = None
 
 while True:
-    frame = cam.capture_array()
-    if frame is None:
+    raw = cam.capture_array()
+    if raw is None:
         time.sleep(0.05)
         continue
-    if frame.shape[2] == 4:
-        frame = frame[:, :, :3]
 
+    frame = np.ascontiguousarray(raw[:, :, :3]).copy()
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     qr_results = decode(frame)
 
     for obj in qr_results:
-        pts = np.array([(p.x, p.y) for p in obj.polygon], np.int32)
+        pts = np.array([(p.x, p.y) for p in obj.polygon], np.int32).reshape((-1, 1, 2))
         cv2.polylines(frame, [pts], True, (0, 255, 0), 2)
 
         try:
