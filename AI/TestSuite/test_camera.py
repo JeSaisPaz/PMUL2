@@ -6,146 +6,66 @@ from pyzbar.pyzbar import decode
 from picamera2 import Picamera2
 
 # ---------------------------------------------------------------------------
-# Camera calibration & Dynamic Layout Rules
+# 1. CAMERA STREAM INITIALISATION
 # ---------------------------------------------------------------------------
-RETRY_STEP_PX   = 6         # pixels shifted outward if the first spot is unclear
-MAX_RETRIES     = 5         # fine-tuned retry limit to keep sampling localized
-PATCH           = 12        # slightly larger patch size (12x12 px) to smoothly average out grain
-
-# ---------------------------------------------------------------------------
-# Colour palette (Calibrated HSV ranges)
-# ---------------------------------------------------------------------------
-COLOR_RANGES = [
-    ("Yellow",  [(20, 35)],   (80, 255),  (80,  255), False),
-    ("Orange",  [(8,  19)],   (150, 255), (150, 255), False),
-    ("Brown",   [(8,  19)],   (60,  220), (20,  149), False),
-    ("Green",   [(40, 85)],   (40,  255), (40,  255), False),
-    ("Blue",    [(100, 130)], (80,  255), (40,  255), False),
-    ("Magenta", [(131, 175)], (70,  255), (40,  255), False), 
-]
-
-TARGET_COLORS = {r[0] for r in COLOR_RANGES}
-
-def classify_color(h, s, v):
-    for name, hue_ranges, (s_lo, s_hi), (v_lo, v_hi), _ in COLOR_RANGES:
-        if not (s_lo <= s <= s_hi and v_lo <= v <= v_hi):
-            continue
-        for (h_lo, h_hi) in hue_ranges:
-            if h_lo <= h <= h_hi:
-                return name
-    return None
-
-def sample_patch(hsv, x, y):
-    patch = hsv[y:y + PATCH, x:x + PATCH]
-    if patch.size == 0:
-        return 0, 0, 0
-    return (
-        int(np.mean(patch[:, :, 0])),
-        int(np.mean(patch[:, :, 1])),
-        int(np.mean(patch[:, :, 2])),
-    )
-
-def sample_at_offset_horizontal(hsv, cx, cy, offset_px, frame_h, frame_w):
-    """
-    STRICTLY SIDE-TO-SIDE SAMPLING
-    """
-    positions = [
-        (cx - offset_px, cy),  # Left wing of the block
-        (cx + offset_px, cy),  # Right wing of the block
-    ]
-    samples = []
-    votes   = {}
-    
-    for px, py in positions:
-        in_bounds = (0 <= px <= frame_w - PATCH and 0 <= py <= frame_h - PATCH)
-        if not in_bounds:
-            samples.append((px, py, 0, 0, 0, None, False))
-            continue
-            
-        h_val, s_val, v_val = sample_patch(hsv, px, py)
-        name = classify_color(h_val, s_val, v_val)
-        samples.append((px, py, h_val, s_val, v_val, name, True))
-        
-        if name in TARGET_COLORS:
-            votes[name] = votes.get(name, 0) + 1
-            
-    return samples, votes
-
-def detect_block_color(hsv, obj, frame_h, frame_w):
-    rect = obj.rect
-    cx = rect.left + rect.width  // 2
-    cy = rect.top  + rect.height // 2
-
-    # DYNAMIC CONFIGURATION: Base the offset purely on the size of the QR code
-    base_offset_px = int(rect.width * 1.2)
-
-    color       = None
-    avg_h = avg_s = avg_v = 0
-    samples     = []
-    final_offset = base_offset_px
-    attempt     = 0
-
-    for attempt in range(MAX_RETRIES):
-        offset_px = base_offset_px + (attempt * RETRY_STEP_PX)
-        samples, votes = sample_at_offset_horizontal(hsv, cx, cy, offset_px, frame_h, frame_w)
-        final_offset = offset_px
-
-        if votes:
-            color = max(votes, key=votes.get)
-            for _, _, h_val, s_val, v_val, name, _ in samples:
-                if name == color:
-                    avg_h, avg_s, avg_v = h_val, s_val, v_val
-                    break
-            break  
-        else:
-            valid = [(h, s, v) for _, _, h, s, v, n, ib in samples if ib]
-            if valid:
-                avg_h = int(np.mean([x[0] for x in valid]))
-                avg_s = int(np.mean([x[1] for x in valid]))
-                avg_v = int(np.mean([x[2] for x in valid]))
-
-    if color is None:
-        color = "Unknown"
-
-    return color, avg_h, avg_s, avg_v, samples, cx, cy, final_offset, attempt
-
-# ---------------------------------------------------------------------------
-# Main Execution Loop
-# ---------------------------------------------------------------------------
-print("[CAM] Initialisation...")
+print("[CAM] Initialising Native Stream...")
 cam = Picamera2()
 
-# FIXED: Native video configuration passed properly as keyword arguments to avoid property crashes
-video_config = cam.create_video_configuration(main={"size": (640, 480), "format": "YUV420"})
-
-cam.configure(video_config)
+# Request direct standard BGR format through safe config parameters
+config = cam.create_preview_configuration({"main": {"size": (640, 480), "format": "BGR888"}})
+cam.configure(config)
 cam.start()
-time.sleep(2)
 
-# Warmup frames
-for _ in range(10):
-    cam.capture_array()
-    time.sleep(0.1)
-
-raw = cam.capture_array()
+# Let the sensor gain settle down 
+time.sleep(1.5)
+frame = cam.capture_array()
 cam.stop()
 
-if raw is None:
-    print("[CAM] Pas de frame, abandon.")
+if frame is None or frame.size == 0:
+    print("[ERROR] Failed to fetch image frame array.")
     sys.exit(1)
 
-# Decode format straight to standard OpenCV matrix BGR format
-frame = cv2.cvtColor(raw, cv2.COLOR_YUV2BGR_I420)
+# Ensure data structure is contiguous for downstream matrix math
+frame = np.ascontiguousarray(frame[:, :, :3])
+h, w = frame.shape[:2]
 
-h, w  = frame.shape[:2]
-hsv   = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+# ---------------------------------------------------------------------------
+# 2. SEAMLESS COLOR IDENTIFICATION
+# ---------------------------------------------------------------------------
+def detect_hue_name(h_val, s_val, v_val):
+    """
+    Direct, fast evaluation of the Hue channel matching your specific objects.
+    Low saturation defaults to Unknown to prevent gray/white shadows from reading.
+    """
+    if s_val < 50 or v_val < 35:
+        return "Unknown"
+        
+    # Check Hue boundaries seamlessly
+    if 8 <= h_val <= 19:
+        return "Orange" if v_val >= 140 else "Brown"
+    elif 20 <= h_val <= 38:
+        return "Yellow"
+    elif 40 <= h_val <= 88:
+        return "Green"
+    elif 95 <= h_val <= 132:
+        return "Blue"
+    elif 133 <= h_val <= 175:
+        return "Magenta"
+        
+    return "Unknown"
+
+# ---------------------------------------------------------------------------
+# 3. QR LOGIC & CALIBRATED BLOCK SAMPLING
+# ---------------------------------------------------------------------------
 qr_results = decode(frame)
-
 if not qr_results:
-    print("[SCAN] Aucun QR detecte")
+    print("[SCAN] No QR Code found in frame.")
+    cv2.imwrite("failed_frame.jpg", frame)
     sys.exit(0)
 
-PURPLE = (180, 0, 180)  # Debug box color
+# Convert image to HSV space for uniform color filtering
+hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+annotated = frame.copy()
 
 for obj in qr_results:
     try:
@@ -153,62 +73,61 @@ for obj in qr_results:
     except Exception:
         continue
 
-    color, avg_h, avg_s, avg_v, samples, cx, cy, final_offset, attempts = \
-        detect_block_color(hsv, obj, h, w)
+    # Identify exact boundaries of the QR code box
+    rx, ry, rw, rh = obj.rect.left, obj.rect.top, obj.rect.width, obj.rect.height
+    cx = rx + (rw // 2)
+    cy = ry + (rh // 2)
 
-    print(f"QR:       {qr_text}")
-    print(f"Centre:   ({cx}, {cy})")
-    print(f"Offset:   {final_offset} px (Derived from QR width: {obj.rect.width} px)")
-    print(f"H S V:    {avg_h} {avg_s} {avg_v}")
-    print(f"Couleur:  {color}")
-    print()
+    # DISPOSITION RULE: Look on the left and right colored wings of the block face.
+    # Set the offset distance dynamically to 1.25x the width of the QR code itself.
+    offset_distance = int(rw * 1.25)
+    sample_spots = [
+        (cx - offset_distance, cy), # Left side block space
+        (cx + offset_distance, cy)  # Right side block space
+    ]
 
-    annotated = frame.copy()
+    votes = []
+    patch_size = 12
 
-    # Draw QR polygon outline
+    for sx, sy in sample_spots:
+        # Prevent picking noise past the boundaries of the image
+        if (0 <= sx <= w - patch_size) and (0 <= sy <= h - patch_size):
+            patch = hsv[sy : sy + patch_size, sx : sx + patch_size]
+            
+            # Simple average value across the patch area
+            avg_h = int(np.mean(patch[:, :, 0]))
+            avg_s = int(np.mean(patch[:, :, 1]))
+            avg_v = int(np.mean(patch[:, :, 2]))
+            
+            detected_name = detect_hue_name(avg_h, avg_s, avg_v)
+            
+            # Draw sample target box on visual report card
+            color_indicator = (0, 255, 0) if detected_name != "Unknown" else (0, 0, 255)
+            cv2.rectangle(annotated, (sx, sy), (sx + patch_size, sy + patch_size), color_indicator, 2)
+            cv2.putText(annotated, f"H:{avg_h} {detected_name}", (sx - 15, sy - 6), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, color_indicator, 1)
+            
+            if detected_name != "Unknown":
+                votes.append(detected_name)
+
+    # Determine final matching color
+    final_color = max(set(votes), key=votes.count) if votes else "Unknown"
+
+    # Print log diagnostics
+    print(f"QR Target: {qr_text}")
+    print(f"Position:  Center X:{cx} Y:{cy}")
+    print(f"Block Color Identified: {final_color}\n")
+
+    # Render graphics markers on output image
     pts = np.array([(p.x, p.y) for p in obj.polygon], np.int32).reshape((-1, 1, 2))
-    cv2.polylines(annotated, [pts], True, (0, 255, 0), 2)
-
-    # Draw QR bounding box
-    cv2.rectangle(annotated,
-                  (obj.rect.left, obj.rect.top),
-                  (obj.rect.left + obj.rect.width, obj.rect.top + obj.rect.height),
-                  (255, 255, 0), 1)
-
-    # Cross-hair at QR centre
-    cv2.drawMarker(annotated, (cx, cy), (0, 255, 255), cv2.MARKER_CROSS, 16, 2)
-
-    # Horizontal guide tracking row line
-    cv2.line(annotated, (0, cy), (w, cy), (0, 140, 255), 1, cv2.LINE_AA)
-
-    # Sample patch overlays
-    for sx, sy, sh, ss, sv, sname, in_bounds in samples:
-        if not in_bounds or sx + PATCH >= w or sy + PATCH >= h:
-            continue
-
-        overlay = annotated.copy()
-        cv2.rectangle(overlay, (sx, sy), (sx + PATCH, sy + PATCH), PURPLE, -1)
-        cv2.addWeighted(overlay, 0.45, annotated, 0.55, 0, annotated)
-
-        rc = (0, 255, 0) if sname in TARGET_COLORS else (255, 255, 0)
-        cv2.rectangle(annotated, (sx, sy), (sx + PATCH, sy + PATCH), rc, 2)
-        cv2.putText(annotated, f"H{sh}S{ss}V{sv}",
-                    (sx, sy - 5),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.35, rc, 1)
-
-    if attempts > 0:
-        badge = f"retries: {attempts}"
-        cv2.putText(annotated, badge,
-                    (obj.rect.left, max(obj.rect.top - 28, 30)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 128, 255), 1)
-
-    label = f"{qr_text} | {color} H:{avg_h} S:{avg_s} V:{avg_v}"
-    cv2.putText(annotated, label,
-                (obj.rect.left, max(obj.rect.top - 10, 15)),
+    cv2.polylines(annotated, [pts], True, (255, 255, 0), 2)
+    cv2.drawMarker(annotated, (cx, cy), (0, 255, 255), cv2.MARKER_CROSS, 12, 2)
+    
+    label = f"{qr_text} : {final_color}"
+    cv2.putText(annotated, label, (rx, max(ry - 10, 15)), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
 
-    fname = "scan_result.jpg"
-    cv2.imwrite(fname, annotated)
-    print(f"Image saved: {fname}")
-
-print("[CAM] Termine.")
+# Save result out to disk
+output_name = "scan_result.jpg"
+cv2.imwrite(output_name, annotated)
+print(f"[SUCCESS] Scan summary exported to {output_name}")
