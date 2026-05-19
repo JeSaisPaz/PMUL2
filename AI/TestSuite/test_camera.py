@@ -27,16 +27,26 @@ bgr_display = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 # 2. IDENTIFICATION & PREVIEW
 # ---------------------------------------------------------------------------
 def identify_color(h, s, v):
-    # This logic now accounts for the filter shift
+    # If the block is very dark, ignore it
     if v < 40: return "Unknown"
     
-    # Blue under yellow filter: low S, H between 85-130
-    if 85 <= h <= 130 and s < 100: return "Blue"
-    # Yellow under yellow filter: high S
-    if 15 <= h < 40: return "Yellow"
-    # Magenta/Red
-    if (h < 15 or h > 165): return "Red"
-    if 40 <= h < 85: return "Green"
+    # 1. NEW: Force any Hue > 80 to be Blue, 
+    # regardless of how "yellow" the camera's AWB thinks it is.
+    if 80 <= h <= 140:
+        return "Blue"
+
+    # 2. Yellow threshold (Only if Hue is significantly lower)
+    if 15 <= h < 40:
+        return "Yellow"
+
+    # 3. Red/Magenta
+    if (h < 15 or h > 165):
+        return "Red"
+        
+    # 4. Green
+    if 40 <= h < 80:
+        return "Green"
+        
     return "Unknown"
 
 # ---------------------------------------------------------------------------
