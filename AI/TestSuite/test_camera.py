@@ -26,9 +26,9 @@ time.sleep(0.5)
 # from deleting the blue spectrum. We lock the Red and Blue channels manually.
 cam.set_controls({
     "AwbEnable": False,
-    "ColourGains": (1.3, 1.7)
     "ExposureTime": 9000,
     "AnalogueGain": 1.0,
+    "ColourGains": (1.3, 1.7),
     "Saturation": 0.9    
 })
 
