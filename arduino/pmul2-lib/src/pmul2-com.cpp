@@ -132,3 +132,17 @@ bool Pmul2Com::readColorList(uint8_t* colors, uint8_t& count) {
     _consumePacket();
     return true;
 }
+
+bool Pmul2Com::readCompletedCount(uint16_t& count) {
+    if (!_checkPacket(PID_COMPLETED_COUNT)) return false;
+
+    // payload: count (2 bytes big-endian)
+    uint8_t high, low;
+    _transfer.packet.rxObj(high, 0);
+    _transfer.packet.rxObj(low, 1);
+
+    _consumePacket();
+
+    count = ((uint16_t)high << 8) | low;
+    return true;
+}

@@ -26,6 +26,7 @@ class Pmul2Com {
         static const uint8_t PID_SENSOR_STATUS = 0x12; // Arduino vers Pi: etat capteurs IR
         static const uint8_t PID_LOCAL_ORDER   = 0x04; // Arduino vers Pi: commande keypad
         static const uint8_t PID_COLOR_LIST    = 0x05; // Pi vers Arduino: couleurs actives
+        static const uint8_t PID_COMPLETED_COUNT = 0x06; // Pi vers Arduino: nb commandes completes
         static const uint8_t PID_STATUS        = 0xFE; // status Arduino (ready/busy/done/scan_needed)
 
         // constructeur
@@ -47,6 +48,8 @@ class Pmul2Com {
                           uint8_t& hue, uint8_t& saturation, uint8_t& value, uint8_t& team);
         // recoit la liste des couleurs actives (max 4)
         bool readColorList(uint8_t* colors, uint8_t& count);
+        // recoit le nombre de commandes completes du backend
+        bool readCompletedCount(uint16_t& count);
         bool handlePing();
 
     private:
