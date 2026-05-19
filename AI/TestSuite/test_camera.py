@@ -50,7 +50,6 @@ def sample_patch(hsv, x, y):
 def sample_at_offset_horizontal(hsv, cx, cy, offset_px, frame_h, frame_w):
     """
     STRICTLY SIDE-TO-SIDE SAMPLING
-    Samples exactly two points: Left (-offset) and Right (+offset) on the Y axis of cy.
     """
     positions = [
         (cx - offset_px, cy),  # Left side
@@ -60,7 +59,6 @@ def sample_at_offset_horizontal(hsv, cx, cy, offset_px, frame_h, frame_w):
     votes   = {}
     
     for px, py in positions:
-        # Ensure the patch fits entirely inside the frame bounds
         in_bounds = (0 <= px <= frame_w - PATCH and 0 <= py <= frame_h - PATCH)
         if not in_bounds:
             samples.append((px, py, 0, 0, 0, None, False))
@@ -88,8 +86,6 @@ def detect_block_color(hsv, obj, frame_h, frame_w):
 
     for attempt in range(MAX_RETRIES):
         offset_px = int(SAMPLE_OFFSET_CM * PIXELS_PER_CM) + attempt * RETRY_STEP_PX
-        
-        # Core fix: Using the strict side-to-side sampler
         samples, votes = sample_at_offset_horizontal(hsv, cx, cy, offset_px, frame_h, frame_w)
         final_offset = offset_px
 
@@ -99,7 +95,7 @@ def detect_block_color(hsv, obj, frame_h, frame_w):
                 if name == color:
                     avg_h, avg_s, avg_v = h_val, s_val, v_val
                     break
-            break  # Valid target color found, exit retry loop
+            break  
         else:
             valid = [(h, s, v) for _, _, h, s, v, n, ib in samples if ib]
             if valid:
@@ -117,8 +113,11 @@ def detect_block_color(hsv, obj, frame_h, frame_w):
 # ---------------------------------------------------------------------------
 print("[CAM] Initialisation...")
 cam = Picamera2()
+
+# FIX: Switch configuration format to native RGB888 to stop buffer artifacting
 cam.configure(cam.create_preview_configuration(
-    main={"size": (640, 480), "format": "BGR888"}))
+    main={"size": (640, 480), "format": "RGB888"}
+))
 cam.start()
 time.sleep(2)
 
@@ -134,7 +133,9 @@ if raw is None:
     print("[CAM] Pas de frame, abandon.")
     sys.exit(1)
 
-frame = np.ascontiguousarray(raw[:, :, :3]).copy()
+# FIX: Convert the stable RGB camera array into the standard BGR format for OpenCV
+frame = cv2.cvtColor(raw, cv2.COLOR_RGB2BGR)
+
 h, w  = frame.shape[:2]
 hsv   = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 qr_results = decode(frame)
@@ -185,12 +186,10 @@ for obj in qr_results:
         if not in_bounds or sx + PATCH >= w or sy + PATCH >= h:
             continue
 
-        # Overlay showing exact sampled zones
         overlay = annotated.copy()
         cv2.rectangle(overlay, (sx, sy), (sx + PATCH, sy + PATCH), PURPLE, -1)
         cv2.addWeighted(overlay, 0.45, annotated, 0.55, 0, annotated)
 
-        # Border color: green = valid targeted hit, cyan = unclassified
         rc = (0, 255, 0) if sname in TARGET_COLORS else (255, 255, 0)
         cv2.rectangle(annotated, (sx, sy), (sx + PATCH, sy + PATCH), rc, 2)
         cv2.putText(annotated, f"H{sh}S{ss}V{sv}",
@@ -209,7 +208,7 @@ for obj in qr_results:
                 cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
 
     fname = "scan_result.jpg"
-    annotated = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
+    # Note: Keep standard BGR conversion order for writing out via cv2.imwrite
     cv2.imwrite(fname, annotated)
     print(f"Image saved: {fname}")
 
