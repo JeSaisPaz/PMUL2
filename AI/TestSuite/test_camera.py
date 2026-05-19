@@ -163,6 +163,7 @@ for obj in qr_results:
                 0.55, (0, 255, 255), 2)
 
     fname = "scan_result.jpg"
+    annotated = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
     cv2.imwrite(fname, annotated)
     print(f"Image: {fname}")
 
