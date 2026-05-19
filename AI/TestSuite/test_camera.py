@@ -6,24 +6,22 @@ from pyzbar.pyzbar import decode
 from picamera2 import Picamera2
 
 # ---------------------------------------------------------------------------
-# Camera calibration
+# Camera calibration & Dynamic Layout Rules
 # ---------------------------------------------------------------------------
-PIXELS_PER_CM   = 25        # ← starting value, tune for your setup
-SAMPLE_OFFSET_CM = 5        # nominal distance from QR centre horizontally (cm)
-RETRY_STEP_PX   = 8         # pixels added to offset on each retry
-MAX_RETRIES     = 10        # give up after this many unsatisfying samples
-PATCH           = 10        # side length of each sample patch (px)
+RETRY_STEP_PX   = 6         # pixels shifted outward if the first spot is unclear
+MAX_RETRIES     = 5         # fine-tuned retry limit to keep sampling localized
+PATCH           = 12        # slightly larger patch size (12x12 px) to smoothly average out grain
 
 # ---------------------------------------------------------------------------
-# Colour palette
+# Colour palette (Calibrated HSV ranges)
 # ---------------------------------------------------------------------------
 COLOR_RANGES = [
     ("Yellow",  [(20, 35)],   (80, 255),  (80,  255), False),
-    ("Orange",  [(8,  20)],   (150, 255), (150, 255), False),
-    ("Brown",   [(8,  20)],   (60,  220), (20,  149), False),
+    ("Orange",  [(8,  19)],   (150, 255), (150, 255), False),
+    ("Brown",   [(8,  19)],   (60,  220), (20,  149), False),
     ("Green",   [(40, 85)],   (40,  255), (40,  255), False),
     ("Blue",    [(100, 130)], (80,  255), (40,  255), False),
-    ("Magenta", [(131, 170)], (80,  255), (40,  255), False),
+    ("Magenta", [(131, 175)], (70,  255), (40,  255), False), # Marginally widened Hue/Sat for real world variance
 ]
 
 TARGET_COLORS = {r[0] for r in COLOR_RANGES}
@@ -52,8 +50,8 @@ def sample_at_offset_horizontal(hsv, cx, cy, offset_px, frame_h, frame_w):
     STRICTLY SIDE-TO-SIDE SAMPLING
     """
     positions = [
-        (cx - offset_px, cy),  # Left side
-        (cx + offset_px, cy),  # Right side
+        (cx - offset_px, cy),  # Left wing of the block
+        (cx + offset_px, cy),  # Right wing of the block
     ]
     samples = []
     votes   = {}
@@ -78,14 +76,18 @@ def detect_block_color(hsv, obj, frame_h, frame_w):
     cx = rect.left + rect.width  // 2
     cy = rect.top  + rect.height // 2
 
+    # DYNAMIC CONFIGURATION: Base the offset purely on the size of the QR code
+    # This keeps the sample squarely on the block's physical face.
+    base_offset_px = int(rect.width * 1.2)
+
     color       = None
     avg_h = avg_s = avg_v = 0
     samples     = []
-    final_offset = int(SAMPLE_OFFSET_CM * PIXELS_PER_CM)
+    final_offset = base_offset_px
     attempt     = 0
 
     for attempt in range(MAX_RETRIES):
-        offset_px = int(SAMPLE_OFFSET_CM * PIXELS_PER_CM) + attempt * RETRY_STEP_PX
+        offset_px = base_offset_px + (attempt * RETRY_STEP_PX)
         samples, votes = sample_at_offset_horizontal(hsv, cx, cy, offset_px, frame_h, frame_w)
         final_offset = offset_px
 
@@ -114,8 +116,7 @@ def detect_block_color(hsv, obj, frame_h, frame_w):
 print("[CAM] Initialisation...")
 cam = Picamera2()
 
-# CORE FIX: Configure the camera to standard video preset (natively YUV420)
-# This bypasses the Pi hardware bugs causing the red/brown barcode corruption patterns.
+# Configure using standard video profiles to enforce standard driver layout bounds (YUV420)
 cam.configure(cam.create_video_configuration(main={"size": (640, 480)}))
 cam.start()
 time.sleep(2)
@@ -132,7 +133,7 @@ if raw is None:
     print("[CAM] Pas de frame, abandon.")
     sys.exit(1)
 
-# CORE FIX: Convert the reliable camera YUV data format over to standard OpenCV BGR
+# Decode format straight to standard OpenCV matrix BGR format
 frame = cv2.cvtColor(raw, cv2.COLOR_YUV2BGR_I420)
 
 h, w  = frame.shape[:2]
@@ -143,7 +144,7 @@ if not qr_results:
     print("[SCAN] Aucun QR detecte")
     sys.exit(0)
 
-PURPLE = (180, 0, 180)  # BGR
+PURPLE = (180, 0, 180)  # Debug box color
 
 for obj in qr_results:
     try:
@@ -156,8 +157,7 @@ for obj in qr_results:
 
     print(f"QR:       {qr_text}")
     print(f"Centre:   ({cx}, {cy})")
-    print(f"Offset:   {final_offset} px  (base {int(SAMPLE_OFFSET_CM * PIXELS_PER_CM)} px, "
-          f"{attempts} retr{'y' if attempts == 1 else 'ies'})")
+    print(f"Offset:   {final_offset} px (Derived from QR width: {obj.rect.width} px)")
     print(f"H S V:    {avg_h} {avg_s} {avg_v}")
     print(f"Couleur:  {color}")
     print()
@@ -177,7 +177,7 @@ for obj in qr_results:
     # Cross-hair at QR centre
     cv2.drawMarker(annotated, (cx, cy), (0, 255, 255), cv2.MARKER_CROSS, 16, 2)
 
-    # Tracking guide line (shows the side-to-side scan row)
+    # Horizontal guide tracking row line
     cv2.line(annotated, (0, cy), (w, cy), (0, 140, 255), 1, cv2.LINE_AA)
 
     # Sample patch overlays
