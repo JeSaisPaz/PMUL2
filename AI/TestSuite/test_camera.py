@@ -21,6 +21,9 @@ cam.start()
 
 # Allow camera AGC and gains to settle
 time.sleep(1.5)
+
+cam.set_controls({"AwbMode": 3})
+
 raw_frame = cam.capture_array()
 cam.stop()
 
