@@ -92,7 +92,8 @@ def detect_block_color(hsv, obj, frame_h, frame_w):
 
 print("[CAM] Initialisation...")
 cam = Picamera2()
-cam.configure(cam.create_preview_configuration(main={"size": (640, 480)}))
+cam.configure(cam.create_preview_configuration(
+    main={"size": (640, 480), "format": "BGR888"}))
 cam.start()
 time.sleep(2)
 
