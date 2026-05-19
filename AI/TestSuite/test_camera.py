@@ -6,79 +6,151 @@ from pyzbar.pyzbar import decode
 from picamera2 import Picamera2
 
 # ---------------------------------------------------------------------------
-# 1. SETUP
+# 1. CAMERA CONFIGURATION & CAPTURE
 # ---------------------------------------------------------------------------
+print("[CAM] Initialising Sensor...")
 cam = Picamera2()
+
 config = cam.create_preview_configuration()
 config["main"]["size"] = (640, 480)
-config["main"]["format"] = "RGB888"
+# Requesting "RGB888" physically hands us BGR array bytes due to libcamera driver mapping
+config["main"]["format"] = "RGB888"  
+
 cam.configure(config)
 cam.start()
-time.sleep(2.0)
+
+# Let the sensor turn on
+time.sleep(0.5)
+
+# HARD OVERRIDE: Disable dynamic auto-white-balance to stop the camera
+# from deleting the blue spectrum. We lock the Red and Blue channels manually.
+cam.set_controls({
+    "AwbEnable": False,
+    "ColourGains": (1.4, 1.4)  # (Red Gain, Blue Gain). Equal values preserve Magenta.
+})
+
+# Let the auto-exposure settle with our locked color settings
+time.sleep(1.0)
 raw_frame = cam.capture_array()
 cam.stop()
 
-# Work with RGB as standard
-frame = np.ascontiguousarray(raw_frame[:, :, :3])
+if raw_frame is None or raw_frame.size == 0:
+    print("[ERROR] Camera stream frame is empty.")
+    sys.exit(1)
+
+# CORRECT THE CHANNEL FLIP: Picamera2 outputs BGR data here. 
+# We fix it immediately so 'frame' is TRUE RGB for PyZbar and HSV parsing.
+bgr_frame = np.ascontiguousarray(raw_frame[:, :, :3])
+frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB) 
+
+h, w = frame.shape[:2]
+
+# Standard OpenCV conversions now map to the exact colors you expect!
 hsv_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
-bgr_display = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+bgr_display = bgr_frame.copy() 
 
 # ---------------------------------------------------------------------------
-# 2. IDENTIFICATION & PREVIEW
+# 2. ROBUST HUE-RANGE COLOR IDENTIFICATION
 # ---------------------------------------------------------------------------
-def identify_color(h, s, v):
-    # If the block is very dark, ignore it
-    if v < 40: return "Unknown"
-    
-    # 1. NEW: Force any Hue > 80 to be Blue, 
-    # regardless of how "yellow" the camera's AWB thinks it is.
-    if 80 <= h <= 140:
-        return "Blue"
+def identify_closest_color(h_val, s_val, v_val):
+    """
+    Identifies color using explicit Hue threshold bands.
+    This eliminates lighting intensity (Value) dependencies.
+    """
+    # If the color is too dark or completely washed out, reject it
+    if v_val < 40 or s_val < 40:
+        return "Unknown"
 
-    # 2. Yellow threshold (Only if Hue is significantly lower)
-    if 15 <= h < 40:
+    # 1. Handle Orange vs Brown (They share the exact same Hue space)
+    if 5 <= h_val < 18:
+        # Brown is simply a low-vibrancy, dark version of Orange
+        if v_val < 110 or s_val < 120:
+            return "Brown"
+        return "Orange"
+
+    # 2. Check remaining structural Hue bands (OpenCV Hue is 0-179)
+    # Shifting the Magenta/Red border from 165 to 170 to give Magenta breathing room
+    if (0 <= h_val < 5) or (170 <= h_val <= 179):
+        return "Red"  
+    elif 18 <= h_val < 38:
         return "Yellow"
-
-    # 3. Red/Magenta
-    if (h < 15 or h > 165):
-        return "Red"
-        
-    # 4. Green
-    if 40 <= h < 80:
+    elif 38 <= h_val < 85:
         return "Green"
-        
+    elif 85 <= h_val < 135:
+        return "Blue"
+    elif 135 <= h_val < 170:
+        return "Magenta"
+
     return "Unknown"
 
 # ---------------------------------------------------------------------------
-# 3. QR DETECTION & SAMPLING
+# 3. QR DETECTION & DISPOSITION SAMPLING
 # ---------------------------------------------------------------------------
 qr_codes = decode(frame)
+if not qr_codes:
+    print("[SCAN] No QR Code found in active frame.")
+    cv2.imwrite("failed_scan.jpg", bgr_display)
+    sys.exit(0)
+
 annotated = bgr_display.copy()
+patch_size = 16  # Slightly larger patch for a better median sample
 
 for obj in qr_codes:
-    rx, ry, rw, rh = obj.rect.left, obj.rect.top, obj.rect.width, obj.rect.height
-    cx, cy = rx + rw // 2, ry + rh // 2
-    
-    # Define a small sampling patch inside the QR code
-    patch = hsv_frame[cy-10:cy+10, cx-10:cx+10]
-    
-    # Get range of HSV to debug
-    h_min, h_max = np.min(patch[:,:,0]), np.max(patch[:,:,0])
-    s_min, s_max = np.min(patch[:,:,1]), np.max(patch[:,:,1])
-    v_min, v_max = np.min(patch[:,:,2]), np.max(patch[:,:,2])
-    
-    mh, ms, mv = np.median(patch[:,:,0]), np.median(patch[:,:,1]), np.median(patch[:,:,2])
-    color = identify_color(mh, ms, mv)
-    
-    # Print the ranges so you can calibrate perfectly
-    print(f"--- HSV Ranges for {color} ---")
-    print(f"Hue: {h_min}-{h_max} (Median: {mh})")
-    print(f"Sat: {s_min}-{s_max} (Median: {ms})")
-    print(f"Val: {v_min}-{v_max} (Median: {mv})")
-    
-    # Visual Preview
-    cv2.rectangle(annotated, (cx-10, cy-10), (cx+10, cy+10), (255, 0, 0), 2)
-    cv2.putText(annotated, f"{color}", (rx, ry-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+    try:
+        qr_text = obj.data.decode("utf-8")
+    except Exception:
+        continue
 
-cv2.imwrite("debug_preview.jpg", annotated)
-print("Saved debug_preview.jpg. Check the terminal for the exact HSV ranges.")
+    # Extract coordinates of the bounding box
+    rx, ry, rw, rh = obj.rect.left, obj.rect.top, obj.rect.width, obj.rect.height
+    cx = rx + (rw // 2)
+    cy = ry + (rh // 2)
+
+    # Tighten your sample zone: place patches exactly 15 pixels outside the QR borders
+    # to guarantee we stay safely inside the colored block perimeter.
+    test_points = [
+        (rx - 15 - patch_size, cy - (patch_size // 2)),  # Left side sample
+        (rx + rw + 15, cy - (patch_size // 2))           # Right side sample
+    ]
+
+    votes = []
+
+    for sx, sy in test_points:
+        # Keep sample coordinates securely within screen boundaries
+        if (0 <= sx <= w - patch_size) and (0 <= sy <= h - patch_size):
+            patch = hsv_frame[sy : sy + patch_size, sx : sx + patch_size]
+            
+            # Use MEDIAN instead of MEAN to completely ignore noise/speckles
+            median_h = int(np.median(patch[:, :, 0]))
+            median_s = int(np.median(patch[:, :, 1]))
+            median_v = int(np.median(patch[:, :, 2]))
+            
+            match_name = identify_closest_color(median_h, median_s, median_v)
+            
+            # Draw visual tracking boxes onto reporting image
+            box_color = (0, 255, 0) if match_name != "Unknown" else (0, 0, 255)
+            cv2.rectangle(annotated, (sx, sy), (sx + patch_size, sy + patch_size), box_color, 2)
+            cv2.putText(annotated, match_name, (sx - 10, sy - 6), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, box_color, 1)
+            
+            if match_name != "Unknown":
+                votes.append(match_name)
+
+    # Determine final matching color
+    final_color = max(set(votes), key=votes.count) if votes else "Unknown"
+
+    print(f"QR Content: {qr_text}")
+    print(f"Block Color Detected: {final_color}\n")
+
+    # Draw visual indicators
+    pts = np.array([(p.x, p.y) for p in obj.polygon], np.int32).reshape((-1, 1, 2))
+    cv2.polylines(annotated, [pts], True, (255, 255, 0), 2)
+    cv2.drawMarker(annotated, (cx, cy), (0, 255, 255), cv2.MARKER_CROSS, 14, 2)
+    
+    cv2.putText(annotated, f"{qr_text} : {final_color}", (rx, max(ry - 12, 15)), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
+
+# Save result out to disk
+output_filename = "scan_result.jpg"
+cv2.imwrite(output_filename, annotated)
+print(f"[SUCCESS] Processed summary frame saved to: {output_filename}")
