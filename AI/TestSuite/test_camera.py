@@ -11,8 +11,11 @@ from picamera2 import Picamera2
 print("[CAM] Initialising Native Stream...")
 cam = Picamera2()
 
-# Request direct standard BGR format through safe config parameters
-config = cam.create_preview_configuration({"main": {"size": (640, 480), "format": "BGR888"}})
+# FIXED: Create an empty configuration template, then modify its properties safely
+config = cam.create_preview_configuration()
+config.main.size = (640, 480)
+config.main.format = "BGR888"
+
 cam.configure(config)
 cam.start()
 
