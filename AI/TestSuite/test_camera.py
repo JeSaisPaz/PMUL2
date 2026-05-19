@@ -13,26 +13,31 @@ cam = Picamera2()
 
 config = cam.create_preview_configuration()
 config["main"]["size"] = (640, 480)
-config["main"]["format"] = "RGB888" 
+# Requesting "RGB888" physically hands us BGR array bytes due to libcamera driver mapping
+config["main"]["format"] = "RGB888"  
 
 cam.configure(config)
 cam.start()
 
 # Allow camera AGC and gains to settle
 time.sleep(1.5)
-frame = cam.capture_array()
+raw_frame = cam.capture_array()
 cam.stop()
 
-if frame is None or frame.size == 0:
+if raw_frame is None or raw_frame.size == 0:
     print("[ERROR] Camera stream frame is empty.")
     sys.exit(1)
 
-frame = np.ascontiguousarray(frame[:, :, :3])
+# CORRECT THE CHANNEL FLIP: Picamera2 outputs BGR data here. 
+# We fix it immediately so 'frame' is TRUE RGB for PyZbar and HSV parsing.
+bgr_frame = np.ascontiguousarray(raw_frame[:, :, :3])
+frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB) 
+
 h, w = frame.shape[:2]
 
-# Convert the RGB frame correctly to HSV format
+# Standard OpenCV conversions now map to the exact colors you expect!
 hsv_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
-bgr_display = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+bgr_display = bgr_frame.copy() 
 
 # ---------------------------------------------------------------------------
 # 2. ROBUST HUE-RANGE COLOR IDENTIFICATION
@@ -55,7 +60,7 @@ def identify_closest_color(h_val, s_val, v_val):
 
     # 2. Check remaining structural Hue bands (OpenCV Hue is 0-179)
     if (0 <= h_val < 5) or (165 <= h_val <= 179):
-        return "Red"  # Out of your targets, but good fail-safe boundary
+        return "Red"  
     elif 18 <= h_val < 38:
         return "Yellow"
     elif 38 <= h_val < 85:
