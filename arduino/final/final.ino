@@ -116,7 +116,7 @@ bool needScan = false;
 
 void checkScanArea() {
     if(!etatsIR[IR_SCAN] && etatsIR[IR_NEXT]||!etatsIR[IR_SCAN] && !etatsIR[IR_NEXT]) {
-    if(currentDecision != ItemDecision::NO_DECISION &&( !tapeActu == 1 || !etapeActu ==  2)) {
+    if(currentDecision != ItemDecision::NO_DECISION &&( !etapeActu == 1 || !etapeActu ==  2)) {
       servoScan.write(0);
       needScan = false;
     
@@ -124,7 +124,7 @@ void checkScanArea() {
     
   }
   else {
-    servoScran.write(10);
+    servoScan.write(10);
     needScan = true;
   }
 }
@@ -190,7 +190,7 @@ void loop() {
         switch(currentDecision) {
           case ItemDecision::ORDER: {
             if(!etatsIR[IR_ORDER]) {
-              servoComande.write(45);
+              servoCommande.write(45);
               break;
 
           }
