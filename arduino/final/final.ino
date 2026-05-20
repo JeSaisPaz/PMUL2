@@ -133,7 +133,7 @@ void loop() {
 
   // 1 Partie capteurs et handler
   checkScanArea();
-  sendSensorStatus(etatsIR[]);
+  objetPmul.sendSensorStatus(etatsIR[0], etatsIR[1], etatsIR[2], etatsIR[3], etatsIR[4]);
 
 
   // debug

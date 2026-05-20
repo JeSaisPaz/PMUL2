@@ -40,6 +40,7 @@ class Pmul2Com {
         void sendScanNeeded();
         void sendPong();
         void sendSensorStatus(uint8_t ir1, uint8_t ir2, uint8_t ir3, uint8_t ir4, uint8_t ir5);
+        void sendScanResult(uint16_t itemId, ItemStatus status);
         // envoie une commande saisie au keypad: lines = [{color, qty}, ...]
         void sendLocalOrder(uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys);
 
