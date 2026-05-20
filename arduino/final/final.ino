@@ -39,15 +39,32 @@ unsigned long tempsActuel = 0;
 unsigned long tempsDepart = 0;
 long attenteServo = 500;
 
+// keypad
+const byte ROWS = 4; 
+const byte COLS = 4; 
+
+char keys[ROWS][COLS] = {
+  {'1','2','3','A'},
+  {'4','5','6','B'},
+  {'7','8','9','C'},
+  {'*','0','#','D'}
+};
+
+// connexions des broches (Pins 9 à 2)
+byte rowPins[ROWS] = {9, 8, 7, 6}; // Lignes connectées aux pins 9, 8, 7, 6
+byte colPins[COLS] = {5, 4, 3, 2}; // Colonnes connectées aux pins 5, 4, 3, 2
+
+// initialisation du clavier
+Keypad customKeypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS); 
+
 // infos du bloc en cours de scan
 uint16_t    currentItemId = 0;
 ItemDecision currentDecision = ItemDecision::NO_DECISION;
 uint8_t     currentOrderId  = 0;
 uint8_t     currentHue = 0, currentSaturation = 0, currentValue = 0, currentTeam = 0;
 
-// keypad
-Pmul2Keypad  keypad;
-
+byte rowPins[4] = {9, 8, 7, 6}; 
+byte colPins[4] = {5, 4, 3, 2};
 // mode: false = SCAN, true = ORDER (saisie commande)
 bool modeOrder = false;
 
@@ -110,6 +127,7 @@ void setup() {
   servoCommande.write(45);
 
   etapeActu = 0;
+
 }
 
 bool needScan = false;
