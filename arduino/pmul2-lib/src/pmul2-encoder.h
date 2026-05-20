@@ -1,34 +1,40 @@
+/*
+ * pmul2-encoder.h
+ * Driver pour encodeur rotatoire avec bouton poussoir.
+ * Compatible Arduino Mega 2560 — polling logiciel (pas d'interruption).
+ * Authors: Louis B., Adnane O.B.T., Loic V.C.
+ * Date: 20/04/2026
+ * License: MIT
+ */
+
 #ifndef PMUL2_ENCODER_H
 #define PMUL2_ENCODER_H
 
 #include <Arduino.h>
 
-// encodeur rotatoire avec bouton poussoir
-// CLK=22, DT=23, SW=24 (interrupts)
-
 class Pmul2Encoder {
     public:
         Pmul2Encoder();
 
-        // lecture du delta depuis le dernier appel (-1, 0, +1)
         int8_t readDelta();
-
-        // true si le bouton vient d'etre presse (front descendant)
         bool pressed();
 
     private:
-        static const uint8_t PIN_CLK = 22;
-        static const uint8_t PIN_DT  = 23;
-        static const uint8_t PIN_SW  = 24;
+        static const uint8_t CLK_PIN = 22;
+        static const uint8_t DT_PIN  = 23;
+        static const uint8_t SW_PIN  = 24;
 
-        volatile int8_t _delta;
-        volatile bool   _btnPressed;
-        bool            _lastBtn;
+        static const unsigned long DEBOUNCE_MS = 30;
 
-        static void isrCLK();
-        static void isrDT();  // unused, handled in isrCLK
+        uint8_t _clkPrev;
+        uint8_t _clkCurr;
+        int8_t _delta;
 
-        static Pmul2Encoder* _instance;
+        bool _btnStable;
+        bool _btnLastStable;
+        bool _btnFlag;
+        unsigned long _btnLastTime;
+        bool _btnCurr;
 };
 
 #endif

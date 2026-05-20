@@ -101,7 +101,8 @@ bool Pmul2Com::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& o
     switch (rawDecision) {
         case static_cast<uint8_t>(ItemDecision::ORDER): decision = ItemDecision::ORDER; break;
         case static_cast<uint8_t>(ItemDecision::STOCK): decision = ItemDecision::STOCK; break;
-        default:                                        decision = ItemDecision::PASS;  break;
+        case static_cast<uint8_t>(ItemDecision::PASS) : decision = ItemDecision::PASS; break;
+        default:                                        decision = ItemDecision::NO_DECISION;  break;
     }
 
     return true;

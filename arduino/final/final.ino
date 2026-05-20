@@ -109,8 +109,8 @@ void setup() {
   servoCommande.attach(9);
 
   servoScan.write(0);
-  servoStock.write(0);
-  servoCommande.write(0);
+  servoStock.write(45);
+  servoCommande.write(45);
 }
 
 void loop() {
@@ -124,6 +124,12 @@ void loop() {
       Serial1.print("[ETAPE] ");
       Serial1.println(noms[etapeActu]);
       lastEtape = etapeActu;
+
+      // notifie le Pi du changement d'etat
+      switch (etapeActu) {
+        case 0: objetPmul.sendReady(); break;
+        case 1: objetPmul.sendBusy();  break;
+      }
     }
   }
 
@@ -155,8 +161,8 @@ void loop() {
 
   if (!systemOn) {
     servoScan.write(0);
-    servoStock.write(0);
-    servoCommande.write(0);
+    servoStock.write(45);
+    servoCommande.write(45);
     etapeActu = 0;
     return;
   }
@@ -184,7 +190,7 @@ void loop() {
 
     case 0: // Attente — on attend qu'un bloc arrive a l'actionneur
       if (etatsIR[IR_SCAN]) {
-        servoScan.write(90);
+        servoScan.write(10);
         etapeActu = 1;
         Serial1.println("[SCAN] bloc bloque, demande info...");
       }
@@ -228,10 +234,10 @@ void loop() {
 
         switch (currentDecision) {
           case ItemDecision::ORDER:
-            servoCommande.write(45);
+            servoCommande.write(0);
             break;
           case ItemDecision::STOCK:
-            servoStock.write(45);
+            servoStock.write(0);
             break;
           default:
             break;
@@ -291,8 +297,8 @@ void loop() {
         //      bloquait indefiniment le systeme, stoppant tout traitement ulterieur.
         if (tempsActuel - tempsDepart > 5000) {
           Serial1.println("[WARN] timeout confirmation, retour attente");
-          servoStock.write(0);
-          servoCommande.write(0);
+          servoStock.write(45);
+          servoCommande.write(45);
           etapeActu = 0;
           break;
         }
@@ -327,10 +333,11 @@ void loop() {
             Serial1.print(" -> ");
             Serial1.println(newCount);
             completedOrders = newCount;
+            objetPmul.sendOrderDone();
           }
 
-          servoStock.write(0);
-          servoCommande.write(0);
+          servoStock.write(45);
+          servoCommande.write(45);
           etapeActu = 0;
         }
       }  // fin bloc case 3
@@ -597,9 +604,7 @@ uint8_t countColor(uint8_t colorId) {
   return total;
 }
 
-// FIX: double-buffer statique — on ne retranscrit une ligne sur l'I2C que si son
-//      contenu a change, eliminant les ~10-17ms de transactions I2C bloquantes
-//      par tour de loop lorsque l'affichage est stable.
+// FIX: double-buffer statique
 static void lcdWriteLine(uint8_t line, const char* text) {
   static char cache[2][17] = {"", ""};
 

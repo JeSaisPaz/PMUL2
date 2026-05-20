@@ -37,7 +37,7 @@ class Pmul2Lib {
         // envoie une commande saisie au keypad
         void sendLocalOrder(uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys);
 
-        // lecture depuis le Pi/backend
+        // lecture depuis le Pi/backendcurrentItem
         bool readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId,
                           uint8_t& hue, uint8_t& saturation, uint8_t& value, uint8_t& team);
         // recoit la liste des couleurs actives (max 4)

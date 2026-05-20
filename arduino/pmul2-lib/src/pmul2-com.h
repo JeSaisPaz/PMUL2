@@ -8,7 +8,8 @@
 enum class ItemDecision : uint8_t {
     PASS  = 0x00,  // bloc d'une autre equipe, on le laisse passer
     ORDER = 0x01,  // bloc pour notre commande, on le garde
-    STOCK = 0x02   // bloc pour nous mais pas dans la commande, on le stock
+    STOCK = 0x02,   // bloc pour nous mais pas dans la commande, on le stock
+    NO_DECISION = 0x03 // le block n'a pas encore de decision du backend
 };
 
 // status de confirmation apres tri
@@ -38,7 +39,6 @@ class Pmul2Com {
         void sendReady();
         void sendScanNeeded();
         void sendPong();
-        void sendScanResult(uint16_t itemId, ItemStatus status);
         void sendSensorStatus(uint8_t ir1, uint8_t ir2, uint8_t ir3, uint8_t ir4, uint8_t ir5);
         // envoie une commande saisie au keypad: lines = [{color, qty}, ...]
         void sendLocalOrder(uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys);

@@ -17,7 +17,6 @@ import numpy as np
 from pyzbar.pyzbar import decode
 from picamera2 import Picamera2, Preview
 from serial_transfer import SerialTransfer
-import re
 import socketio
 
 # config
@@ -189,15 +188,7 @@ def handleScanNeeded():
         itemId   = data["itemId"]
         decision = data["decision"]
         orderId  = data.get("orderId") or 0
-        # le backend renvoie hsv en string: "h:120, s:150, v:200"
-        hsv_str  = data.get("hsv", "")
-        m = re.match(r'h:(\d+),\s*s:(\d+),\s*v:(\d+)', str(hsv_str))
-        if m:
-            hue = int(m.group(1)) & 0xFF
-            sat = int(m.group(2)) & 0xFF
-            val = int(m.group(3)) & 0xFF
-        else:
-            hue = sat = val = 0
+        # le backend ne renvoie plus de hsv — on garde les valeurs scannees par decodeFrame
         team_raw = data.get("team")
         if team_raw and team_raw.startswith("TEAM"):
             team_byte = max(0, min(5, int(team_raw[4:]) - 1)) + 1
