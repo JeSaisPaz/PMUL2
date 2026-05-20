@@ -1,3 +1,24 @@
+/*
+ * PMUL2 - Systeme de Tri Automatise
+ * 
+ * NOUVEAU PROCESSUS DE BLOCAGE/DEBLOCAGE:
+ * =========================================
+ * 1. Par defaut: ServoScan en position BLOQUEE (10) - les boites sont toujours bloquees
+ * 2. Detection: Quand IR_NEXT detecte une boite -> demande scan au backend
+ * 3. Scan: Reception de la decision (ORDER/STOCK/PASS) du backend
+ * 4. Aiguillage: Configuration des servos d'aiguillage selon la decision
+ * 5. Liberation: Deblocage du servoScan (0) pour laisser passer la boite
+ * 6. Reblocage: Des que IR_NEXT detecte la boite suivante -> blocage immediat
+ * 7. Confirmation: Attente que la boite precedente atteigne son capteur de destination
+ * 8. Reset: Retour des aiguillages en position neutre, retour a l'etape 1
+ * 
+ * CAPTEURS IR (INPUT_PULLUP - actif LOW):
+ * - IR_NEXT (pin 7): Detecte la boite suivante (une boite derriere le blocage)
+ * - IR_ORDER (pin 5): Confirmation arrivee dans bac commande
+ * - IR_STOCK (pin 6): Confirmation arrivee dans bac stock  
+ * - IR_PASS (pin 4): Confirmation passage tout droit
+ */
+
 #include <Servo.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
@@ -17,23 +38,49 @@ uint16_t completedOrders = 0; // recu du backend via PID_COMPLETED_COUNT
 // Com Raspberry Pi via USB
 Pmul2Lib objetPmul(Serial);
 
-// 0=Attente, 1=Scan, 2=Liberation, 3=Confirmation
+// Machine a etats pour le processus de tri
+// 0=Attente boite, 1=Attente scan, 2=Aiguillage, 3=Liberation, 4=Attente prochaine, 5=Confirmation
 byte etapeActu = 0;
+byte etapePrecedente = 255; // Pour detecter les changements d'etat
+
+// Gestion des timeouts
+unsigned long tempsEntreeEtat = 0;  // Moment ou on entre dans un etat
+const unsigned long TIMEOUT_SCAN = 5000;        // 5 secondes pour recevoir le scan
+const unsigned long TIMEOUT_CONFIRMATION = 10000; // 10 secondes pour confirmation
+const unsigned long TIMEOUT_ATTENTE_BOITE = 30000; // 30 secondes d'attente max pour une boite
+
+// Variables pour l'etat 4 (plus de static!)
+bool previousBoxCleared = false;
 
 // Capteurs IR: pin, role, confirmation associee
+// IMPORTANT: Avec INPUT_PULLUP, LOW = objet detecte, HIGH = pas d'objet
 byte pinsIR[] = {8, 7, 6, 5, 4};
 bool etatsIR[] = {0, 0, 0, 0, 0};
 
-#define IR_SCAN    0  // pin 8 - en face de l'actionneur (bloc en position)
-#define IR_NEXT    1  // pin 7 - une boite derriere (prochain bloc)
+// Optimisation envoi capteurs
+bool etatsIRPrecedents[] = {0, 0, 0, 0, 0};
+unsigned long dernierEnvoiCapteurs = 0;
+const unsigned long INTERVALLE_ENVOI_CAPTEURS = 1000; // Envoi force toutes les secondes
+bool capteursOntChange = false;
+
+#define IR_SCAN    0  // pin 8 - DEPRECATED (sera retire)
+#define IR_NEXT    1  // pin 7 - detecte la boite suivante (une boite derriere)
 #define IR_STOCK   2  // pin 6 - confirmation stock
 #define IR_ORDER   3  // pin 5 - confirmation commande
 #define IR_PASS    4  // pin 4 - confirmation autre (passe tout droit)
 
 // Servo Moteur
-Servo servoScan;
-Servo servoStock;
-Servo servoCommande;
+Servo servoScan;      // Servo de blocage/deblocage (pin 11)
+Servo servoStock;     // Servo aiguillage stock (pin 10)
+Servo servoCommande;  // Servo aiguillage commande (pin 9)
+
+// Positions servo blocage
+#define SERVO_BLOQUE    10  // Position bloquee (empeche les boites de passer)
+#define SERVO_LIBRE     0   // Position libre (laisse passer les boites)
+
+// Positions servo aiguillage
+#define SERVO_AIGUILLE  0   // Position pour devier
+#define SERVO_NEUTRE    45  // Position neutre/repos
 
 unsigned long tempsActuel = 0;
 unsigned long tempsDepart = 0;
@@ -63,8 +110,6 @@ ItemDecision currentDecision = ItemDecision::NO_DECISION;
 uint8_t     currentOrderId  = 0;
 uint8_t     currentHue = 0, currentSaturation = 0, currentValue = 0, currentTeam = 0;
 
-byte rowPins[4] = {9, 8, 7, 6}; 
-byte colPins[4] = {5, 4, 3, 2};
 // mode: false = SCAN, true = ORDER (saisie commande)
 bool modeOrder = false;
 
@@ -122,44 +167,44 @@ void setup() {
   servoStock.attach(10);
   servoCommande.attach(9);
 
-  servoScan.write(10);
-  servoStock.write(45);
-  servoCommande.write(45);
+  // Initialisation: blocage actif, aiguillages neutres
+  servoScan.write(SERVO_BLOQUE);      // Bloque les boites par defaut
+  servoStock.write(SERVO_NEUTRE);     // Position neutre
+  servoCommande.write(SERVO_NEUTRE);  // Position neutre
 
   etapeActu = 0;
 
 }
 
-bool needScan = false;
-
-void checkScanArea() {
-    if(!etatsIR[IR_SCAN] && etatsIR[IR_NEXT]||!etatsIR[IR_SCAN] && !etatsIR[IR_NEXT]) {
-    if(currentDecision != ItemDecision::NO_DECISION &&( !etapeActu == 1 || !etapeActu ==  2)) {
-      servoScan.write(0);
-      needScan = false;
-    
-    }
-    
-  }
-  else {
-    servoScan.write(10);
-    needScan = true;
-  }
-}
-
 void loop() {
 
-  // 1 Partie capteurs et handler
-  checkScanArea();
-  objetPmul.sendSensorStatus(etatsIR[0], etatsIR[1], etatsIR[2], etatsIR[3], etatsIR[4]);
+  // 1. Lecture des capteurs IR
+  // INPUT_PULLUP: LOW = detecte, HIGH = rien
+  capteursOntChange = false;
+  for (byte i = 0; i < 5; i++) {
+    bool nouvelEtat = !digitalRead(pinsIR[i]); // Inverse pour avoir true = detecte
+    if (nouvelEtat != etatsIR[i]) {
+      capteursOntChange = true;
+    }
+    etatsIR[i] = nouvelEtat;
+  }
+  
+  // Envoi status capteurs au backend seulement si changement ou timeout
+  unsigned long maintenant = millis();
+  if (capteursOntChange || (maintenant - dernierEnvoiCapteurs > INTERVALLE_ENVOI_CAPTEURS)) {
+    objetPmul.sendSensorStatus(etatsIR[0], etatsIR[1], etatsIR[2], etatsIR[3], etatsIR[4]);
+    dernierEnvoiCapteurs = maintenant;
+    
+    // Mise a jour pour la prochaine comparaison
+    for (byte i = 0; i < 5; i++) {
+      etatsIRPrecedents[i] = etatsIR[i];
+    }
+  }
 
-
-  // debug
+  // Debug ping
   objetPmul.handlePing();
 
-  // 2 Continue le process avec la machine a etat
-
-  // Couleurs du back
+  // 2. Reception des couleurs actives du backend
   {
     uint8_t colors[4];
     uint8_t count;
@@ -168,68 +213,230 @@ void loop() {
       for (uint8_t i = 0; i < count; i++) {
         activeColors[i] = colors[i];
       }
-      //Serial1.print("[COLORS] ");
-      //Serial1.println(activeColorCount);
     }
   }
 
+  // Detection changement d'etat pour reset timer et variables
+  if (etapeActu != etapePrecedente) {
+    tempsEntreeEtat = millis();
+    
+    // Reset des variables specifiques a certains etats
+    if (etapeActu == 4) {
+      previousBoxCleared = false;  // Reset pour l'etat 4
+    }
+    
+    etapePrecedente = etapeActu;
+  }
+
+  // 3. Machine a etats principale (uniquement si systeme actif)
   if(systemOn) {
+    // Affichage LCD selon le mode
+    if(modeAffichage == 0) {
+      lcd.setCursor(0, 0);
+      lcd.print("Etat: ");
+      switch(etapeActu) {
+        case 0: lcd.print("Attente   "); break;
+        case 1: lcd.print("Scan...   "); break;
+        case 2: lcd.print("Aiguillage"); break;
+        case 3: lcd.print("Liberation"); break;
+        case 4: lcd.print("Prochain  "); break;
+        case 5: lcd.print("Confirm   "); break;
+      }
+      lcd.setCursor(0, 1);
+      lcd.print("Tries: ");
+      lcd.print(totalArticlesTries);
+      lcd.print("    ");
+    }
+    
     switch(etapeActu) {
-      // Attente
+      
+      // ====== ETAT 0: ATTENTE BOITE ======
+      // Blocage actif, attend qu'une boite arrive a IR_NEXT
       case 0: {
-        if(needScan) {
+        // S'assurer que le blocage est actif
+        servoScan.write(SERVO_BLOQUE);
+        
+        // Timeout optionnel si aucune boite n'arrive pendant longtemps
+        // (peut indiquer un probleme avec le convoyeur)
+        if (millis() - tempsEntreeEtat > TIMEOUT_ATTENTE_BOITE) {
+          // Log mais ne rien faire de special
+          if ((millis() - tempsEntreeEtat) % 5000 == 0) {  // Log toutes les 5 secondes
+            Serial1.println("[INFO] Aucune boite depuis 30+ secondes");
+          }
+        }
+        
+        // Si une boite est detectee a IR_NEXT
+        if(etatsIR[IR_NEXT]) {
+          // Demander le scan au backend
+          Serial1.println("[ETAT 0] Boite detectee - demande scan");
           objetPmul.sendScanNeeded();
-          if(objetPmul.readItemInfo(currentItemId, currentDecision, currentOrderId, currentHue, currentSaturation, currentValue, currentTeam)) {
-             etapeActu++;
-          }
+          etapeActu = 1; // Passer a l'attente du scan
         }
-
+        break;
       }
-      // Scan
+      
+      // ====== ETAT 1: ATTENTE SCAN ======
+      // Attend la reponse du backend avec la decision
       case 1: {
-        switch (currentDecision) {
-              case ItemDecision::ORDER:
-                servoCommande.write(0);
-                break;
-              case ItemDecision::STOCK:
-                servoStock.write(0);
-                break;
-              default:
-                // Pas de decision = tout droit (PASS)
-                break;
-              }
-
-              etapeActu++;
-
-      }
-      // Confirmation
-      case 2: {
-
-        switch(currentDecision) {
-          case ItemDecision::ORDER: {
-            if(!etatsIR[IR_ORDER]) {
-              servoCommande.write(45);
-              break;
-
-          }
-          case ItemDecision::STOCK: {
-            if(!etatsIR[IR_STOCK]) {
-              servoStock.write(45);
-              break;
-            }
-          }
-          case ItemDecision::PASS: {
-            if(!etatsIR[IR_PASS]) {
-              break;
-            }
-
-          }
-          default:
-            break;
-          }
+        // Verifier le timeout
+        if (millis() - tempsEntreeEtat > TIMEOUT_SCAN) {
+          // Timeout! Le backend n'a pas repondu
+          Serial1.println("[TIMEOUT] Scan non recu, passage en PASS");
+          
+          // Decision par defaut: laisser passer
+          currentDecision = ItemDecision::PASS;
+          currentItemId = 0;
+          currentOrderId = 0;
+          
+          // Passer directement a l'aiguillage
+          etapeActu = 2;
+          break;
         }
-        etapeActu = 0;
+        
+        // Essayer de lire les infos depuis le backend
+        if(objetPmul.readItemInfo(currentItemId, currentDecision, currentOrderId, 
+                                  currentHue, currentSaturation, currentValue, currentTeam)) {
+          // Scan recu, passer a l'aiguillage
+          Serial1.print("[SCAN OK] Item #");
+          Serial1.print(currentItemId);
+          Serial1.print(" Decision: ");
+          Serial1.println((int)currentDecision);
+          etapeActu = 2;
+        }
+        break;
+      }
+      
+      // ====== ETAT 2: AIGUILLAGE ======
+      // Configure les servos d'aiguillage selon la decision
+      case 2: {
+        Serial1.print("[ETAT 2] Aiguillage pour decision: ");
+        switch (currentDecision) {
+          case ItemDecision::ORDER:
+            Serial1.println("ORDER");
+            servoCommande.write(SERVO_AIGUILLE);  // Devier vers commande
+            break;
+          case ItemDecision::STOCK:
+            Serial1.println("STOCK");
+            servoStock.write(SERVO_AIGUILLE);     // Devier vers stock
+            break;
+          case ItemDecision::PASS:
+          default:
+            Serial1.println("PASS (tout droit)");
+            // Pas d'aiguillage, la boite passe tout droit
+            break;
+        }
+        
+        // Petit delai pour laisser les servos bouger
+        delay(100);
+        etapeActu = 3; // Passer a la liberation
+        break;
+      }
+      
+      // ====== ETAT 3: LIBERATION ======
+      // Debloque pour laisser passer la boite
+      case 3: {
+        Serial1.println("[ETAT 3] Liberation - deblocage");
+        servoScan.write(SERVO_LIBRE);  // Debloquer
+        etapeActu = 4; // Passer a l'attente de la prochaine boite
+        break;
+      }
+      
+      // ====== ETAT 4: ATTENTE PROCHAINE BOITE ======
+      // Des que IR_NEXT detecte la boite suivante, on rebloque immediatement
+      case 4: {
+        // Note: previousBoxCleared est maintenant une variable globale, 
+        // reset a false quand on entre dans cet etat (voir debut du loop)
+        
+        // D'abord, attendre que la boite actuelle quitte IR_NEXT
+        if(!previousBoxCleared && !etatsIR[IR_NEXT]) {
+          previousBoxCleared = true;  // La boite actuelle est partie
+          Serial1.println("[ETAT 4] Boite actuelle partie de IR_NEXT");
+        }
+        
+        // Ensuite, detecter l'arrivee de la prochaine boite
+        if(previousBoxCleared && etatsIR[IR_NEXT]) {
+          // Rebloquer immediatement pour arreter les boites suivantes
+          servoScan.write(SERVO_BLOQUE);
+          Serial1.println("[ETAT 4] Nouvelle boite detectee - BLOCAGE!");
+          etapeActu = 5; // Passer a la confirmation
+        }
+        // Note: Si pas de boite suivante, on reste en etat 4 (debloque)
+        // jusqu'a ce qu'une boite arrive
+        break;
+      }
+      
+      // ====== ETAT 5: CONFIRMATION ======
+      // Attend que la boite precedente atteigne son capteur de confirmation
+      // puis remet les aiguillages en position neutre
+      case 5: {
+        // Verifier le timeout
+        if (millis() - tempsEntreeEtat > TIMEOUT_CONFIRMATION) {
+          // Timeout! La boite n'a pas atteint le capteur de confirmation
+          Serial1.println("[TIMEOUT] Confirmation non recue");
+          
+          // Remettre les aiguillages en position neutre quand meme
+          servoStock.write(SERVO_NEUTRE);
+          servoCommande.write(SERVO_NEUTRE);
+          
+          // Compter comme un echec mais continuer
+          totalArticlesTries++;  // On compte quand meme
+          currentDecision = ItemDecision::NO_DECISION;  // Reset decision
+          etapeActu = 0;  // Retour a l'attente
+          break;
+        }
+        
+        bool confirmed = false;
+        
+        switch(currentDecision) {
+          case ItemDecision::ORDER:
+            if(etatsIR[IR_ORDER]) {
+              servoCommande.write(SERVO_NEUTRE);  // Remettre en position neutre
+              Serial1.println("[CONFIRM] Boite arrivee en ORDER");
+              confirmed = true;
+            }
+            break;
+            
+          case ItemDecision::STOCK:
+            if(etatsIR[IR_STOCK]) {
+              servoStock.write(SERVO_NEUTRE);     // Remettre en position neutre
+              Serial1.println("[CONFIRM] Boite arrivee en STOCK");
+              confirmed = true;
+            }
+            break;
+            
+          case ItemDecision::PASS:
+            if(etatsIR[IR_PASS]) {
+              Serial1.println("[CONFIRM] Boite passee tout droit");
+              confirmed = true;
+            }
+            break;
+            
+          default:
+            // Si pas de decision, considerer comme confirme
+            Serial1.println("[CONFIRM] Pas de decision - validation auto");
+            confirmed = true;
+            break;
+        }
+        
+        // Si confirmation recue, retour a l'etat initial
+        if(confirmed) {
+          totalArticlesTries++;
+          currentDecision = ItemDecision::NO_DECISION;  // Reset decision
+          etapeActu = 0;  // Retour a l'attente
+          
+          // Note: Le blocage est deja actif depuis l'etat 4
+          // La prochaine boite est deja en attente a IR_NEXT
+        }
+        break;
       }
     }
+  }
+  else {
+    // Systeme en pause/maintenance
+    // S'assurer que tout est bloque et en position neutre
+    servoScan.write(SERVO_BLOQUE);
+    servoStock.write(SERVO_NEUTRE);
+    servoCommande.write(SERVO_NEUTRE);
+    etapeActu = 0;
   }
 }
