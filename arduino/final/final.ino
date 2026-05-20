@@ -82,7 +82,9 @@ void basculeAffichage(){
 
 void setup() {
   Serial.begin(9600);
-  Serial1.begin(9600);
+  // FIX: 9600 bauds saturait le buffer UART (64o) en ~67ms lors de prints rapides,
+  //      bloquant la loop et retardant les envois capteurs vers le Pi.
+  Serial1.begin(115200);
 
   // dit au Pi qu'on est pret AVANT lcd.init() qui peut bloquer
   Serial.write('R');
@@ -189,18 +191,29 @@ void loop() {
       break;
 
     case 1: { // Scan — on demande l'info au Pi, max 3 essais
+      // FIX: scanRequested etait initialise a true, ce qui empechait l'envoi de la
+      //      demande au premier passage et introduisait un delai systematique de 1500ms.
       static bool scanRequested = false;
       static byte scanRetries = 0;
+      static bool freshScan = true;
 
-      if (!scanRequested) {
+      // reinitialisation au premier passage apres un nouveau bloc
+      if (freshScan) {
+        scanRetries = 0;
+        scanRequested = false;
+        freshScan = false;
+      }
+
+      // envoi de la demande si pas encore fait et pas epuise
+      if (!scanRequested && scanRetries < 3) {
         objetPmul.sendScanNeeded();
         scanRequested = true;
-        scanRetries = 0;
+        tempsDepart = tempsActuel;
       }
 
       if (objetPmul.readItemInfo(currentItemId, currentDecision, currentOrderId,
                                    currentHue, currentSaturation, currentValue, currentTeam)) {
-        scanRequested = false;
+        freshScan = true;
 
         Serial1.print("[ITEM] #");
         Serial1.print(currentItemId);
@@ -226,19 +239,18 @@ void loop() {
 
         tempsDepart = tempsActuel;
         etapeActu = 2;
-      } else {
-        // si toujours pas de reponse apres ~1.5s, on re-essaie
-        if (tempsActuel - tempsDepart > 1500 && scanRetries < 3) {
-          scanRequested = false; // force re-envoi du scan needed
+      } else if (scanRequested && tempsActuel - tempsDepart > 1500) {
+        // delai depasse sans reponse : re-essaie ou abandonne
+        scanRequested = false;
+        if (scanRetries < 3) {
           scanRetries++;
           Serial1.print("[SCAN] retry ");
           Serial1.println(scanRetries);
         }
-        // 3 essais sans reponse -> on laisse passer (PASS)
-        if (scanRetries >= 3 && tempsActuel - tempsDepart > 4500) {
+        if (scanRetries >= 3) {
           currentDecision = ItemDecision::PASS;
           Serial1.println("[SCAN] 3 essais echoues, -> PASS");
-          scanRequested = false;
+          freshScan = true;
           tempsDepart = tempsActuel;
           etapeActu = 2;
         }
@@ -246,19 +258,45 @@ void loop() {
       break;
     }
 
-    case 2: // Liberation — delai servo puis on libere le bloc
-      if (tempsActuel - tempsDepart >= attenteServo) {
+    case 2: { // Liberation — delai servo puis on libere le bloc
+      // FIX: sans timeout, si le bloc restait coince sur IR_SCAN apres le relachement
+      //      du servo, la machine bouclait indefiniment en case 2.
+      static unsigned long tempsRelache = 0;
+
+      if (tempsActuel - tempsDepart >= (unsigned long)attenteServo) {
         servoScan.write(0);
+
+        // marque le moment du premier relachement pour le timeout
+        if (tempsRelache == 0) tempsRelache = tempsActuel;
+
         // attend que le bloc quitte la zone de scan
         if (etatsIR[IR_SCAN] == 0) {
+          tempsRelache = 0;
+          tempsDepart = tempsActuel; // horodatage de depart pour le timeout du case 3
           etapeActu = 3;
           Serial1.println("[RELACHE] bloc parti, attente confirmation...");
+        } else if (tempsActuel - tempsRelache > 3000) {
+          // bloc toujours present 3s apres relachement : retour a l'attente
+          Serial1.println("[WARN] bloc coince apres relachement, retour attente");
+          tempsRelache = 0;
+          etapeActu = 0;
         }
       }
       break;
+    }
 
     case 3: // Confirmation — le bon capteur IR confirme le passage
       {
+        // FIX: sans timeout, un bloc n'atteignant jamais son capteur de confirmation
+        //      bloquait indefiniment le systeme, stoppant tout traitement ulterieur.
+        if (tempsActuel - tempsDepart > 5000) {
+          Serial1.println("[WARN] timeout confirmation, retour attente");
+          servoStock.write(0);
+          servoCommande.write(0);
+          etapeActu = 0;
+          break;
+        }
+
         bool confirmed = false;
         switch (currentDecision) {
           case ItemDecision::ORDER:
@@ -454,11 +492,11 @@ void updateLCD() {
     return;
   dernierRefresh = millis();
 
-  lcd.setCursor(0, 0);
+  char buf[17];
+
   if (!systemOn) {
-    lcd.print("MODE:MAINTENANCE");
-    lcd.setCursor(0, 1);
-    lcd.print("SYSTEME ARRETE");
+    lcdWriteLine(0, "MODE:MAINTENANCE");
+    lcdWriteLine(1, "SYSTEME ARRETE");
     return;
   }
 
@@ -471,97 +509,81 @@ void updateLCD() {
   // mode SCAN normal
   // BP2 (modeAffichage) switch entre deux vues
   if (modeAffichage == 1) {
-    lcd.print("Cmd effectuees:");
-    lcd.setCursor(0, 1);
-    lcd.print(completedOrders);
+    lcdWriteLine(0, "Cmd effectuees:");
+    snprintf(buf, 17, "%u", completedOrders);
+    lcdWriteLine(1, buf);
     return;
   }
 
-  if (etapeActu >= 2 && currentDecision == ItemDecision::ORDER) {
-    lcd.print("H");
-    lcd.print(currentHue);
-    lcd.print(" S");
-    lcd.print(currentSaturation);
-    lcd.print(" V");
-    lcd.print(currentValue);
-    lcd.setCursor(0, 1);
+  if (etapeActu >= 2 && (currentDecision == ItemDecision::ORDER || currentDecision == ItemDecision::STOCK)) {
+    snprintf(buf, 17, "H%u S%u V%u", currentHue, currentSaturation, currentValue);
+    lcdWriteLine(0, buf);
     if (currentTeam >= 0x01 && currentTeam <= 0x05) {
-      lcd.print("T0");
-      lcd.print(currentTeam);
+      snprintf(buf, 17, "T0%u %s #%u", currentTeam,
+               currentDecision == ItemDecision::ORDER ? "ORDER" : "STOCK", currentOrderId);
     } else {
-      lcd.print("T?");
+      snprintf(buf, 17, "T? %s #%u",
+               currentDecision == ItemDecision::ORDER ? "ORDER" : "STOCK", currentOrderId);
     }
-    lcd.print(" ORDER #");
-    lcd.print(currentOrderId);
-  } else if (etapeActu >= 2 && currentDecision == ItemDecision::STOCK) {
-    lcd.print("H");
-    lcd.print(currentHue);
-    lcd.print(" S");
-    lcd.print(currentSaturation);
-    lcd.print(" V");
-    lcd.print(currentValue);
-    lcd.setCursor(0, 1);
-    if (currentTeam >= 0x01 && currentTeam <= 0x05) {
-      lcd.print("T0");
-      lcd.print(currentTeam);
-    } else {
-      lcd.print("T?");
-    }
-    lcd.print(" STOCK");
+    lcdWriteLine(1, buf);
   } else {
-    lcd.print("Total Tries: ");
-    lcd.setCursor(0, 1);
-    lcd.print(totalArticlesTries);
-    lcd.print(" articles");
+    snprintf(buf, 17, "Total Tries: %u", totalArticlesTries);
+    lcdWriteLine(0, buf);
+    snprintf(buf, 17, "%u article%s", totalArticlesTries, totalArticlesTries <= 1 ? "" : "s");
+    lcdWriteLine(1, buf);
   }
 }
 
 void drawOrderMenu() {
-  lcd.clear();
+  char buf[17];
+  uint8_t pos;
 
   if (orderPage == 0) {
-    lcd.setCursor(0, 0);
     if (localLineCount == 0) {
-      lcd.print("Ajouter ligne?");
+      lcdWriteLine(0, "Ajouter ligne?");
     } else {
-      lcd.print("Cmd: ");
-      for (uint8_t i = 0; i < localLineCount && i < 4; i++) {
-        lcd.print(colorNameById(localColors[i])[0]);
-        lcd.print(localQtys[i]);
-        if (i < localLineCount - 1) lcd.print(",");
+      pos = snprintf(buf, 17, "Cmd: ");
+      for (uint8_t i = 0; i < localLineCount && pos < 16; i++) {
+        buf[pos++] = colorNameById(localColors[i])[0];
+        if (localQtys[i] >= 10 && pos < 16) buf[pos++] = '0' + (localQtys[i] / 10);
+        if (pos < 16) buf[pos++] = '0' + (localQtys[i] % 10);
+        if (i < localLineCount - 1 && pos < 16) buf[pos++] = ',';
       }
+      buf[pos] = '\0';
+      lcdWriteLine(0, buf);
     }
-    lcd.setCursor(0, 1);
+
+    pos = 0;
     if (activeColorCount > 0 && editingColorIdx < activeColorCount) {
-      lcd.print("[");
-      lcd.print(colorNameById(activeColors[editingColorIdx]));
-      lcd.print("]");
+      buf[pos++] = '[';
+      const char* nom = colorNameById(activeColors[editingColorIdx]);
+      buf[pos++] = nom[0];
+      if (nom[1]) buf[pos++] = nom[1];
+      buf[pos++] = ']';
     }
-    if (localLineCount > 0) {
-      lcd.print(" #=fin");
+    if (localLineCount > 0 && pos < 16) {
+      while (pos < 5 && pos < 16) buf[pos++] = ' ';
+      const char* fin = " #=fin";
+      for (uint8_t i = 0; fin[i] && pos < 16; i++) buf[pos++] = fin[i];
     }
+    buf[pos] = '\0';
+    lcdWriteLine(1, buf);
   }
   else if (orderPage == 1) {
-    lcd.setCursor(0, 0);
     if (editingColorIdx < activeColorCount) {
-      lcd.print(colorNameById(activeColors[editingColorIdx]));
+      snprintf(buf, 17, "%s", colorNameById(activeColors[editingColorIdx]));
+      lcdWriteLine(0, buf);
+    } else {
+      lcdWriteLine(0, "");
     }
-    lcd.setCursor(0, 1);
-    lcd.print("Qte: ");
-    lcd.print(editingQty);
-    lcd.print(" pressez=ok");
+    snprintf(buf, 17, "Qte: %u pressez=ok", editingQty);
+    lcdWriteLine(1, buf);
   }
   else if (orderPage == 2) {
-    lcd.setCursor(0, 0);
     uint8_t b = countColor(COLOR_BLUE), j = countColor(COLOR_YELLOW), m = countColor(COLOR_MAGENTA);
-    lcd.print("B");
-    lcd.print(b);
-    lcd.print(" J");
-    lcd.print(j);
-    lcd.print(" M");
-    lcd.print(m);
-    lcd.setCursor(0, 1);
-    lcd.print("pressez=envoi #=annul");
+    snprintf(buf, 17, "B%u J%u M%u", b, j, m);
+    lcdWriteLine(0, buf);
+    lcdWriteLine(1, "pressez=envoi #=annul");
   }
 }
 
@@ -575,5 +597,23 @@ uint8_t countColor(uint8_t colorId) {
   return total;
 }
 
-// overload keyToColor via pmul2-colors.h keypad->color mapping
-// (already defined inline in the header)
+// FIX: double-buffer statique — on ne retranscrit une ligne sur l'I2C que si son
+//      contenu a change, eliminant les ~10-17ms de transactions I2C bloquantes
+//      par tour de loop lorsque l'affichage est stable.
+static void lcdWriteLine(uint8_t line, const char* text) {
+  static char cache[2][17] = {"", ""};
+
+  // construit la ligne paddee a 16 caracteres dans un buffer local
+  char buf[17];
+  uint8_t len = 0;
+  while (len < 16 && text[len]) { buf[len] = text[len]; len++; }
+  while (len < 16) buf[len++] = ' ';
+  buf[16] = '\0';
+
+  // si identique au dernier affichage, pas d'ecriture I2C
+  if (memcmp(cache[line], buf, 16) == 0) return;
+  memcpy(cache[line], buf, 17);
+
+  lcd.setCursor(0, line);
+  for (uint8_t i = 0; i < 16; i++) lcd.print(buf[i]);
+}
