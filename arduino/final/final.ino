@@ -33,7 +33,7 @@ uint8_t btn2 = 3;
 volatile bool systemOn = true;
 // false: Affichage current order in process, true: Number of orders completed
 volatile bool modeAffichage = false;
-uint16_t completedOrders = 0; // recu du backend via PID_COMPLETED_COUNT
+uint16_t totalArticlesTries = 0; // recu du backend via PID_COMPLETED_COUNT
 
 // Com Raspberry Pi via USB
 Pmul2Lib objetPmul(Serial);
@@ -111,6 +111,7 @@ uint8_t     currentHue = 0, currentSaturation = 0, currentValue = 0, currentTeam
 
 // mode: false = SCAN, true = ORDER (saisie commande)
 bool modeOrder = false;
+bool orderConfirmed = false;
 
 // etat du menu de saisie: 0=choix couleur, 1=qte, 2=resume
 uint8_t orderPage = 0;
@@ -250,7 +251,7 @@ void loop() {
       lcd.setCursor(0, 0);
       lcd.print("Completed Orders:");
       lcd.setCursor(0, 1);
-      lcd.print(completedOrders);
+      lcd.print(totalArticlesTries);
     } else {
         // Mode 0: Affichage de la commande en cours
         lcd.clear();
@@ -303,7 +304,7 @@ void loop() {
           lcd.print("#:OK");
         }
 
-        bool orderConfirmed = false;
+        
         while(!orderConfirmed) {
           char key = 0;
           while(!key) {

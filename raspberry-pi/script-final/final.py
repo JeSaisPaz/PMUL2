@@ -96,33 +96,6 @@ def cleanup(signum=None, frame=None):
 signal.signal(signal.SIGINT, cleanup)
 signal.signal(signal.SIGTERM, cleanup)
 
-# identification couleur par plages de Hue (OpenCV Hue = 0-179)
-# independant de l'intensite lumineuse grace aux seuils S et V
-
-def identify_closest_color(h_val, s_val, v_val):
-    # couleur trop sombre ou desaturee => poubelle
-    if v_val < 40 or s_val < 40:
-        return "Unknown"
-
-    # orange vs brun (meme bande Hue, differencies par saturation et value)
-    if 5 <= h_val < 18:
-        # brun = orange fonce / peu vibre
-        if v_val < 110 or s_val < 120:
-            return "Brun"
-        return "orange"
-
-    # plages Hue restantes
-    if (0 <= h_val < 5) or (170 <= h_val <= 179):
-        return "magenta"
-    elif 18 <= h_val < 38:
-        return "jaune"
-    elif 85 <= h_val < 135:
-        return "bleu"
-    elif 135 <= h_val < 170:
-        return "magenta"
-
-    return "Unknown"
-
 # detection QR + echantillonnage couleur avec mediane (ignore le bruit)
 
 def decodeFrame(frame_bgr):
@@ -212,23 +185,13 @@ def handleScanNeeded():
         itemId   = data["itemId"]
         decision = data["decision"]
         orderId  = data.get("orderId") or 0
-        # le backend renvoie hsv en string: "h:120, s:150, v:200"
-        hsv_str  = data.get("hsv", "")
-        m = re.match(r'h:(\d+),\s*s:(\d+),\s*v:(\d+)', str(hsv_str))
-        if m:
-            hue = int(m.group(1)) & 0xFF
-            sat = int(m.group(2)) & 0xFF
-            val = int(m.group(3)) & 0xFF
-        else:
-            hue = sat = val = 0
+        # le backend renvoie le nom de la couleur en string: "yellow"
+        color_name = data.get("color", "").lower()
+
         team_raw = data.get("team")
-        if team_raw and team_raw.startswith("TEAM"):
-            team_byte = max(0, min(5, int(team_raw[4:]) - 1)) + 1
-        else:
-            team_byte = 0x00
 
         print(f"  [BACKEND] Item #{itemId} decision={decision} orderId={orderId}"
-              f" H={hue} S={sat} V={val} team={team_raw} ({int(team_byte)})")
+              f" team={team_raw} color={color_name}")
 
         # envoie l'info a l'Arduino pour l'aiguillage + affichage HSV/team
         decisionByte = {"ORDER": 0x01, "STOCK": 0x02}.get(decision, 0x00)
@@ -240,7 +203,7 @@ def handleScanNeeded():
             hue,
             sat,
             val,
-            team_byte,
+            team_raw.get("id", 0) if isinstance(team_raw, dict) else 0
         ])
         st.send(SerialTransfer.PID_ITEM_INFO, payload)
 
