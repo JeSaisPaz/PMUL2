@@ -15,8 +15,6 @@
 #include <Arduino.h>
 #include "pmul2-colors.h"
 #include "pmul2-com.h"
-#include "pmul2-keypad.h"
-#include "pmul2-encoder.h"
 
 class Pmul2Lib {
     public:
