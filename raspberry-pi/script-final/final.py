@@ -17,6 +17,7 @@ import numpy as np
 from pyzbar.pyzbar import decode
 from picamera2 import Picamera2, Preview
 from serial_transfer import SerialTransfer
+import re
 import socketio
 
 # config
@@ -97,7 +98,30 @@ signal.signal(signal.SIGTERM, cleanup)
 
 # identification couleur par plages de Hue (OpenCV Hue = 0-179)
 # independant de l'intensite lumineuse grace aux seuils S et V
-# desormais gere cote backend — le Pi ne fait que transmettre les valeurs HSV brutes
+
+def identify_closest_color(h_val, s_val, v_val):
+    # couleur trop sombre ou desaturee => poubelle
+    if v_val < 40 or s_val < 40:
+        return "Unknown"
+
+    # orange vs brun (meme bande Hue, differencies par saturation et value)
+    if 5 <= h_val < 18:
+        # brun = orange fonce / peu vibre
+        if v_val < 110 or s_val < 120:
+            return "Brun"
+        return "orange"
+
+    # plages Hue restantes
+    if (0 <= h_val < 5) or (170 <= h_val <= 179):
+        return "magenta"
+    elif 18 <= h_val < 38:
+        return "jaune"
+    elif 85 <= h_val < 135:
+        return "bleu"
+    elif 135 <= h_val < 170:
+        return "magenta"
+
+    return "Unknown"
 
 # detection QR + echantillonnage couleur avec mediane (ignore le bruit)
 
@@ -188,7 +212,15 @@ def handleScanNeeded():
         itemId   = data["itemId"]
         decision = data["decision"]
         orderId  = data.get("orderId") or 0
-        # le backend ne renvoie plus de hsv — on garde les valeurs scannees par decodeFrame
+        # le backend renvoie hsv en string: "h:120, s:150, v:200"
+        hsv_str  = data.get("hsv", "")
+        m = re.match(r'h:(\d+),\s*s:(\d+),\s*v:(\d+)', str(hsv_str))
+        if m:
+            hue = int(m.group(1)) & 0xFF
+            sat = int(m.group(2)) & 0xFF
+            val = int(m.group(3)) & 0xFF
+        else:
+            hue = sat = val = 0
         team_raw = data.get("team")
         if team_raw and team_raw.startswith("TEAM"):
             team_byte = max(0, min(5, int(team_raw[4:]) - 1)) + 1
@@ -226,21 +258,9 @@ def handleScanResult(payload):
     print(f"[ARDUINO] Resultat: Item #{itemId} {decisionStatus}")
 
     try:
-        r = requests.patch(f"{BACKEND_URL}/api/items/{itemId}/status", json={
+        requests.patch(f"{BACKEND_URL}/api/items/{itemId}/status", json={
             "status": {"status": decisionStatus}
         }, timeout=5)
-
-        # le backend renvoie le nombre de commandes completes
-        if r.status_code == 200 and r.text:
-            try:
-                data = r.json()
-                count = data.get("completedCount") or data.get("completedOrders") or data.get("count")
-                if count is not None:
-                    # envoie a l'Arduino pour l'affichage BP2
-                    payload = bytes([(count >> 8) & 0xFF, count & 0xFF])
-                    st.send(SerialTransfer.PID_COMPLETED_COUNT, payload)
-            except:
-                pass
     except Exception as e:
         print(f"  [!] Backend injoignable: {e}")
 
@@ -280,8 +300,13 @@ def handleSensorStatus(payload):
     if len(payload) < 1:
         return
     mask = payload[0]
-    noms = ["SCAN", "NEXT", "STOCK", "ORDER", "PASS"]
-    sensors = [{"name": noms[i], "state": 1 if mask & (1 << i) else 0} for i in range(5)]
+    sensors = [
+        {"name": "IR 1", "state": 1 if mask & 0x01 else 0},
+        {"name": "IR 2", "state": 1 if mask & 0x02 else 0},
+        {"name": "IR 3", "state": 1 if mask & 0x04 else 0},
+        {"name": "IR 4", "state": 1 if mask & 0x08 else 0},
+        {"name": "IR 5", "state": 1 if mask & 0x10 else 0},
+    ]
     try:
         requests.post(f"{BACKEND_URL}/api/stats/sensors", json={"sensors": sensors}, timeout=2)
     except Exception:
@@ -358,23 +383,6 @@ def fetchAndSendColors():
 def on_connect():
     print("[SIO] Connecte au backend")
     fetchAndSendColors()  # charge les couleurs direct au connect
-    # envoie aussi le nombre de commandes completes au demarrage
-    sendCompletedCount()
-
-def sendCompletedCount():
-    """GET /api/orders -> compte les COMPLETED, envoie a l'Arduino."""
-    try:
-        r = requests.get(f"{BACKEND_URL}/api/orders", timeout=5)
-        if r.status_code != 200:
-            return
-        orders = r.json()
-        # le backend stocke "COMPLETED" (sans IN_ prefix car Prisma v7)
-        count = sum(1 for o in orders if o.get("status") == "COMPLETED")
-        payload = bytes([(count >> 8) & 0xFF, count & 0xFF])
-        st.send(SerialTransfer.PID_COMPLETED_COUNT, payload)
-        print(f"[COMPLETED] {count} commandes effectuees envoyees a l'Arduino")
-    except Exception:
-        pass  # backend down, on retentera au prochain scan result
 
 @sio.on('disconnect')
 def on_disconnect():

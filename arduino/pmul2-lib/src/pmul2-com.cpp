@@ -60,12 +60,6 @@ void Pmul2Com::sendSensorStatus(uint8_t ir1, uint8_t ir2, uint8_t ir3, uint8_t i
     _transfer.packet.txBuff[0] = mask;
     _transfer.sendData(1, PID_SENSOR_STATUS);
 }
-void Pmul2Com::sendScanResult(uint16_t itemId, ItemStatus status) {
-    _transfer.packet.txBuff[0] = (itemId >> 8) & 0xFF;
-    _transfer.packet.txBuff[1] = itemId & 0xFF;
-    _transfer.packet.txBuff[2] = static_cast<uint8_t>(status);
-    _transfer.sendData(3, PID_SCAN_RESULT);
-}
 
 void Pmul2Com::sendLocalOrder(uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys) {
     // payload: lineCount(1) + [color(1) + qty(1)] * N
@@ -101,7 +95,7 @@ bool Pmul2Com::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& o
     switch (rawDecision) {
         case static_cast<uint8_t>(ItemDecision::ORDER): decision = ItemDecision::ORDER; break;
         case static_cast<uint8_t>(ItemDecision::STOCK): decision = ItemDecision::STOCK; break;
-        case static_cast<uint8_t>(ItemDecision::PASS) : decision = ItemDecision::PASS; break;
+        case static_cast<uint8_t>(ItemDecision::PASS) : decision = ItemDecision:: PASS; break;
         default:                                        decision = ItemDecision::NO_DECISION;  break;
     }
 
