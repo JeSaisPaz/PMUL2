@@ -31,7 +31,8 @@ uint8_t btn1 = 2;
 uint8_t btn2 = 3;
 
 volatile bool systemOn = true;
-volatile uint8_t modeAffichage = 0;
+// false: Affichage current order in process, true: Number of orders completed
+volatile bool modeAffichage = false;
 uint16_t completedOrders = 0; // recu du backend via PID_COMPLETED_COUNT
 
 // Com Raspberry Pi via USB
@@ -127,10 +128,12 @@ void basculeSystem(){
   Serial1.println(systemOn ? "[SYS] ON" : "[SYS] OFF (maintenance)");
 }
 
+volatile bool modeAffichageChanged = false;
 void basculeAffichage(){
-  modeAffichage = (modeAffichage+1)%2;
+  modeAffichage = !modeAffichage;
   Serial1.print("[AFF] BP2 -> mode ");
   Serial1.println(modeAffichage);
+  modeAffichageChanged = true;
 }
 
 void setup() {
@@ -148,8 +151,8 @@ void setup() {
   pinMode(btn1, INPUT_PULLUP);
   pinMode(btn2, INPUT_PULLUP);
 
-  attachInterrupt(digitalPinToInterrupt(btn1), basculeSystem, FALLING);
-  attachInterrupt(digitalPinToInterrupt(btn2), basculeAffichage, FALLING);
+  attachInterrupt(digitalPinToInterrupt(btn1), basculeSystem, RISING);
+  attachInterrupt(digitalPinToInterrupt(btn2), basculeAffichage, RISING);
 
   for (uint8_t i = 0; i < 5; i++) {
     pinMode(pinsIR[i], INPUT_PULLUP);
@@ -237,11 +240,50 @@ uint8_t getQuantityForColor(uint8_t colorId) {
 }
 
 void loop() {
+
+  if(modeAffichageChanged) {
+    // Si le mode d'affichage a change, forcer une mise a jour de l'affichage
+    modeAffichageChanged = false;
+    if(modeAffichage) {
+      // Mode 1: Affichage du nombre de commandes completes
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Completed Orders:");
+      lcd.setCursor(0, 1);
+      lcd.print(completedOrders);
+    } else {
+        // Mode 0: Affichage de la commande en cours
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Current Order:");
+        // Afficher les details de la commande en cours
+        lcd.setCursor(0, 0);
+        for(uint8_t i = 0; i < 3; i++) {
+          lcd.print(colorDisplayFormatById(orderLine[i][0], true));
+          lcd.print(":");
+          lcd.print(orderLine[i][1]);
+          lcd.print(" ");
+        }
+        if(activeColorCount >= 3) {
+          lcd.setCursor(0, 1);
+          for(uint8_t i = 3; i < activeColorCount; i++) {
+            lcd.print(colorDisplayFormatById(orderLine[i][0], true));
+            lcd.print(":");
+            lcd.print(orderLine[i][1]);
+            lcd.print(" ");
+          }
+          return;
+        }
+      }
+    }
+
   char key = customKeypad.getKey();
   if(key == '*') {
     modeOrder = true;
     orderPage = 0;
   }
+
+
   // 0. Systeme de commande locale
   if(modeOrder && etapeActu == 1) {
     switch(orderPage) {
@@ -339,6 +381,10 @@ void loop() {
     }
   }
 
+  if(!modeOrder) {
+
+  }
+
   // 1. Lecture des capteurs IR
   // INPUT_PULLUP: LOW = detecte, HIGH = rien
   capteursOntChange = false;
@@ -391,23 +437,8 @@ void loop() {
 
   // 3. Machine a etats principale (uniquement si systeme actif)
   if(systemOn) {
-    // Affichage LCD selon le mode, 
-    // TODO: a retirer pour les BP
     if(modeAffichage == 0) {
-      lcd.setCursor(0, 0);
-      lcd.print("State: ");
-      switch(etapeActu) {
-        case 0: lcd.print("Waiting   "); break;
-        case 1: lcd.print("Scaning...   "); break;
-        case 2: lcd.print("Guiding"); break;
-        case 3: lcd.print("Freeing"); break;
-        case 4: lcd.print("Next  "); break;
-        case 5: lcd.print("Confirm   "); break;
-      }
-      lcd.setCursor(0, 1);
-      lcd.print("Tries: ");
-      lcd.print(totalArticlesTries);
-      lcd.print("    ");
+      
     }
     
     switch(etapeActu) {
@@ -417,16 +448,7 @@ void loop() {
       case 0: {
         // S'assurer que le blocage est actif
         servoScan.write(SERVO_BLOQUE);
-        
-        // Timeout optionnel si aucune boite n'arrive pendant longtemps
-        // (peut indiquer un probleme avec le convoyeur)
-        if (millis() - tempsEntreeEtat > TIMEOUT_ATTENTE_BOITE) {
-          // Log mais ne rien faire de special
-          if ((millis() - tempsEntreeEtat) % 5000 == 0) {  // Log toutes les 5 secondes
-            Serial1.println("[INFO] Aucune boite depuis 30+ secondes");
-          }
-        }
-        
+       
         // Si une boite est detectee a IR_NEXT
         if(etatsIR[IR_NEXT]) {
           // Demander le scan au backend
