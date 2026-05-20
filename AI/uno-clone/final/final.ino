@@ -246,17 +246,14 @@ void loop() {
     // Affichage LCD selon le mode
     if(modeAffichage == 0) {
       lcd.setCursor(0, 0);
-      lcd.print("Etat: ");
-      switch(etapeActu) {
-        case 0: lcd.print("Attente   "); break;
-        case 1: lcd.print("Scan...   "); break;
-        case 2: lcd.print("Aiguillage"); break;
-        case 3: lcd.print("Liberation"); break;
-        case 4: lcd.print("Prochain  "); break;
-        case 5: lcd.print("Confirm   "); break;
-      }
+      lcd.print("Current Order ID:");
+      // Afficher les details de la commande en cours
+      lcd.print(currentItemId);
+      
+    } else {
+      lcd.setCursor(0, 0);
+      lcd.print("Completed Orders:");
       lcd.setCursor(0, 1);
-      lcd.print("Tries: ");
       lcd.print(totalArticlesTries);
       lcd.print("    ");
     }
