@@ -296,8 +296,7 @@ void loop() {
         }
         
         // Essayer de lire les infos depuis le backend
-        if(objetPmul.readItemInfo(currentItemId, currentDecision, currentOrderId, 
-                                  currentHue, currentSaturation, currentValue, currentTeam)) {
+        if(objetPmul.readItemInfo(currentItemId, currentDecision, currentOrderId, currentHue, currentSaturation, currentValue, currentTeam)) {
           // Scan recu, passer a l'aiguillage
           etapeActu = 2;
         }

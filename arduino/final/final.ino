@@ -27,12 +27,11 @@
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-byte btn1 = 2;
-byte btn2 = 3;
+uint8_t btn1 = 2;
+uint8_t btn2 = 3;
 
 volatile bool systemOn = true;
-volatile byte modeAffichage = 0;
-int totalArticlesTries = 0;
+volatile uint8_t modeAffichage = 0;
 uint16_t completedOrders = 0; // recu du backend via PID_COMPLETED_COUNT
 
 // Com Raspberry Pi via USB
@@ -40,8 +39,8 @@ Pmul2Lib objetPmul(Serial);
 
 // Machine a etats pour le processus de tri
 // 0=Attente boite, 1=Attente scan, 2=Aiguillage, 3=Liberation, 4=Attente prochaine, 5=Confirmation
-byte etapeActu = 0;
-byte etapePrecedente = 255; // Pour detecter les changements d'etat
+uint8_t etapeActu = 0;
+uint8_t etapePrecedente = 255; // Pour detecter les changements d'etat
 
 // Gestion des timeouts
 unsigned long tempsEntreeEtat = 0;  // Moment ou on entre dans un etat
@@ -54,7 +53,7 @@ bool previousBoxCleared = false;
 
 // Capteurs IR: pin, role, confirmation associee
 // IMPORTANT: Avec INPUT_PULLUP, LOW = objet detecte, HIGH = pas d'objet
-byte pinsIR[] = {8, 7, 6, 5, 4};
+uint8_t pinsIR[] = {8, 7, 6, 5, 4};
 bool etatsIR[] = {0, 0, 0, 0, 0};
 
 // Optimisation envoi capteurs
@@ -63,7 +62,6 @@ unsigned long dernierEnvoiCapteurs = 0;
 const unsigned long INTERVALLE_ENVOI_CAPTEURS = 1000; // Envoi force toutes les secondes
 bool capteursOntChange = false;
 
-#define IR_SCAN    0  // pin 8 - DEPRECATED (sera retire)
 #define IR_NEXT    1  // pin 7 - detecte la boite suivante (une boite derriere)
 #define IR_STOCK   2  // pin 6 - confirmation stock
 #define IR_ORDER   3  // pin 5 - confirmation commande
@@ -79,7 +77,7 @@ Servo servoCommande;  // Servo aiguillage commande (pin 9)
 #define SERVO_LIBRE     0   // Position libre (laisse passer les boites)
 
 // Positions servo aiguillage
-#define SERVO_AIGUILLE  0   // Position pour devier
+#define SERVO_AIGUILLAGE  0   // Position pour devier
 #define SERVO_NEUTRE    45  // Position neutre/repos
 
 unsigned long tempsActuel = 0;
@@ -87,8 +85,8 @@ unsigned long tempsDepart = 0;
 long attenteServo = 500;
 
 // keypad
-const byte ROWS = 4; 
-const byte COLS = 4; 
+const uint8_t ROWS = 4; 
+const uint8_t COLS = 4; 
 
 char keys[ROWS][COLS] = {
   {'1','2','3','A'},
@@ -98,8 +96,8 @@ char keys[ROWS][COLS] = {
 };
 
 // connexions des broches (Pins 9 à 2)
-byte rowPins[ROWS] = {9, 8, 7, 6}; // Lignes connectées aux pins 9, 8, 7, 6
-byte colPins[COLS] = {5, 4, 3, 2}; // Colonnes connectées aux pins 5, 4, 3, 2
+uint8_t rowPins[ROWS] = {9, 8, 7, 6}; // Lignes connectées aux pins 9, 8, 7, 6
+uint8_t colPins[COLS] = {5, 4, 3, 2}; // Colonnes connectées aux pins 5, 4, 3, 2
 
 // initialisation du clavier
 Keypad customKeypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS); 
@@ -114,21 +112,15 @@ uint8_t     currentHue = 0, currentSaturation = 0, currentValue = 0, currentTeam
 bool modeOrder = false;
 
 // etat du menu de saisie: 0=choix couleur, 1=qte, 2=resume
-byte orderPage = 0;
+uint8_t orderPage = 0;
 
 // couleurs actives envoyees par le backend (max 4, mappees sur A,B,C,D)
 uint8_t activeColors[4] = {COLOR_BLUE, COLOR_YELLOW, COLOR_MAGENTA};
 uint8_t activeColorCount = 3;
 
-// commande en cours de saisie (max 8 lignes)
-uint8_t localColors[8];
-uint8_t localQtys[8];
-uint8_t localLineCount = 0;
-
-// pour la page 1: index dans activeColors, qte en cours de saisie
-uint8_t editingColorIdx = 0;
-uint8_t editingQty = 0;
-bool editingQtyStarted = false;
+// Lignes de commande: Color | Qty pour chaque ligne
+uint8_t orderLine[6][2];
+uint8_t orderLineCount = 0;
 
 void basculeSystem(){
   systemOn = !systemOn;
@@ -147,11 +139,11 @@ void setup() {
 
   // dit au Pi qu'on est pret AVANT lcd.init() qui peut bloquer
   Serial.write('R');
-  Serial1.println("Pret.");
+  Serial1.println("Ready.");
 
   lcd.init();
   lcd.backlight();
-  lcd.print("Systeme Pret");
+  lcd.print("System ready");
 
   pinMode(btn1, INPUT_PULLUP);
   pinMode(btn2, INPUT_PULLUP);
@@ -159,7 +151,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(btn1), basculeSystem, FALLING);
   attachInterrupt(digitalPinToInterrupt(btn2), basculeAffichage, FALLING);
 
-  for (byte i = 0; i < 5; i++) {
+  for (uint8_t i = 0; i < 5; i++) {
     pinMode(pinsIR[i], INPUT_PULLUP);
   }
 
@@ -176,12 +168,181 @@ void setup() {
 
 }
 
+String colorDisplayFormatById(uint8_t colorId, bool shortFormat) {
+  // Mappe les ID de couleur sur un format d'affichage (ex: 1->BL, 2->YL, etc.)
+  switch(colorId) {
+    case COLOR_BLUE: return shortFormat ? "BL" : "BL:1";    // Bleu
+    case COLOR_YELLOW: return shortFormat ? "YL" : "YL:2";  // Jaune
+    case COLOR_MAGENTA: return shortFormat ? "MG" : "MG:3"; // Magenta
+    case COLOR_BROWN: return shortFormat ? "BR" : "BR:4";   // Brun
+    case COLOR_ORANGE: return shortFormat ? "OR" : "OR:5";  // Orange
+    default: return "?";            // Inconnu
+  }
+}
+
+uint8_t colorIndexCharToId(char c) {
+  // Mappe les caracteres de selection sur les ID de couleur
+  switch(c) {
+    case '1': return activeColors[0];
+    case '2': return activeColors[1];
+    case '3': return activeColors[2];
+    case '4': return activeColors[3];
+    default: return 0xFF; // Invalide
+  }
+}
+
+// Verifie si une couleur est deja dans la commande en cours
+bool isColorInOrder(uint8_t colorId) {
+  for (uint8_t i = 0; i < orderLineCount; i++) {
+    if (orderLine[i][0] == colorId) return true;
+  }
+  return false;
+}
+
+// Demande la quantite pour une couleur donnee (bloquant)
+uint8_t getQuantityForColor(uint8_t colorId) {
+  uint8_t qty = 0;
+  bool quantitySet = false;
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Qty: ");
+  lcd.print(colorDisplayFormatById(colorId, true));
+  lcd.print(" 1+ 2- =OK");
+  lcd.setCursor(0, 1);
+  lcd.print(qty);
+
+  while (!quantitySet) {
+    char key = customKeypad.getKey();
+    if (!key) continue; // attendre une touche
+
+    switch (key) {
+      case '1':
+        if (qty < 10) qty++;
+        break;
+      case '2':
+        if (qty > 0) qty--;
+        break;
+      case '=':
+        quantitySet = true;
+        break;
+      default: break;
+    }
+
+    lcd.setCursor(0, 1);
+    lcd.print(qty);
+    lcd.print("   "); // efface les chiffres residuels
+  }
+  return qty;
+}
+
 void loop() {
+  char key = customKeypad.getKey();
+  if(key == '*') {
+    modeOrder = true;
+    orderPage = 0;
+  }
+  // 0. Systeme de commande locale
+  if(modeOrder && etapeActu == 1) {
+    switch(orderPage) {
+      // Phase de choix couleur et quantite
+      case 0: {
+        lcd.setCursor(0,0);
+        // Page de choix de couleur (A,B,C,D)
+        // Afficher les couleurs actives et attendre une selection
+        for (uint8_t i = 0; i < 3; i++) {
+          lcd.print(colorDisplayFormatById(activeColors[i], false));
+        }
+        if(activeColorCount >= 3) {
+          lcd.setCursor(0,1);
+          for(uint8_t i = 3; i < activeColorCount; i++) {
+            lcd.print(colorDisplayFormatById(activeColors[i], false));
+          }
+          lcd.print("#:OK");
+        }
+
+        bool orderConfirmed = false;
+        while(!orderConfirmed) {
+          char key = 0;
+          while(!key) {
+            key = customKeypad.getKey();
+          }
+
+          uint8_t colorId = colorIndexCharToId(key);
+
+          if(key >= '1' && key <= '4') {
+            if(colorId != 0xFF && !isColorInOrder(colorId) && orderLineCount < 6) {
+              orderLine[orderLineCount][0] = colorId;
+              orderLine[orderLineCount][1] = getQuantityForColor(colorId);
+              orderLineCount++;
+              lcd.clear();
+              lcd.setCursor(0,0);
+              for (uint8_t i = 0; i < 3; i++) {
+                lcd.print(colorDisplayFormatById(activeColors[i], false));
+              }
+              if(activeColorCount >= 3) {
+                lcd.setCursor(0,1);
+                for(uint8_t i = 3; i < activeColorCount; i++) {
+                  lcd.print(colorDisplayFormatById(activeColors[i], false));
+                }
+                lcd.print("#:OK");
+              }
+            }
+          } 
+          else if(key == '=') {
+            orderConfirmed = true;
+          }
+        }
+
+        orderPage = 1;
+        lcd.clear();
+        break;
+      }
+      // Confirmation
+      case 1: {
+        // Page de resume
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Confirm order:");
+        lcd.setCursor(0,1);
+        lcd.print("# Edit    = OK");
+        char key = 0;
+        while(!key) {
+          key = customKeypad.getKey();
+        }
+        if(key == '#') {
+          orderPage = 0;
+          orderLineCount = 0;
+          for (uint8_t i = 0; i < 6; i++) {
+            orderLine[i][0] = 0;
+            orderLine[i][1] = 0;
+          }
+          orderConfirmed = false;
+        } else {
+          if(key == '=') {
+            // Envoyer la commande au backend
+            objetPmul.sendLocalOrder(orderLineCount, (uint8_t*)orderLine, (uint8_t*)orderLine);
+            // reset de la saisie locale
+            modeOrder = false;
+            orderPage = 0;
+            orderLineCount = 0;
+            for (uint8_t i = 0; i < 6; i++) {
+              orderLine[i][0] = 0;
+              orderLine[i][1] = 0;
+            }
+            orderConfirmed = false;
+          }
+        }
+
+        break;
+      }
+    }
+  }
 
   // 1. Lecture des capteurs IR
   // INPUT_PULLUP: LOW = detecte, HIGH = rien
   capteursOntChange = false;
-  for (byte i = 0; i < 5; i++) {
+  for (uint8_t i = 0; i < 5; i++) {
     bool nouvelEtat = !digitalRead(pinsIR[i]); // Inverse pour avoir true = detecte
     if (nouvelEtat != etatsIR[i]) {
       capteursOntChange = true;
@@ -196,7 +357,7 @@ void loop() {
     dernierEnvoiCapteurs = maintenant;
     
     // Mise a jour pour la prochaine comparaison
-    for (byte i = 0; i < 5; i++) {
+    for (uint8_t i = 0; i < 5; i++) {
       etatsIRPrecedents[i] = etatsIR[i];
     }
   }
@@ -230,16 +391,17 @@ void loop() {
 
   // 3. Machine a etats principale (uniquement si systeme actif)
   if(systemOn) {
-    // Affichage LCD selon le mode
+    // Affichage LCD selon le mode, 
+    // TODO: a retirer pour les BP
     if(modeAffichage == 0) {
       lcd.setCursor(0, 0);
-      lcd.print("Etat: ");
+      lcd.print("State: ");
       switch(etapeActu) {
-        case 0: lcd.print("Attente   "); break;
-        case 1: lcd.print("Scan...   "); break;
-        case 2: lcd.print("Aiguillage"); break;
-        case 3: lcd.print("Liberation"); break;
-        case 4: lcd.print("Prochain  "); break;
+        case 0: lcd.print("Waiting   "); break;
+        case 1: lcd.print("Scaning...   "); break;
+        case 2: lcd.print("Guiding"); break;
+        case 3: lcd.print("Freeing"); break;
+        case 4: lcd.print("Next  "); break;
         case 5: lcd.print("Confirm   "); break;
       }
       lcd.setCursor(0, 1);
@@ -294,8 +456,7 @@ void loop() {
         }
         
         // Essayer de lire les infos depuis le backend
-        if(objetPmul.readItemInfo(currentItemId, currentDecision, currentOrderId, 
-                                  currentHue, currentSaturation, currentValue, currentTeam)) {
+        if(objetPmul.readItemInfo(currentItemId, currentDecision, currentOrderId, currentHue, currentSaturation, currentValue, currentTeam)) {
           // Scan recu, passer a l'aiguillage
           Serial1.print("[SCAN OK] Item #");
           Serial1.print(currentItemId);
@@ -313,11 +474,11 @@ void loop() {
         switch (currentDecision) {
           case ItemDecision::ORDER:
             Serial1.println("ORDER");
-            servoCommande.write(SERVO_AIGUILLE);  // Devier vers commande
+            servoCommande.write(SERVO_AIGUILLAGE);  // Devier vers commande
             break;
           case ItemDecision::STOCK:
             Serial1.println("STOCK");
-            servoStock.write(SERVO_AIGUILLE);     // Devier vers stock
+            servoStock.write(SERVO_AIGUILLAGE);     // Devier vers stock
             break;
           case ItemDecision::PASS:
           default:
@@ -326,8 +487,6 @@ void loop() {
             break;
         }
         
-        // Petit delai pour laisser les servos bouger
-        delay(100);
         etapeActu = 3; // Passer a la liberation
         break;
       }
@@ -377,9 +536,6 @@ void loop() {
           // Remettre les aiguillages en position neutre quand meme
           servoStock.write(SERVO_NEUTRE);
           servoCommande.write(SERVO_NEUTRE);
-          
-          // Compter comme un echec mais continuer
-          totalArticlesTries++;  // On compte quand meme
           currentDecision = ItemDecision::NO_DECISION;  // Reset decision
           etapeActu = 0;  // Retour a l'attente
           break;
