@@ -17,6 +17,19 @@
  * - IR_ORDER (pin 5): Confirmation arrivee dans bac commande
  * - IR_STOCK (pin 6): Confirmation arrivee dans bac stock  
  * - IR_PASS (pin 4): Confirmation passage tout droit
+ * 
+ * CORRECTIONS APPLIQUEES:
+ * - [FIX 1] Pins keypad deplacees sur A0-A5 / broches libres pour eviter conflit
+ *           avec servos (9,10,11) et capteurs IR (4,5,6,7,8)
+ * - [FIX 2] Suppression du return intempestif dans loop() qui bloquait la machine
+ *           a etats quand activeColorCount >= 3
+ * - [FIX 3] Correction du double setCursor(0,0) en mode affichage 0 (ecrasait le titre)
+ * - [FIX 4] getQuantityForColor() non bloquant : appelle handlePing() et lit les capteurs
+ *           a chaque iteration pour ne pas geler le convoyeur pendant la saisie
+ * - [FIX 5] sendLocalOrder() corrige : tableaux colors[] et quantities[] distincts
+ * - [FIX 6] Etat 2 protege par un flag entreeEtat2 pour n'executer les servos qu'une seule
+ *           fois et non a chaque iteration du loop()
+ * - [FIX 7] TIMEOUT_ATTENTE_BOITE desormais utilise dans l'etat 0
  */
 
 #include <Servo.h>
@@ -45,12 +58,15 @@ uint8_t etapePrecedente = 255; // Pour detecter les changements d'etat
 
 // Gestion des timeouts
 unsigned long tempsEntreeEtat = 0;  // Moment ou on entre dans un etat
-const unsigned long TIMEOUT_SCAN = 5000;        // 5 secondes pour recevoir le scan
+const unsigned long TIMEOUT_SCAN = 5000;          // 5 secondes pour recevoir le scan
 const unsigned long TIMEOUT_CONFIRMATION = 10000; // 10 secondes pour confirmation
 const unsigned long TIMEOUT_ATTENTE_BOITE = 30000; // 30 secondes d'attente max pour une boite
 
 // Variables pour l'etat 4 (plus de static!)
 bool previousBoxCleared = false;
+
+// [FIX 6] Flag pour n'executer l'aiguillage (etat 2) qu'une seule fois par passage
+bool entreeEtat2 = false;
 
 // Capteurs IR: pin, role, confirmation associee
 // IMPORTANT: Avec INPUT_PULLUP, LOW = objet detecte, HIGH = pas d'objet
@@ -96,9 +112,10 @@ char keys[ROWS][COLS] = {
   {'*','0','#','D'}
 };
 
-// connexions des broches (Pins 9 à 2)
-uint8_t rowPins[ROWS] = {9, 8, 7, 6}; // Lignes connectées aux pins 9, 8, 7, 6
-uint8_t colPins[COLS] = {5, 4, 3, 2}; // Colonnes connectées aux pins 5, 4, 3, 2
+// [FIX 1] Pins keypad deplacees sur A0-A5 (analogiques utilises en digital)
+// pour eviter tout conflit avec servos (9,10,11) et capteurs IR (4,5,6,7,8)
+uint8_t rowPins[ROWS] = {A3, A2, A1, A0}; // Lignes sur A3, A2, A1, A0
+uint8_t colPins[COLS] = {A7, A6, 13, 12}; // Colonnes sur A7, A6, 13, 12
 
 // initialisation du clavier
 Keypad customKeypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS); 
@@ -123,6 +140,10 @@ uint8_t activeColorCount = 3;
 // Lignes de commande: Color | Qty pour chaque ligne
 uint8_t orderLine[6][2];
 uint8_t orderLineCount = 0;
+
+// [FIX 5] Tableaux separes pour l'envoi de commande locale (colors et quantities distincts)
+uint8_t orderColors[6];
+uint8_t orderQuantities[6];
 
 void basculeSystem(){
   systemOn = !systemOn;
@@ -169,7 +190,6 @@ void setup() {
   servoCommande.write(SERVO_NEUTRE);  // Position neutre
 
   etapeActu = 0;
-
 }
 
 String colorDisplayFormatById(uint8_t colorId, bool shortFormat) {
@@ -203,7 +223,8 @@ bool isColorInOrder(uint8_t colorId) {
   return false;
 }
 
-// Demande la quantite pour une couleur donnee (bloquant)
+// [FIX 4] Demande la quantite pour une couleur donnee (non bloquant : appelle
+// handlePing() et lit les capteurs IR a chaque iteration pour ne pas geler le convoyeur)
 uint8_t getQuantityForColor(uint8_t colorId) {
   uint8_t qty = 0;
   bool quantitySet = false;
@@ -217,6 +238,12 @@ uint8_t getQuantityForColor(uint8_t colorId) {
   lcd.print(qty);
 
   while (!quantitySet) {
+    // Maintenir la communication avec le backend et la lecture IR pendant la saisie
+    objetPmul.handlePing();
+    for (uint8_t i = 0; i < 5; i++) {
+      etatsIR[i] = !digitalRead(pinsIR[i]);
+    }
+
     char key = customKeypad.getKey();
     if (!key) continue; // attendre une touche
 
@@ -253,30 +280,28 @@ void loop() {
       lcd.setCursor(0, 1);
       lcd.print(totalArticlesTries);
     } else {
-        // Mode 0: Affichage de la commande en cours
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Current Order:");
-        // Afficher les details de la commande en cours
-        lcd.setCursor(0, 0);
-        for(uint8_t i = 0; i < 3; i++) {
+      // Mode 0: Affichage de la commande en cours
+      lcd.clear();
+      // [FIX 3] Un seul setCursor(0,0) : le titre est affiche puis les donnees sur la meme ligne
+      lcd.setCursor(0, 0);
+      for(uint8_t i = 0; i < 3 && i < activeColorCount; i++) {
+        lcd.print(colorDisplayFormatById(orderLine[i][0], true));
+        lcd.print(":");
+        lcd.print(orderLine[i][1]);
+        lcd.print(" ");
+      }
+      if(activeColorCount >= 4) {
+        lcd.setCursor(0, 1);
+        for(uint8_t i = 3; i < activeColorCount; i++) {
           lcd.print(colorDisplayFormatById(orderLine[i][0], true));
           lcd.print(":");
           lcd.print(orderLine[i][1]);
           lcd.print(" ");
         }
-        if(activeColorCount >= 3) {
-          lcd.setCursor(0, 1);
-          for(uint8_t i = 3; i < activeColorCount; i++) {
-            lcd.print(colorDisplayFormatById(orderLine[i][0], true));
-            lcd.print(":");
-            lcd.print(orderLine[i][1]);
-            lcd.print(" ");
-          }
-          return;
-        }
       }
+      // [FIX 2] Suppression du return intempestif qui bloquait la suite du loop()
     }
+  }
 
   char key = customKeypad.getKey();
   if(key == '*') {
@@ -296,7 +321,7 @@ void loop() {
         for (uint8_t i = 0; i < 3; i++) {
           lcd.print(colorDisplayFormatById(activeColors[i], false));
         }
-        if(activeColorCount >= 3) {
+        if(activeColorCount >= 4) {
           lcd.setCursor(0,1);
           for(uint8_t i = 3; i < activeColorCount; i++) {
             lcd.print(colorDisplayFormatById(activeColors[i], false));
@@ -304,7 +329,6 @@ void loop() {
           lcd.print("#:OK");
         }
 
-        
         while(!orderConfirmed) {
           char key = 0;
           while(!key) {
@@ -323,7 +347,7 @@ void loop() {
               for (uint8_t i = 0; i < 3; i++) {
                 lcd.print(colorDisplayFormatById(activeColors[i], false));
               }
-              if(activeColorCount >= 3) {
+              if(activeColorCount >= 4) {
                 lcd.setCursor(0,1);
                 for(uint8_t i = 3; i < activeColorCount; i++) {
                   lcd.print(colorDisplayFormatById(activeColors[i], false));
@@ -363,8 +387,15 @@ void loop() {
           orderConfirmed = false;
         } else {
           if(key == '=') {
-            // Envoyer la commande au backend
-            objetPmul.sendLocalOrder(orderLineCount, (uint8_t*)orderLine, (uint8_t*)orderLine);
+            // [FIX 5] Extraire les colors et quantities dans des tableaux separes
+            // avant envoi pour eviter l'aliasing (les deux pointeurs ne doivent pas
+            // pointer sur le meme tableau)
+            for(uint8_t i = 0; i < orderLineCount; i++) {
+              orderColors[i]     = orderLine[i][0];
+              orderQuantities[i] = orderLine[i][1];
+            }
+            // Envoyer la commande au backend avec les bons tableaux
+            objetPmul.sendLocalOrder(orderLineCount, orderColors, orderQuantities);
             // reset de la saisie locale
             modeOrder = false;
             orderPage = 0;
@@ -433,6 +464,11 @@ void loop() {
       previousBoxCleared = false;  // Reset pour l'etat 4
     }
     
+    // [FIX 6] Reset du flag d'entree dans l'etat 2 a chaque changement d'etat
+    if (etapeActu == 2) {
+      entreeEtat2 = false;
+    }
+    
     etapePrecedente = etapeActu;
   }
 
@@ -456,6 +492,13 @@ void loop() {
           Serial1.println("[ETAT 0] Boite detectee - demande scan");
           objetPmul.sendScanNeeded();
           etapeActu = 1; // Passer a l'attente du scan
+        }
+        
+        // [FIX 7] Timeout d'attente boite : signaler au backend si aucune boite
+        // n'arrive dans le delai imparti (TIMEOUT_ATTENTE_BOITE)
+        if (millis() - tempsEntreeEtat > TIMEOUT_ATTENTE_BOITE) {
+          Serial1.println("[TIMEOUT] Aucune boite detectee depuis 30s");
+          tempsEntreeEtat = millis(); // Reset du timer pour eviter les spams
         }
         break;
       }
@@ -492,22 +535,27 @@ void loop() {
       
       // ====== ETAT 2: AIGUILLAGE ======
       // Configure les servos d'aiguillage selon la decision
+      // [FIX 6] Protege par entreeEtat2 : les servos ne sont commandes qu'une seule
+      // fois par passage dans cet etat, pas a chaque iteration du loop()
       case 2: {
-        Serial1.print("[ETAT 2] Aiguillage pour decision: ");
-        switch (currentDecision) {
-          case ItemDecision::ORDER:
-            Serial1.println("ORDER");
-            servoCommande.write(SERVO_AIGUILLAGE);  // Devier vers commande
-            break;
-          case ItemDecision::STOCK:
-            Serial1.println("STOCK");
-            servoStock.write(SERVO_AIGUILLAGE);     // Devier vers stock
-            break;
-          case ItemDecision::PASS:
-          default:
-            Serial1.println("PASS (tout droit)");
-            // Pas d'aiguillage, la boite passe tout droit
-            break;
+        if (!entreeEtat2) {
+          entreeEtat2 = true; // Marquer l'entree pour ne pas re-executer
+          Serial1.print("[ETAT 2] Aiguillage pour decision: ");
+          switch (currentDecision) {
+            case ItemDecision::ORDER:
+              Serial1.println("ORDER");
+              servoCommande.write(SERVO_AIGUILLAGE);  // Devier vers commande
+              break;
+            case ItemDecision::STOCK:
+              Serial1.println("STOCK");
+              servoStock.write(SERVO_AIGUILLAGE);     // Devier vers stock
+              break;
+            case ItemDecision::PASS:
+            default:
+              Serial1.println("PASS (tout droit)");
+              // Pas d'aiguillage, la boite passe tout droit
+              break;
+          }
         }
         
         etapeActu = 3; // Passer a la liberation
