@@ -9,6 +9,28 @@ async function getItems() {
     });
 }
 
+async function getItemDetails(id) {
+    const item = await prisma.iTEM.findUnique({
+        where: { id },
+        include: {
+            COLOR: { select: { name: true, hex: true } },
+            READ_CYCLE: { select: { scannedAt: true, qrValue: true, hue: true, saturation: true, value: true } },
+            ORDER_LINE: { select: { id: true, ORDER: { select: { id: true, status: true } } } },
+            SELECTION_HISTORY: { orderBy: { createdAt: 'desc' } }
+        }
+    });
+
+    if (!item) throw { code: 404, message: "Item not found" };
+    return item;
+}
+
+async function getLogs() {
+    return prisma.sELECTION_HISTORY.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: { ITEM: { select: { id: true, decision: true } } }
+    });
+}
+
 async function deleteItem(id) {
     const item = await prisma.iTEM.findUnique({
         where: { id },
@@ -46,8 +68,7 @@ async function updateItemStatus(id, status) {
         const newStatus = status.status === DECISION_STATUS.CONFIRMED ? ITEM_STATUS.EXTERNAL : ITEM_STATUS.CANCELLED;
         await prisma.$transaction([
             prisma.iTEM.update({ where: { id }, data: { status: newStatus, decisionStatus: status.status } }),
-            prisma.iTEM_HISTORY.create({ data: { ITEM_id: id, status: newStatus } }),
-            prisma.sELECTION_HISTORY.create({ data: { ITEM_id: id, status: status.status } })
+            prisma.sELECTION_HISTORY.create({ data: { ITEM_id: id, decisionStatus: status.status, itemStatus: newStatus } })
         ]);
     }
 
@@ -55,8 +76,7 @@ async function updateItemStatus(id, status) {
         const newStatus = status.status === DECISION_STATUS.CONFIRMED ? ITEM_STATUS.AVAILABLE : ITEM_STATUS.CANCELLED;
         await prisma.$transaction([
             prisma.iTEM.update({ where: { id }, data: { status: newStatus, decisionStatus: status.status } }),
-            prisma.iTEM_HISTORY.create({ data: { ITEM_id: id, status: newStatus } }),
-            prisma.sELECTION_HISTORY.create({ data: { ITEM_id: id, status: status.status } })
+            prisma.sELECTION_HISTORY.create({ data: { ITEM_id: id, decisionStatus: status.status, itemStatus: newStatus } })
         ]);
     }
 
@@ -66,8 +86,7 @@ async function updateItemStatus(id, status) {
         if (item.ORDER_LINE?.ORDER.status !== ORDER_STATUS.CANCELLED) {
             await prisma.$transaction([
                 prisma.iTEM.update({ where: { id }, data: { status: newStatus, decisionStatus: status.status } }),
-                prisma.iTEM_HISTORY.create({ data: { ITEM_id: id, status: newStatus } }),
-                prisma.sELECTION_HISTORY.create({ data: { ITEM_id: id, status: status.status } })
+                prisma.sELECTION_HISTORY.create({ data: { ITEM_id: id, decisionStatus: status.status, itemStatus: newStatus } })
             ]);
 
             const currentLine = await prisma.oRDER_LINE.findUnique({
@@ -104,10 +123,10 @@ async function updateItemStatus(id, status) {
         } else {
             await prisma.$transaction([
                 prisma.iTEM.update({ where: { id }, data: { status: newStatus, decisionStatus: status.status } }),
-                prisma.sELECTION_HISTORY.create({ data: { ITEM_id: id, status: status.status } })
+                prisma.sELECTION_HISTORY.create({ data: { ITEM_id: id, decisionStatus: status.status, itemStatus: newStatus } })
             ]);
         }
     }
 }
 
-module.exports = { getItems, deleteItem, updateItemStatus };
+module.exports = { getItems, deleteItem, updateItemStatus, getLogs, getItemDetails };

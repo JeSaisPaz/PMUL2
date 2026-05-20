@@ -1,0 +1,87 @@
+{% extends "layout.twig" %}
+
+{% block body %}
+<div class="card">
+    <div class="card-header"> <h1>{{title}}</h1> </div>
+    <div class="card-body p-3">
+        <table id="logsTable" class="table table-striped border" width="100%">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Item</th>
+                    <th>Decision</th>
+                    <th>Item status</th>
+                    <th>Decision status</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    const table = $('#logsTable').DataTable({
+        ajax: {
+            url: '/api/logs',
+            dataSrc: ''
+        },
+        responsive: true,
+        autoWidth: false,
+        columns: [
+            {
+                data: 'createdAt',
+                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>'
+            },
+            {
+                data: 'ITEM',
+                render: (item) => item ? `<a href="/items/${item.id}" class="btn btn-sm btn-primary">#${item.id}</a>` : '<span class="badge bg-secondary">NONE</span>'
+            },
+            {
+                data: 'ITEM.decision',
+                render: (decision) => {
+                    const badges = {
+                        'ORDER': 'bg-info',
+                        'STOCK': 'bg-primary',
+                        'PASS':  'bg-warning'
+                    }
+                    const badge = badges[decision] ?? 'bg-secondary'
+                    return `<span class="badge rounded-pill ${badge}">${decision ?? '—'}</span>`
+                }
+            },
+            {
+                data: 'itemStatus',
+                render: (status) => {
+                    const badges = {
+                        'AVAILABLE': 'bg-success',
+                        'EXTERNAL':  'bg-warning',
+                        'PROCESS':   'bg-info',
+                        'ORDERED':   'bg-primary',
+                        'CANCELLED': 'bg-danger',
+                    }
+                    const badge = badges[status] ?? 'bg-secondary'
+                    return `<span class="badge rounded-pill ${badge}">${status}</span>`
+                }
+            },
+            {
+                data: 'decisionStatus',
+                render: (status) => {
+                    const badges = {
+                        'CONFIRMED': 'bg-success',
+                        'FAILED':    'bg-danger',
+                        'PROCESS':   'bg-info',
+                    }
+                    const badge = badges[status] ?? 'bg-secondary'
+                    return `<span class="badge rounded-pill ${badge}">${status}</span>`
+                }
+            }
+        ],
+        order: [[0, 'desc']]
+    });
+
+    socket.on('db_event', function() {
+        table.ajax.reload(null, false);
+    });
+});
+</script>
+{% endblock %}

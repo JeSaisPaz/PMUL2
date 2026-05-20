@@ -3,7 +3,7 @@ var router = express.Router();
 
 const { getScans, createScan, deleteScan } = require("../services/scan");
 const { getOrders, getOrderDetails, createOrder, deleteOrder, cancelOrder } = require("../services/order");
-const { getItems, deleteItem, updateItemStatus } = require("../services/item");
+const { getItems, deleteItem, updateItemStatus, getLogs, getItemDetails } = require("../services/item");
 const { getColors, updateColors, initColors, saveAsJson } = require("../services/color");
 const { getStats, resetColorStats, incrementColorStat, setSensors } = require("../services/stats");
 
@@ -56,6 +56,14 @@ module.exports = function (io) {
 
     router.get('/items', handle(async (req, res) => {
         res.json(await getItems());
+    }));
+
+    router.get('/items/:id', handle(async (req, res) => {
+        res.json(await getItemDetails(parseInt(req.params.id)));
+    }));
+
+    router.get('/logs', handle(async (req, res) => {
+        res.json(await getLogs());
     }));
 
     router.delete('/items/:id/delete', handle(async (req, res) => {

@@ -25,7 +25,6 @@ def main():
         return
 
     print(f"\nItem #{item['id']}")
-    print(f"  Color      : {item['COLOR']['name']}")
     print(f"  Team       : {item['team']}")
     print(f"  Decision   : {item['decision']}")
     print(f"  Status     : {item['status']}")

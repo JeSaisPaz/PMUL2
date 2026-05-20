@@ -39,4 +39,8 @@ router.get('/colors', function(req, res, next) {
   res.render('colors', { title: 'Colors' });
 });
 
+router.get('/logs', function(req, res, next) {
+  res.render('logs', { title: 'Logs' });
+});
+
 module.exports = router;

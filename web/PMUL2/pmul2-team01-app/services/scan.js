@@ -64,7 +64,6 @@ async function createScan(scan) {
                 COLOR_id: color ? color.id : null,
                 READ_CYCLE_id: readCycle.id,
                 ORDER_LINE_id: orderLineInNeed ? orderLineInNeed.id : null,
-                ITEM_HISTORY: { create: {} },
                 SELECTION_HISTORY: { create: {} }
             }
         });
@@ -84,7 +83,6 @@ async function createScan(scan) {
                 decision: DECISION.PASS,
                 COLOR_id: color ? color.id : null,
                 READ_CYCLE_id: readCycle.id,
-                ITEM_HISTORY: { create: {} },
                 SELECTION_HISTORY: { create: {} }
             }
         });
