@@ -42,6 +42,8 @@ class Pmul2Lib {
                           uint8_t& hue, uint8_t& saturation, uint8_t& value, uint8_t& team);
         // recoit la liste des couleurs actives (max 4)
         bool readColorList(uint8_t* colors, uint8_t& count);
+        // recoit le nombre de commandes completes
+        bool readCompletedCount(uint16_t& count);
         bool handlePing();
 
     private:

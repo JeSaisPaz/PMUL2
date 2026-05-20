@@ -62,6 +62,10 @@ bool Pmul2Lib::readColorList(uint8_t* colors, uint8_t& count) {
     return _com.readColorList(colors, count);
 }
 
+bool Pmul2Lib::readCompletedCount(uint16_t& count) {
+    return _com.readCompletedCount(count);
+}
+
 bool Pmul2Lib::handlePing() {
     return _com.handlePing();
 }

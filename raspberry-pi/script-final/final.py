@@ -235,9 +235,21 @@ def handleScanResult(payload):
     print(f"[ARDUINO] Resultat: Item #{itemId} {decisionStatus}")
 
     try:
-        requests.patch(f"{BACKEND_URL}/api/items/{itemId}/status", json={
+        r = requests.patch(f"{BACKEND_URL}/api/items/{itemId}/status", json={
             "status": {"status": decisionStatus}
         }, timeout=5)
+
+        # le backend renvoie le nombre de commandes completes
+        if r.status_code == 200 and r.text:
+            try:
+                data = r.json()
+                count = data.get("completedCount") or data.get("completedOrders") or data.get("count")
+                if count is not None:
+                    # envoie a l'Arduino pour l'affichage BP2
+                    payload = bytes([(count >> 8) & 0xFF, count & 0xFF])
+                    st.send(SerialTransfer.PID_COMPLETED_COUNT, payload)
+            except:
+                pass
     except Exception as e:
         print(f"  [!] Backend injoignable: {e}")
 
@@ -277,14 +289,8 @@ def handleSensorStatus(payload):
     if len(payload) < 1:
         return
     mask = payload[0]
-    #on envoie un tableau pour simplifier en web
-    sensors = [
-        {"name": "IR 1", "state": 1 if mask & 0x01 else 0},
-        {"name": "IR 2", "state": 1 if mask & 0x02 else 0},
-        {"name": "IR 3", "state": 1 if mask & 0x04 else 0},
-        {"name": "IR 4", "state": 1 if mask & 0x08 else 0},
-        {"name": "IR 5", "state": 1 if mask & 0x10 else 0},
-    ]
+    noms = ["SCAN", "NEXT", "STOCK", "ORDER", "PASS"]
+    sensors = [{"name": noms[i], "state": 1 if mask & (1 << i) else 0} for i in range(5)]
     try:
         requests.post(f"{BACKEND_URL}/api/stats/sensors", json={"sensors": sensors}, timeout=2)
     except Exception:
@@ -361,6 +367,23 @@ def fetchAndSendColors():
 def on_connect():
     print("[SIO] Connecte au backend")
     fetchAndSendColors()  # charge les couleurs direct au connect
+    # envoie aussi le nombre de commandes completes au demarrage
+    sendCompletedCount()
+
+def sendCompletedCount():
+    """GET /api/orders -> compte les COMPLETED, envoie a l'Arduino."""
+    try:
+        r = requests.get(f"{BACKEND_URL}/api/orders", timeout=5)
+        if r.status_code != 200:
+            return
+        orders = r.json()
+        # le backend stocke "COMPLETED" (sans IN_ prefix car Prisma v7)
+        count = sum(1 for o in orders if o.get("status") == "COMPLETED")
+        payload = bytes([(count >> 8) & 0xFF, count & 0xFF])
+        st.send(SerialTransfer.PID_COMPLETED_COUNT, payload)
+        print(f"[COMPLETED] {count} commandes effectuees envoyees a l'Arduino")
+    except Exception:
+        pass  # backend down, on retentera au prochain scan result
 
 @sio.on('disconnect')
 def on_disconnect():

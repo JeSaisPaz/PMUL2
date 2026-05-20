@@ -12,16 +12,23 @@ byte btn2 = 3;
 volatile bool systemOn = true;
 volatile byte modeAffichage = 0;
 int totalArticlesTries = 0;
+uint16_t completedOrders = 0; // recu du backend via PID_COMPLETED_COUNT
 
 // Com Raspberry Pi via USB
 Pmul2Lib objetPmul(Serial);
 
-// 0=Attente, 1=Scan, 2=Aiguillage, 3=Sortie
+// 0=Attente, 1=Scan, 2=Liberation, 3=Confirmation
 byte etapeActu = 0;
 
-// Capteurs IR1 a 5
+// Capteurs IR: pin, role, confirmation associee
 byte pinsIR[] = {8, 7, 6, 5, 4};
 bool etatsIR[] = {0, 0, 0, 0, 0};
+
+#define IR_SCAN    0  // pin 8 - en face de l'actionneur (bloc en position)
+#define IR_NEXT    1  // pin 7 - une boite derriere (prochain bloc)
+#define IR_STOCK   2  // pin 6 - confirmation stock
+#define IR_ORDER   3  // pin 5 - confirmation commande
+#define IR_PASS    4  // pin 4 - confirmation autre (passe tout droit)
 
 // Servo Moteur
 Servo servoScan;
@@ -64,10 +71,13 @@ bool editingQtyStarted = false;
 
 void basculeSystem(){
   systemOn = !systemOn;
+  Serial1.println(systemOn ? "[SYS] ON" : "[SYS] OFF (maintenance)");
 }
 
 void basculeAffichage(){
   modeAffichage = (modeAffichage+1)%2;
+  Serial1.print("[AFF] BP2 -> mode ");
+  Serial1.println(modeAffichage);
 }
 
 void setup() {
@@ -104,6 +114,17 @@ void setup() {
 void loop() {
   updateLCD();
 
+  // log changement d'etape
+  {
+    static byte lastEtape = 0xFF;
+    if (etapeActu != lastEtape) {
+      const char* noms[] = {"Attente", "Scan", "Liberation", "Confirmation"};
+      Serial1.print("[ETAPE] ");
+      Serial1.println(noms[etapeActu]);
+      lastEtape = etapeActu;
+    }
+  }
+
   // diag
   objetPmul.handlePing();
 
@@ -116,6 +137,8 @@ void loop() {
       for (uint8_t i = 0; i < count; i++) {
         activeColors[i] = colors[i];
       }
+      Serial1.print("[COLORS] ");
+      Serial1.println(activeColorCount);
     }
   }
 
@@ -146,33 +169,49 @@ void loop() {
     bool lecture = (digitalRead(pinsIR[i]) == LOW);
     if (lecture != etatsIR[i]) {
       etatsIR[i] = lecture;
-      Serial1.print("IR");
-      Serial1.print(i + 1);
-      Serial1.print(": ");
-      Serial1.println(etatsIR[i] ? "1" : "0");
+      const char* noms[] = {"SCAN", "NEXT", "STOCK", "ORDER", "PASS"};
+      Serial1.print("[IR-");
+      Serial1.print(noms[i]);
+      Serial1.print("] ");
+      Serial1.println(etatsIR[i] ? "ON" : "OFF");
       objetPmul.sendSensorStatus(etatsIR[0], etatsIR[1], etatsIR[2], etatsIR[3], etatsIR[4]);
     }
   }
 
   switch (etapeActu) {
 
-    case 0: // Attente
-      if (etatsIR[0]) {
+    case 0: // Attente — on attend qu'un bloc arrive a l'actionneur
+      if (etatsIR[IR_SCAN]) {
         servoScan.write(90);
         etapeActu = 1;
+        Serial1.println("[SCAN] bloc bloque, demande info...");
       }
       break;
 
-    case 1: { // Scan
+    case 1: { // Scan — on demande l'info au Pi, max 3 essais
       static bool scanRequested = false;
+      static byte scanRetries = 0;
+
       if (!scanRequested) {
         objetPmul.sendScanNeeded();
         scanRequested = true;
+        scanRetries = 0;
       }
 
       if (objetPmul.readItemInfo(currentItemId, currentDecision, currentOrderId,
                                    currentHue, currentSaturation, currentValue, currentTeam)) {
         scanRequested = false;
+
+        Serial1.print("[ITEM] #");
+        Serial1.print(currentItemId);
+        Serial1.print(" dec=");
+        Serial1.print(static_cast<int>(currentDecision));
+        Serial1.print(" order=");
+        Serial1.print(currentOrderId);
+        Serial1.print(" H=");
+        Serial1.print(currentHue);
+        Serial1.print(" T=");
+        Serial1.println(currentTeam);
 
         switch (currentDecision) {
           case ItemDecision::ORDER:
@@ -187,26 +226,76 @@ void loop() {
 
         tempsDepart = tempsActuel;
         etapeActu = 2;
+      } else {
+        // si toujours pas de reponse apres ~1.5s, on re-essaie
+        if (tempsActuel - tempsDepart > 1500 && scanRetries < 3) {
+          scanRequested = false; // force re-envoi du scan needed
+          scanRetries++;
+          Serial1.print("[SCAN] retry ");
+          Serial1.println(scanRetries);
+        }
+        // 3 essais sans reponse -> on laisse passer (PASS)
+        if (scanRetries >= 3 && tempsActuel - tempsDepart > 4500) {
+          currentDecision = ItemDecision::PASS;
+          Serial1.println("[SCAN] 3 essais echoues, -> PASS");
+          scanRequested = false;
+          tempsDepart = tempsActuel;
+          etapeActu = 2;
+        }
       }
       break;
     }
 
-    case 2: // Aiguillage
-      if ((tempsActuel - tempsDepart >= attenteServo) && (etatsIR[1] == 0)) {
+    case 2: // Liberation — delai servo puis on libere le bloc
+      if (tempsActuel - tempsDepart >= attenteServo) {
         servoScan.write(0);
-        etapeActu = 3;
+        // attend que le bloc quitte la zone de scan
+        if (etatsIR[IR_SCAN] == 0) {
+          etapeActu = 3;
+          Serial1.println("[RELACHE] bloc parti, attente confirmation...");
+        }
       }
       break;
 
-    case 3: // Sortie
-      if (etatsIR[2] || etatsIR[3] || etatsIR[4]) {
-        objetPmul.sendScanResult(currentItemId, ItemStatus::CONFIRMED);
-        totalArticlesTries++;
+    case 3: // Confirmation — le bon capteur IR confirme le passage
+      {
+        bool confirmed = false;
+        switch (currentDecision) {
+          case ItemDecision::ORDER:
+            confirmed = etatsIR[IR_ORDER];
+            break;
+          case ItemDecision::STOCK:
+            confirmed = etatsIR[IR_STOCK];
+            break;
+          default: // PASS
+            confirmed = etatsIR[IR_PASS];
+            break;
+        }
 
-        servoStock.write(0);
-        servoCommande.write(0);
-        etapeActu = 0;
-      }
+        if (confirmed) {
+          objetPmul.sendScanResult(currentItemId, ItemStatus::CONFIRMED);
+          totalArticlesTries++;
+
+          Serial1.print("[SORTIE] item ");
+          Serial1.print(currentItemId);
+          Serial1.print(" tries=");
+          Serial1.println(totalArticlesTries);
+
+          // check le nombre de commandes completes
+          uint16_t newCount;
+          if (objetPmul.readCompletedCount(newCount) && newCount != completedOrders) {
+            Serial1.print("[COMPLETED] ");
+            Serial1.print(completedOrders);
+            Serial1.print(" -> ");
+            Serial1.println(newCount);
+            completedOrders = newCount;
+          }
+
+          servoStock.write(0);
+          servoCommande.write(0);
+          etapeActu = 0;
+        }
+      }  // fin bloc case 3
       break;
   }
 }
@@ -279,6 +368,7 @@ void enterOrderMode() {
   editingColorIdx = 0;
   editingQty = 0;
   editingQtyStarted = false;
+  Serial1.println("[ORDER] mode saisie active");
 }
 
 void handleEncoder(int8_t delta) {
@@ -346,12 +436,16 @@ void confirmOrderStep() {
 void sendLocalOrder() {
   if (localLineCount == 0) return;
   objetPmul.sendLocalOrder(localLineCount, localColors, localQtys);
+  Serial1.print("[ORDER] envoye: ");
+  Serial1.print(localLineCount);
+  Serial1.println(" lignes");
 }
 
 void exitOrderMode(bool sent) {
   modeOrder = false;
   orderPage = 0;
   localLineCount = 0;
+  Serial1.println(sent ? "[ORDER] commande envoyee, retour scan" : "[ORDER] annule, retour scan");
 }
 
 void updateLCD() {
@@ -375,6 +469,14 @@ void updateLCD() {
   }
 
   // mode SCAN normal
+  // BP2 (modeAffichage) switch entre deux vues
+  if (modeAffichage == 1) {
+    lcd.print("Cmd effectuees:");
+    lcd.setCursor(0, 1);
+    lcd.print(completedOrders);
+    return;
+  }
+
   if (etapeActu >= 2 && currentDecision == ItemDecision::ORDER) {
     lcd.print("H");
     lcd.print(currentHue);
