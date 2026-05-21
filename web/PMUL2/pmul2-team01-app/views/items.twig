@@ -58,7 +58,7 @@ $(document).ready(function() {
                 data: 'team',
                 render: (data) => {
                     if (!data) return '<span class="text-muted">—</span>';
-                    const badgeClass = (data === 'TEAM01') ? 'badge bg-success' : 'badge bg-secondary';
+                    const badgeClass = (data === 'TEAM 01') ? 'badge bg-success' : 'badge bg-secondary';
                     return `<span class="${badgeClass}">${data}</span>`
                 }
             },

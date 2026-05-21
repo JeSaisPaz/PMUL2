@@ -204,7 +204,9 @@
             </div>
         </template>
 
-        <button onclick="history.back();" class="btn btn-primary">← Return</button>
+        <button 
+            x-data 
+            @click="let prev = document.referrer; window.location.href = prev ? prev : '/'" class="btn btn-primary">← Return</button>
     </div>
 
     <!-- Loader -->

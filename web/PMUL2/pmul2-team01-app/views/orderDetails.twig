@@ -1,7 +1,6 @@
 {% extends "layout.twig" %}
 
 {% block body %}
-
     <div class="card" x-data="orderDetails({{id}})">
         <div class="table-responsive">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -120,6 +119,13 @@ document.addEventListener('alpine:init', () => {
             // update aux event de la db
             socket.on('db_event', () => {
                 this.fetchDetails();
+            });
+
+            window.addEventListener('pageshow', (event) => {
+                if (event.persisted) {
+                    // La page vient du cache (bfcache)
+                    window.location.reload();
+                }
             });
         }
     }));
