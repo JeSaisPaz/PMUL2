@@ -39,7 +39,7 @@
           <div class="card p-3 h-100">
             <button class="btn btn-outline-danger" @click="resetStats()">Reset</button>
             <div style="position: relative; height: 450px; width: 100%;">
-              <canvas x-ref="allColors"></canvas>
+              <canvas id="chartAllColors"></canvas>
             </div>
           </div>
         </div>
@@ -47,7 +47,7 @@
         <div class="col-md-6">
           <div class="card p-3 h-100">
             <div style="position: relative; height: 450px; width: 100%;">
-              <canvas x-ref="requestedReceived"></canvas>
+              <canvas id="chartRequestedReceived"></canvas>
             </div>
           </div>
         </div>
@@ -93,6 +93,7 @@
           const res = await fetch('/api/stats');
           if (!res.ok) throw new Error(`Error : ${res.status}`);
           this.stats = await res.json();
+          // $nextTick garantit que le DOM est à jour avant de dessiner
           this.$nextTick(() => this.drawChart());
         } catch (e) {
           console.error(e);
@@ -104,47 +105,71 @@
         this.fetchStats();
       },
 
+      // Récupère le canvas par id (plus fiable que $refs dans ce contexte)
+      getCanvas(id) {
+        const el = document.getElementById(id);
+        if (!el) {
+          console.warn(`Canvas #${id} introuvable`);
+          return null;
+        }
+        return el;
+      },
+
       drawChart() {
         if (!this.stats?.colorStats) return;
-        if (!this.$refs.allColors || !this.$refs.requestedReceived) return;
 
-        if (this.chartColor) this.chartColor.destroy();
-        this.chartColor = new Chart(this.$refs.allColors, {
-          type: 'pie',
-          data: {
-            labels: this.stats.colorStats.map(item => item.name),
-            datasets: [{
-              data: this.stats.colorStats.map(item => item.count),
-              backgroundColor: this.stats.colorStats.map(item => item.hex),
-              borderColor: '#252525',
-              borderWidth: 2
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'right' } }
-          }
-        });
+        const canvasColors   = this.getCanvas('chartAllColors');
+        const canvasQuantity = this.getCanvas('chartRequestedReceived');
 
-        if (this.chartQuantity) this.chartQuantity.destroy();
-        this.chartQuantity = new Chart(this.$refs.requestedReceived, {
-          type: 'bar',
-          data: {
-            labels: ['Total Requested', 'Total Acquired'],
-            datasets: [{
-              label: 'Requested/Acquired',
-              data: [this.stats.totalRequested, this.stats.totalAcquired],
-              backgroundColor: ['#ffc107', '#198754'],
-              borderColor: '#252525',
-              borderWidth: 1
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false
+        // --- Graphique Pie : répartition par couleur ---
+        if (canvasColors) {
+          if (this.chartColor) {
+            this.chartColor.destroy();
+            this.chartColor = null;
           }
-        });
+          this.chartColor = new Chart(canvasColors, {
+            type: 'pie',
+            data: {
+              labels: this.stats.colorStats.map(item => item.name),
+              datasets: [{
+                data: this.stats.colorStats.map(item => item.count),
+                backgroundColor: this.stats.colorStats.map(item => item.hex),
+                borderColor: '#252525',
+                borderWidth: 2
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: 'right' } }
+            }
+          });
+        }
+
+        // --- Graphique Bar : Requested / Acquired ---
+        if (canvasQuantity) {
+          if (this.chartQuantity) {
+            this.chartQuantity.destroy();
+            this.chartQuantity = null;
+          }
+          this.chartQuantity = new Chart(canvasQuantity, {
+            type: 'bar',
+            data: {
+              labels: ['Total Requested', 'Total Acquired'],
+              datasets: [{
+                label: 'Requested/Acquired',
+                data: [this.stats.totalRequested, this.stats.totalAcquired],
+                backgroundColor: ['#ffc107', '#198754'],
+                borderColor: '#252525',
+                borderWidth: 1
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false
+            }
+          });
+        }
       },
 
       async init() {
