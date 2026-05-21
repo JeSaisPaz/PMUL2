@@ -30,6 +30,7 @@ volatile bool modeAffichage = false;
 volatile bool modeAffichageChanged = true; // Forcer l'affichage initial
 
 uint16_t completedOrdersCount = 0; 
+uint16t newCount = 0;
 
 // Com Raspberry Pi via USB
 Pmul2Lib objetPmul(Serial);
