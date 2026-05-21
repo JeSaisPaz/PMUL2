@@ -500,20 +500,29 @@ void loop() {
             break;
         }
         
-        if(confirmed) {
-         objetPmul.sendScanResult(currentItemId, ItemStatus::CONFIRMED);
-         newCount = objetPmul.readCompletedCount(newCount);
-         if(completedOrdersCount != newCount) {
-          completedOrdersCount = newCount;
-         }
-          etapeActu = 0;
-          currentDecision = ItemDecision::NO_DECISION;
-          modeAffichageChanged = true;
-        }   
+           // 5. RECEPTION COULEURS DU BACKEND
 
-        break;
-    }
-  }
+     uint8_t colors[4];
+   
+     uint8_t count;
+   
+     if (objetPmul.readColorList(colors, count)) {
+   
+       activeColorCount = count;
+   
+       for (uint8_t i = 0; i < count; i++) {
+   
+         activeColors[i] = colors[i];
+   
+       }
+   
+       modeAffichageChanged = true; // Forcer refresh si changement
+   
+     } 
+   
+           break;
+       }
+     }
   else if (!systemOn) {
     // Systeme en maintenance
     servoScan.write(SERVO_LIBRE);
