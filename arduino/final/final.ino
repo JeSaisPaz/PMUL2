@@ -196,7 +196,8 @@ void setup() {
 
 void loop() {
   // 1. GESTION DES CAPTEURS 
-  unsigned long maintenant = millis();
+ updateIRStates(); 
+ unsigned long maintenant = millis();
   if (capteursOntChange || (maintenant - dernierEnvoiCapteurs > INTERVALLE_ENVOI_CAPTEURS)) {
     objetPmul.sendSensorStatus(etatsIR[0], etatsIR[1], etatsIR[2], etatsIR[3], etatsIR[4]);
     dernierEnvoiCapteurs = maintenant;
@@ -380,7 +381,6 @@ void loop() {
     switch(etapeActu) {
       
       case 0: // ATTENTE BOITE
-       updateIRStates();
         servoScan.write(SERVO_BLOQUE);
         if(etatsIR[IR_SCAN]) {
           //[ETAT 0] Boite detectee - demande scan"
@@ -436,8 +436,6 @@ void loop() {
         break;
       
       case 4: // NEXT
-        //changements car on utilises updateIRStates pour lire les capteur
-        updateIRStates();
         if(!etatsIR[IR_SCAN]) {
           break; // On quitte le switch pour laisser le loop() tourner, on reste à l'étape 4
         }
@@ -456,8 +454,6 @@ void loop() {
           objetPmul.sendScanResult(currentItemId, ItemStatus::FAILED);
           break;
         }
-
-        updateIRStates();
         
         bool confirmed = false;
         switch(currentDecision) {
