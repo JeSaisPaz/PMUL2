@@ -321,19 +321,25 @@ void loop() {
     } else {
       lcd.clear();
       lcd.setCursor(0, 0);
-      for(uint8_t i = 0; i < 3 && i < activeColorCount; i++) {
-        lcd.print(colorDisplayFormatById(orderLine[i][0], true));
-        lcd.print(":"); lcd.print(orderLine[i][1]); lcd.print(" ");
-      }
-      if(activeColorCount >= 4) {
-        lcd.setCursor(0, 1);
-        for(uint8_t i = 3; i < activeColorCount; i++) {
-          lcd.print(colorDisplayFormatById(orderLine[i][0], true));
-          lcd.print(":"); lcd.print(orderLine[i][1]); lcd.print(" ");
-        }
+      lcd.print("Item: #")
+      lcd.print(itemId)
+      lcd.setCursor(0, 1);
+      switch(currentDecision) {
+        case ItemDecision::ORDER:
+          lcd.print("TO ORDER #");
+          lcd.print(orderId);
+          break;
+        case ItemDecision::STOCK: 
+          lcd.print("TO STOCK");
+          break;
+        case ItemDecision::PASS:
+          lcd.print("PASS");
+        default:
+          lcd.print("TO ?");
+          break;
+
       }
     }
-  }
 
   // 5. RECEPTION COULEURS DU BACKEND
   uint8_t colors[4];
