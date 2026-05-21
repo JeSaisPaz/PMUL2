@@ -125,7 +125,7 @@ Servo servoCommande;  // pin 9
 
 #define SERVO_AIGUILLAGE  0   
 
-#define SERVO_NEUTRE    45  
+#define SERVO_NEUTRE    50
 
 
 // --- KEYPAD ---
