@@ -121,7 +121,7 @@ Servo servoCommande;  // pin 9
 
 #define SERVO_BLOQUE    0 
 
-#define SERVO_LIBRE     10   
+#define SERVO_LIBRE     20
 
 #define SERVO_AIGUILLAGE  0   
 
@@ -835,14 +835,13 @@ void loop() {
 
       
 
-      case 4: // NEXT
-
-        if(!etatsIR[IR_SCAN]) {
-
-          break; // On quitte le switch pour laisser le loop() tourner, on reste à l'étape 4
-
+      case 4: // ATTENTE FIN DE PASSAGE - la boite doit quitter le capteur IR_SCAN
+        // On attend que la boite AIT QUITTE le capteur (passage de true -> false)
+        if(etatsIR[IR_SCAN]) {
+          // La boite est encore devant le capteur, on attend
+          break;
         }
-
+        // La boite a quitte le capteur, on peut bloquer et passer a la confirmation
         servoScan.write(SERVO_BLOQUE);
 
         previousBoxCleared = true;
@@ -887,8 +886,6 @@ void loop() {
 
             }
 
-            servoCommande.write(SERVO_NEUTRE);
-
             break;
 
           case ItemDecision::STOCK:
@@ -925,6 +922,10 @@ void loop() {
         if(confirmed) {
 
          objetPmul.sendScanResult(currentItemId, ItemStatus::CONFIRMED);
+
+         // Reset TOUS les servos d'aiguillage a la position neutre
+         servoStock.write(SERVO_NEUTRE);
+         servoCommande.write(SERVO_NEUTRE);
 
          newCount = objetPmul.readCompletedCount(newCount);
 
