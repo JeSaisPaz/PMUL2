@@ -288,11 +288,11 @@ def handleSensorStatus(payload):
         return
     mask = payload[0]
     sensors = [
-        {"name": "IR 1", "state": 1 if mask & 0x01 else 0},
-        {"name": "IR 2", "state": 1 if mask & 0x02 else 0},
-        {"name": "IR 3", "state": 1 if mask & 0x04 else 0},
-        {"name": "IR 4", "state": 1 if mask & 0x08 else 0},
-        {"name": "IR 5", "state": 1 if mask & 0x10 else 0},
+        {"name": "IR Scan", "state": 1 if mask & 0x01 else 0},
+        {"name": "IR Next", "state": 1 if mask & 0x02 else 0},
+        {"name": "IR Stock", "state": 1 if mask & 0x04 else 0},
+        {"name": "IR Order", "state": 1 if mask & 0x08 else 0},
+        {"name": "IR Pass", "state": 1 if mask & 0x10 else 0},
     ]
     try:
         requests.post(f"{BACKEND_URL}/api/stats/sensors", json={"sensors": sensors}, timeout=2)
