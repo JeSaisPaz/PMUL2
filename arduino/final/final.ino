@@ -178,8 +178,10 @@ void setup() {
   pinMode(btn1, INPUT_PULLUP);
   pinMode(btn2, INPUT_PULLUP);
 
-  attachInterrupt(digitalPinToInterrupt(btn1), basculeSystem, RISING);
-  attachInterrupt(digitalPinToInterrupt(btn2), basculeAffichage, RISING);
+  //attachInterrupt(digitalPinToInterrupt(btn1), basculeSystem, RISING);
+  //attachInterrupt(digitalPinToInterrupt(btn2), basculeAffichage, RISING);
+  pinMode(btn1, INPUT_PULLUP);
+  pinMode(btn2, INPUT_PULLUP);
 
   for (uint8_t i = 0; i < 5; i++) {
      pinMode(pinsIR[i], INPUT_PULLUP);
@@ -206,12 +208,22 @@ void loop() {
   }
   // 1. GESTION DES CAPTEURS 
  updateIRStates(); 
- unsigned long maintenant = millis();
-  if (capteursOntChange || (maintenant - dernierEnvoiCapteurs > INTERVALLE_ENVOI_CAPTEURS)) {
-    objetPmul.sendSensorStatus(etatsIR[0], etatsIR[1], etatsIR[2], etatsIR[3], etatsIR[4]);
-    dernierEnvoiCapteurs = maintenant;
-    for (uint8_t i = 0; i < 5; i++) etatsIRPrecedents[i] = etatsIR[i];
-  }
+
+ // LCD
+ static unsigned long lastBtn1 = 0;
+ static unsigned long lastBtn2 = 0;
+ 
+ if (digitalRead(btn1) == LOW && millis() - lastBtn1 > 300) {
+   systemOn = !systemOn;
+   modeAffichageChanged = true;
+   lastBtn1 = millis();
+ }
+ 
+ if (digitalRead(btn2) == LOW && millis() - lastBtn2 > 300) {
+   modeAffichage = !modeAffichage;
+   modeAffichageChanged = true;
+   lastBtn2 = millis();
+ }
 
   // 2. LECTURE CLAVIER
   char key = customKeypad.getKey();
@@ -366,16 +378,16 @@ void loop() {
       }
     }
   }
-  // 5. RECEPTION COULEURS DU BACKEND
-  uint8_t colors[4];
-  uint8_t count;
-  if (objetPmul.readColorList(colors, count)) {
+// 5. RECEPTION COULEURS DU BACKEND
+ if (objetPmul.readColorList(colors, count)) {
+  if (!modeOrder) {
     activeColorCount = count;
     for (uint8_t i = 0; i < count; i++) {
       activeColors[i] = colors[i];
     }
-    modeAffichageChanged = true; // Forcer refresh si changement
+    modeAffichageChanged = true;
   }
+}
 
   // 6. MACHINE A ETATS DU TRI (uniquement si le système est actif et hors menu)
   if(systemOn && !modeOrder) {
