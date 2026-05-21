@@ -497,7 +497,7 @@ void loop() {
   }
   else if (!systemOn) {
     // Systeme en maintenance
-    servoScan.write(SERVO_BLOQUE);
+    servoScan.write(SERVO_LIBRE);
     servoStock.write(SERVO_NEUTRE);
     servoCommande.write(SERVO_NEUTRE);
     // "[MAINTENANCE] Systeme en maintenance"
