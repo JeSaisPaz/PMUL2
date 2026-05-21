@@ -257,7 +257,7 @@ def handleLocalOrder(payload):
             if cid and qty > 0:
                 order_lines.append({"quantity": qty, "id": cid})
         r = requests.post(f"{BACKEND_URL}/api/neworder", json={"lines": order_lines}, timeout=5)
-        if r.status_code == 204:
+        if r.status_code == 200:
             print(f"  [BACKEND] Commande creee ({lineCount} lignes)")
         else:
             print(f"  [!] POST /neworder {r.status_code}")
