@@ -106,6 +106,7 @@
 
       drawChart() {
         if (!this.stats?.colorStats) return;
+        if (!this.$refs.allColors || !this.$refs.requestedReceived) return;
 
         if (this.chartColor) this.chartColor.destroy();
         this.chartColor = new Chart(this.$refs.allColors, {
