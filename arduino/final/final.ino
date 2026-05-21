@@ -483,7 +483,6 @@ void loop() {
         }
         
         if(confirmed) {
-          totalArticlesTries++;
           objetPmul.sendScanResult(currentItemId, ItemStatus::CONFIRMED);
          newCount = objetPmul.readCompletedCount(newCount);
          if(completedOrdersCount != newCount) {
@@ -510,7 +509,7 @@ void loop() {
         lcd.setCursor(0, 0);
         lcd.print("Completed Orders:");
         lcd.setCursor(0, 1);
-        lcd.print(totalArticlesTries);
+        lcd.print(completedOrdersCount);
       } else {
         // Affichage de l'état de la machine
         lcd.setCursor(0,0);
