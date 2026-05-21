@@ -30,7 +30,6 @@ volatile bool modeAffichage = false;
 volatile bool modeAffichageChanged = true; // Forcer l'affichage initial
 
 uint16_t completedOrdersCount = 0; 
-uint16t newCount = 0;
 
 // Com Raspberry Pi via USB
 Pmul2Lib objetPmul(Serial);
@@ -484,8 +483,8 @@ void loop() {
         }
         
         if(confirmed) {
-          objetPmul.sendScanResult(currentItemId, ItemStatus::CONFIRMED);
-         newCount = objetPmul.readCompletedCount(newCount);
+         objetPmul.sendScanResult(currentItemId, ItemStatus::CONFIRMED);
+         uint16_t = newCount = objetPmul.readCompletedCount(newCount);
          if(completedOrdersCount != newCount) {
           completedOrdersCount = newCount;
          }
