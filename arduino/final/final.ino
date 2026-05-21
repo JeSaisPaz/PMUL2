@@ -8,6 +8,9 @@
  * - Remplacement de la touche '=' (inexistante) par '#' pour valider la quantité
  */
 
+ //IMPORTANT AFFICHER LE VRAI NOMBRE DE COMMANDE COMPLETE AVEC LA REPONSE DE L'API
+//PAS DE TOTAL ARTICLES TRIES
+
 #include <Servo.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
@@ -18,6 +21,9 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 uint8_t btn1 = 2;
 uint8_t btn2 = 3;
+
+volatile unsigned long btn1UpdateTime = 0;
+volatile unsigned long btn2UpdateTime = 0;
 
 volatile bool systemOn = true;
 volatile bool modeAffichage = false;
@@ -35,7 +41,6 @@ uint8_t etapePrecedente = 255;
 unsigned long tempsEntreeEtat = 0;  
 const unsigned long TIMEOUT_SCAN = 5000;          
 const unsigned long TIMEOUT_CONFIRMATION = 10000; 
-const unsigned long TIMEOUT_ATTENTE_BOITE = 30000; 
 
 bool previousBoxCleared = false;
 bool entreeEtat2 = false;
@@ -52,14 +57,15 @@ bool capteursOntChange = false;
 #define IR_STOCK   2  // pin 6 
 #define IR_ORDER   3  // pin 5 
 #define IR_PASS    4  // pin 4 
+#define IR_SCAN    0  // pin 8
 
 // Servo Moteurs
 Servo servoScan;      // pin 11
 Servo servoStock;     // pin 10
 Servo servoCommande;  // pin 9
 
-#define SERVO_BLOQUE    10  
-#define SERVO_LIBRE     0   
+#define SERVO_BLOQUE    0 
+#define SERVO_LIBRE     10   
 #define SERVO_AIGUILLAGE  0   
 #define SERVO_NEUTRE    45  
 
@@ -74,8 +80,6 @@ char keys[ROWS][COLS] = {
   {'*','0','#','D'}
 };
 
-/* ATTENTION: Sur Nano/Uno, A6 et A7 sont EXCLUSIVEMENT analogiques et ne 
-   marcheront pas ici. Si vous utilisez une carte Mega, cela fonctionne. */
 uint8_t rowPins[ROWS] = {A3, A2, A1, A0}; 
 uint8_t colPins[COLS] = {A7, A6, 13, 12}; 
 
@@ -104,47 +108,19 @@ uint8_t orderQuantities[6];
 
 // Interruptions
 void basculeSystem(){
+  unsigned long currentTime = millis();
+  if(currentTime - btn1UpdateTime < 200) return;
+  btn1UpdateTime = currentTime; 
   systemOn = !systemOn;
-  Serial1.println(systemOn ? "[SYS] ON" : "[SYS] OFF (maintenance)");
-}
-
-void basculeAffichage(){
-  modeAffichage = !modeAffichage;
-  Serial1.print("[AFF] BP2 -> mode ");
-  Serial1.println(modeAffichage);
   modeAffichageChanged = true;
 }
 
-void setup() {
-  Serial.begin(9600);
-  Serial1.begin(9600);
-
-  Serial.write('R');
-  Serial1.println("Ready.");
-
-  lcd.init();
-  lcd.backlight();
-  lcd.print("System ready");
-
-  pinMode(btn1, INPUT_PULLUP);
-  pinMode(btn2, INPUT_PULLUP);
-
-  attachInterrupt(digitalPinToInterrupt(btn1), basculeSystem, RISING);
-  attachInterrupt(digitalPinToInterrupt(btn2), basculeAffichage, RISING);
-
-  for (uint8_t i = 0; i < 5; i++) {
-    pinMode(pinsIR[i], INPUT_PULLUP);
-  }
-
-  servoScan.attach(11);
-  servoStock.attach(10);
-  servoCommande.attach(9);
-
-  servoScan.write(SERVO_BLOQUE);      
-  servoStock.write(SERVO_NEUTRE);     
-  servoCommande.write(SERVO_NEUTRE);  
-
-  etapeActu = 0;
+void basculeAffichage(){
+  unsigned long currentTime = millis();
+  if(currentTime - btn2UpdateTime < 200) return;
+  btn2UpdateTime = currentTime; 
+  modeAffichage = !modeAffichage;
+  modeAffichageChanged = true;
 }
 
 String colorDisplayFormatById(uint8_t colorId, bool shortFormat) {
@@ -175,17 +151,49 @@ bool isColorInOrder(uint8_t colorId) {
   return false;
 }
 
-void loop() {
-  // 1. GESTION DES CAPTEURS 
-
-  
+void updateIRStates() {
   capteursOntChange = false;
   for (uint8_t i = 0; i < 5; i++) {
-    bool nouvelEtat = !digitalRead(pinsIR[i]); 
-    if (nouvelEtat != etatsIR[i]) capteursOntChange = true;
-    etatsIR[i] = nouvelEtat;
+    bool etat = digitalRead(pinsIR[i]) == LOW; 
+    if (etat != etatsIRPrecedents[i]) {
+      etatsIR[i] = etat;
+      capteursOntChange = true;
+    }
   }
-  
+}
+
+void setup() {
+  Serial.begin(9600);
+
+  Serial.write('R');
+
+  lcd.init();
+  lcd.backlight();
+  lcd.print("System ready");
+
+  pinMode(btn1, INPUT_PULLUP);
+  pinMode(btn2, INPUT_PULLUP);
+
+  attachInterrupt(digitalPinToInterrupt(btn1), basculeSystem, RISING);
+  attachInterrupt(digitalPinToInterrupt(btn2), basculeAffichage, RISING);
+
+  for (uint8_t i = 0; i < 5; i++) {
+    pinMode(pinsIR[i], INPUT_PULLUP);
+  }
+
+  servoScan.attach(11);
+  servoStock.attach(10);
+  servoCommande.attach(9);
+
+  servoScan.write(SERVO_BLOQUE);      
+  servoStock.write(SERVO_NEUTRE);     
+  servoCommande.write(SERVO_NEUTRE);  
+
+  etapeActu = 0;
+}
+
+void loop() {
+  // 1. GESTION DES CAPTEURS 
   unsigned long maintenant = millis();
   if (capteursOntChange || (maintenant - dernierEnvoiCapteurs > INTERVALLE_ENVOI_CAPTEURS)) {
     objetPmul.sendSensorStatus(etatsIR[0], etatsIR[1], etatsIR[2], etatsIR[3], etatsIR[4]);
@@ -202,7 +210,7 @@ void loop() {
     orderPage = 0;
     orderLineCount = 0; 
     menuNeedsUpdate = true;
-    Serial1.println("[ORDER] Mode saisie active");
+    //[ORDER] Mode saisie active"
     key = 0; // On consomme la touche pour ne pas l'utiliser dans le menu
   }
 
@@ -287,7 +295,7 @@ void loop() {
       if(key == 'C') { // Annuler
         modeOrder = false;
         orderLineCount = 0;
-        Serial1.println("[ORDER] Annulee");
+        //[ORDER] Annulee"
         modeAffichageChanged = true;
       } 
       else if(key == 'D') { // Confirmer
@@ -296,14 +304,13 @@ void loop() {
           orderQuantities[i] = orderLine[i][1];
         }
         objetPmul.sendLocalOrder(orderLineCount, orderColors, orderQuantities);
-        Serial1.println("[ORDER] Envoyee");
+        //[ORDER] Envoyee"
         modeOrder = false;
         orderLineCount = 0;
         
         lcd.clear();
         lcd.setCursor(0,0);
         lcd.print("Cmd Envoyee!");
-        delay(1000); // Petit delai visuel tolérable ici car l'ordre est envoyé
         modeAffichageChanged = true;
       }
     }
@@ -318,28 +325,35 @@ void loop() {
       lcd.print("Completed Orders:");
       lcd.setCursor(0, 1);
       lcd.print(totalArticlesTries);
-    } else {
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Item: #")
-      lcd.print(itemId)
-      lcd.setCursor(0, 1);
-      switch(currentDecision) {
-        case ItemDecision::ORDER:
-          lcd.print("TO ORDER #");
-          lcd.print(orderId);
-          break;
-        case ItemDecision::STOCK: 
-          lcd.print("TO STOCK");
-          break;
-        case ItemDecision::PASS:
-          lcd.print("PASS");
-        default:
-          lcd.print("TO ?");
-          break;
+    } else{
+      if(currentDecision != ItemDecision::NO_DECISION) {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Item: #");
+        lcd.print(currentItemId);
+        lcd.setCursor(0, 1);
+        switch(currentDecision) {
+          case ItemDecision::ORDER:
+            lcd.print("TO ORDER #");
+            lcd.print(currentOrderId);
+            break;
+          case ItemDecision::STOCK: 
+            lcd.print("TO STOCK");
+            break;
+          case ItemDecision::PASS:
+            lcd.print("PASS");
+          default:
+            lcd.print("TO ?");
+            break;
 
+        }
+      }else{
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("No current item");
       }
     }
+  }
 
   // 5. RECEPTION COULEURS DU BACKEND
   uint8_t colors[4];
@@ -366,94 +380,103 @@ void loop() {
       
       case 0: // ATTENTE BOITE
         servoScan.write(SERVO_BLOQUE);
-        if(etatsIR[IR_NEXT]) {
-          Serial1.println("[ETAT 0] Boite detectee - demande scan");
+        if(etatsIR[IR_SCAN]) {
+          updateIRStates();
+          //[ETAT 0] Boite detectee - demande scan"
           objetPmul.sendScanNeeded();
           etapeActu = 1; 
-        }
-        if (millis() - tempsEntreeEtat > TIMEOUT_ATTENTE_BOITE) {
-          tempsEntreeEtat = millis(); 
         }
         break;
       
       case 1: // ATTENTE SCAN
         if (millis() - tempsEntreeEtat > TIMEOUT_SCAN) {
-          Serial1.println("[TIMEOUT] Scan non recu, passage en PASS");
+          //[TIMEOUT] Scan non recu, passage en PASS"
           currentDecision = ItemDecision::PASS;
           currentItemId = 0; currentOrderId = 0;
           etapeActu = 2;
+          modeAffichageChanged = true;
           break;
         }
         if(objetPmul.readItemInfo(currentItemId, currentDecision, currentOrderId, currentHue, currentSaturation, currentValue, currentTeam)) {
-          Serial1.print("[SCAN OK] Item #");
-          Serial1.print(currentItemId);
-          Serial1.print(" Decision: ");
-          Serial1.println((int)currentDecision);
+          //"[SCAN OK] Item ");
           etapeActu = 2;
+          modeAffichageChanged = true;
         }
         break;
       
       case 2: // AIGUILLAGE
         if (!entreeEtat2) {
           entreeEtat2 = true; 
-          Serial1.print("[ETAT 2] Aiguillage: ");
+          //[ETAT 2] Aiguillage
           switch (currentDecision) {
             case ItemDecision::ORDER:
-              Serial1.println("ORDER");
+              //[ETAT 2] Aiguillage - ORDER
               servoCommande.write(SERVO_AIGUILLAGE);  
               break;
             case ItemDecision::STOCK:
-              Serial1.println("STOCK");
+              //[ETAT 2] Aiguillage - STOCK
               servoStock.write(SERVO_AIGUILLAGE);     
               break;
             case ItemDecision::PASS:
             default:
-              Serial1.println("PASS");
+              //[ETAT 2] Aiguillage - PASS
               break;
           }
         }
-        etapeActu = 3; 
+        if (millis() - tempsEntreeEtat > 300) {
+          etapeActu = 3; // Le servo est en place, on peut passer à la suite !
+        }
         break;
       
       case 3: // LIBERATION
-        Serial1.println("[ETAT 3] Liberation");
+        //[ETAT 3] Liberation
         servoScan.write(SERVO_LIBRE);  
         etapeActu = 4; 
         break;
       
-      case 4: // ATTENTE PROCHAINE BOITE
-        if(!previousBoxCleared && !etatsIR[IR_NEXT]) {
-          previousBoxCleared = true;  
-          Serial1.println("[ETAT 4] Boite actuelle sortie");
+      case 4: // NEXT
+        //changements car on utilises updateIRStates pour lire les capteur
+        updateIRStates();
+        if(!etatsIR[IR_SCAN]) {
+          break; // On quitte le switch pour laisser le loop() tourner, on reste à l'étape 4
         }
-        if(previousBoxCleared && etatsIR[IR_NEXT]) {
-          servoScan.write(SERVO_BLOQUE);
-          Serial1.println("[ETAT 4] Nouvelle boite - BLOCAGE");
-          etapeActu = 5; 
-        }
+        servoScan.write(SERVO_BLOQUE);
+        previousBoxCleared = true;
+        etapeActu = 5; 
         break;
       
       case 5: // CONFIRMATION
         if (millis() - tempsEntreeEtat > TIMEOUT_CONFIRMATION) {
-          Serial1.println("[TIMEOUT] Confirmation");
+          //[TIMEOUT] Confirmation
           servoStock.write(SERVO_NEUTRE);
           servoCommande.write(SERVO_NEUTRE);
           currentDecision = ItemDecision::NO_DECISION;  
-          etapeActu = 0;  
+          etapeActu = 0;
+          objetPmul.sendScanResult(currentItemId, ItemStatus::FAILED);
           break;
         }
+
+        updateIRStates();
         
         bool confirmed = false;
         switch(currentDecision) {
           case ItemDecision::ORDER:
-            if(etatsIR[IR_ORDER]) { servoCommande.write(SERVO_NEUTRE); confirmed = true; }
+            if(etatsIR[IR_ORDER] && !(etatsIR[IR_STOCK] || etatsIR[IR_PASS])) {
+              confirmed = true; 
+            }
+            servoCommande.write(SERVO_NEUTRE);
             break;
           case ItemDecision::STOCK:
-            if(etatsIR[IR_STOCK]) { servoStock.write(SERVO_NEUTRE); confirmed = true; }
+            if(etatsIR[IR_STOCK] && !(etatsIR[IR_ORDER] || etatsIR[IR_PASS])) { 
+              confirmed = true; 
+            }
             break;
           case ItemDecision::PASS:
-            if(etatsIR[IR_PASS]) { confirmed = true; }
+            if(etatsIR[IR_PASS] && !(etatsIR[IR_ORDER] || etatsIR[IR_STOCK])) { 
+              confirmed = true; 
+            }
             break;
+
           default:
             confirmed = true;
             break;
@@ -461,9 +484,12 @@ void loop() {
         
         if(confirmed) {
           totalArticlesTries++;
-          currentDecision = ItemDecision::NO_DECISION;  
-          etapeActu = 0;  
-        }
+          objetPmul.sendScanResult(currentItemId, ItemStatus::CONFIRMED);
+          etapeActu = 0;
+          currentDecision = ItemDecision::NO_DECISION;
+          modeAffichageChanged = true;
+        }   
+
         break;
     }
   }
@@ -472,6 +498,23 @@ void loop() {
     servoScan.write(SERVO_BLOQUE);
     servoStock.write(SERVO_NEUTRE);
     servoCommande.write(SERVO_NEUTRE);
-    etapeActu = 0;
+    // "[MAINTENANCE] Systeme en maintenance"
+    if(modeAffichageChanged){
+      lcd.clear();
+      if(modeAffichage) {
+        // Affichage des statistiques même en pause
+        lcd.setCursor(0, 0);
+        lcd.print("Completed Orders:");
+        lcd.setCursor(0, 1);
+        lcd.print(totalArticlesTries);
+      } else {
+        // Affichage de l'état de la machine
+        lcd.setCursor(0,0);
+        lcd.print("MAINTENANCE");
+        lcd.setCursor(0,1); 
+        lcd.print("System Off");
+      }
+      modeAffichageChanged = false;
+    }
   }
-}//
+}
