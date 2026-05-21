@@ -117,12 +117,10 @@ void basculeSystem(){
   modeAffichageChanged = true;
 }
 
-void basculeAffichage(){
- unsigned long currentTime = millis();
- if(currentTime - btn2UpdateTime < 200) return;
- btn2UpdateTime = currentTime;
-  modeAffichage = !modeAffichage;
-  modeAffichageChanged = true;
+volatile bool displayChangeRequested = false;
+
+void basculeAffichage() {
+  displayChangeRequested = true; // Just flag it
 }
 
 String colorDisplayFormatById(uint8_t colorId, bool shortFormat) {
@@ -199,6 +197,13 @@ void setup() {
 }
 
 void loop() {
+ //0. Ecran LCD
+ if (displayChangeRequested) {
+    displayChangeRequested = false; // Reset the flag
+    modeAffichage = !modeAffichage;
+    modeAffichageChanged = true;
+    // Perform screen updates here, NOT inside the ISR
+  }
   // 1. GESTION DES CAPTEURS 
  updateIRStates(); 
  unsigned long maintenant = millis();
