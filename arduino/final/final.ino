@@ -19,6 +19,9 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 uint8_t btn1 = 2;
 uint8_t btn2 = 3;
 
+uint16_t btn1UpdateTime = 0;
+uint16_t btn2UpdateTime = 0;
+
 volatile bool systemOn = true;
 volatile bool modeAffichage = false;
 volatile bool modeAffichageChanged = true; // Forcer l'affichage initial
@@ -102,12 +105,57 @@ uint8_t orderQuantities[6];
 
 // Interruptions
 void basculeSystem(){
+  currentTime = millis();
+  if(currentTime - btn1UpdateTime < 200) return;
+  btn1UpdateTime = currentTime; 
   systemOn = !systemOn;
 }
 
 void basculeAffichage(){
+  currentTime = millis();
+  if(currentTime - btn2UpdateTime < 200) return;
+  btn2UpdateTime = currentTime; 
   modeAffichage = !modeAffichage;
   modeAffichageChanged = true;
+}
+
+String colorDisplayFormatById(uint8_t colorId, bool shortFormat) {
+  switch(colorId) {
+    case COLOR_BLUE: return shortFormat ? "BL" : "BL:1";    
+    case COLOR_YELLOW: return shortFormat ? "YL" : "YL:2";  
+    case COLOR_MAGENTA: return shortFormat ? "MG" : "MG:3"; 
+    case COLOR_BROWN: return shortFormat ? "BR" : "BR:4";   
+    case COLOR_ORANGE: return shortFormat ? "OR" : "OR:5";  
+    default: return "?";            
+  }
+}
+
+uint8_t colorIndexCharToId(char c) {
+  switch(c) {
+    case '1': return activeColors[0];
+    case '2': return activeColors[1];
+    case '3': return activeColors[2];
+    case '4': return activeColors[3];
+    default: return 0xFF; 
+  }
+}
+
+bool isColorInOrder(uint8_t colorId) {
+  for (uint8_t i = 0; i < orderLineCount; i++) {
+    if (orderLine[i][0] == colorId) return true;
+  }
+  return false;
+}
+
+void updateIRStates() {
+  capteursOntChange = false;
+  for (uint8_t i = 0; i < 5; i++) {
+    bool etat = digitalRead(pinsIR[i]) == LOW; 
+    if (etat != etatsIRPrecedents[i]) {
+      etatsIR[i] = etat;
+      capteursOntChange = true;
+    }
+  }
 }
 
 void setup() {
@@ -140,45 +188,8 @@ void setup() {
   etapeActu = 0;
 }
 
-String colorDisplayFormatById(uint8_t colorId, bool shortFormat) {
-  switch(colorId) {
-    case COLOR_BLUE: return shortFormat ? "BL" : "BL:1";    
-    case COLOR_YELLOW: return shortFormat ? "YL" : "YL:2";  
-    case COLOR_MAGENTA: return shortFormat ? "MG" : "MG:3"; 
-    case COLOR_BROWN: return shortFormat ? "BR" : "BR:4";   
-    case COLOR_ORANGE: return shortFormat ? "OR" : "OR:5";  
-    default: return "?";            
-  }
-}
-
-uint8_t colorIndexCharToId(char c) {
-  switch(c) {
-    case '1': return activeColors[0];
-    case '2': return activeColors[1];
-    case '3': return activeColors[2];
-    case '4': return activeColors[3];
-    default: return 0xFF; 
-  }
-}
-
-bool isColorInOrder(uint8_t colorId) {
-  for (uint8_t i = 0; i < orderLineCount; i++) {
-    if (orderLine[i][0] == colorId) return true;
-  }
-  return false;
-}
-
 void loop() {
   // 1. GESTION DES CAPTEURS 
-
-  
-  capteursOntChange = false;
-  for (uint8_t i = 0; i < 5; i++) {
-    bool nouvelEtat = !digitalRead(pinsIR[i]); 
-    if (nouvelEtat != etatsIR[i]) capteursOntChange = true;
-    etatsIR[i] = nouvelEtat;
-  }
-  
   unsigned long maintenant = millis();
   if (capteursOntChange || (maintenant - dernierEnvoiCapteurs > INTERVALLE_ENVOI_CAPTEURS)) {
     objetPmul.sendSensorStatus(etatsIR[0], etatsIR[1], etatsIR[2], etatsIR[3], etatsIR[4]);
@@ -360,6 +371,7 @@ void loop() {
       case 0: // ATTENTE BOITE
         servoScan.write(SERVO_BLOQUE);
         if(etatsIR[IR_SCAN]) {
+          updateIRStates();
           //[ETAT 0] Boite detectee - demande scan"
           objetPmul.sendScanNeeded();
           etapeActu = 1; 
@@ -409,9 +421,10 @@ void loop() {
         break;
       
       case 4: 
-        while(!etatsIR[IR_SCAN]) { 
+        while(!etatsIR[IR_SCAN]) {
 
         }
+        updateIRStates();
         servoScan.write(SERVO_BLOQUE);
         previousBoxCleared = true;
         etapeActu = 5; 
@@ -427,6 +440,8 @@ void loop() {
           objetPmul.sendScanResult(currentItemId, ItemStatus::FAILED);
           break;
         }
+
+        updateIRStates();
         
         bool confirmed = false;
         switch(currentDecision) {
@@ -446,7 +461,7 @@ void loop() {
               confirmed = true; 
             }
             break;
-            
+
           default:
             confirmed = true;
             break;
@@ -468,6 +483,11 @@ void loop() {
     servoScan.write(SERVO_BLOQUE);
     servoStock.write(SERVO_NEUTRE);
     servoCommande.write(SERVO_NEUTRE);
-    etapeActu = 0;
+    // "[MAINTENANCE] Systeme en maintenance"
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("MAINTENANCE");
+    lcd.setCursor(0,1); 
+    lcd.print("System Off");
   }
 }
