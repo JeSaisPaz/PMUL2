@@ -159,18 +159,9 @@ void updateIRStates() {
   capteursOntChange = false;
   
   for (uint8_t i = 0; i < 5; i++) {
-    bool etat;
-    // Traitement des capteurs analogiques (Index 0 et 2)
-    if (i == 0 || i == 2) {
-      int valeurAnalogique = analogRead(pinsIR[i]);
-      // Ajustez la valeur 500 selon vos tests de luminosité
-      etat = (valeurAnalogique < 800); 
-    } 
-    // Traitement des capteurs numériques (Index 1, 3 et 4)
-    else {
-      etat = (digitalRead(pinsIR[i]) == LOW); 
-    }
-    // Détection de changement d'état
+    // Read everything as digital
+    bool etat = (digitalRead(pinsIR[i]) == LOW);
+    
     if (etat != etatsIRPrecedents[i]) {
       etatsIR[i] = etat;
       capteursOntChange = true;
