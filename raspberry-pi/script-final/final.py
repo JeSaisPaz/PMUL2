@@ -243,7 +243,7 @@ def handleLocalOrder(payload):
     color_names = {0x01: "jaune", 0x02: "bleu", 0x03: "magenta", 0x04: "brun", 0x05: "orange"}
     print(f"[ARDUINO] Commande keypad")
     try:
-        r_colors = requests.get(f"{BACKEND_URL}/api/colors", timeout=5)
+        r_colors = requests.get(f"{BACKEND_URL}/api/colors", timeout=10)
         if r_colors.status_code != 200:
             print("  [!] Impossible de recuperer les couleurs de la DB")
             return
