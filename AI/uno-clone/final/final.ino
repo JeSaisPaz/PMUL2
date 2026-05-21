@@ -319,18 +319,25 @@ void loop() {
       lcd.setCursor(0, 1);
       lcd.print(totalArticlesTries);
     } else {
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Current Order:");
-      lcd.setCursor(0, 1);
-      lcd.print("ID:");
-      lcd.print(currentItemId);
-      lcd.print(" Dec:");
-      switch(currentDecision) {
-        case ItemDecision::ORDER: lcd.print("ORD"); break;
-        case ItemDecision::STOCK: lcd.print("STK"); break;
-        case ItemDecision::PASS: lcd.print("PSS"); break;
-        default: lcd.print("N/A"); break;
+      if(currentDecision != ItemDecision::NO_DECISION) {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Current Order:");
+        lcd.setCursor(0, 1);
+        lcd.print("ID:");
+        lcd.print(currentItemId);
+        lcd.print(" Dec:");
+        switch(currentDecision) {
+          case ItemDecision::ORDER: lcd.print("ORD"); break;
+          case ItemDecision::STOCK: lcd.print("STK"); break;
+          case ItemDecision::PASS: lcd.print("PSS"); break;
+          default: lcd.print("N/A"); break;
+        }
+    }
+    else {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("No current item");
       }
     }
   }

@@ -159,9 +159,16 @@ def handleScanNeeded():
         return
 
     qr_text, hue, sat, val = decodeFrame(frame)
-    if qr_text is None:
-        print("  [!] Scan: QR pas detecte")
-        return
+    
+    tries = 0
+    while qr_text is None and tries < 3:
+        print("  [!] Scan: QR pas detecte, retry...")
+        time.sleep(0.5)
+        frame = cam.capture_array()
+        if frame is not None:
+            qr_text, hue, sat, val = decodeFrame(frame)
+        tries += 1
+
 
     print(f"  [SCAN] QR={qr_text} H={hue} S={sat} V={val}")
 
@@ -234,7 +241,7 @@ def handleLocalOrder(payload):
     lineCount = payload[0]
     if lineCount == 0 or len(payload) < 1 + lineCount * 2:
         return
-    color_names = {0x01: "jaune", 0x02: "bleu", 0x03: "magenta", 0x04: "brun", 0x05: "orange"}
+    color_names = {0x01: "Yellow", 0x02: "Blue", 0x03: "Magenta", 0x04: "Brown", 0x05: "Orange"}
     print(f"[ARDUINO] Commande keypad")
     try:
         r_colors = requests.get(f"{BACKEND_URL}/api/colors", timeout=5)
@@ -264,11 +271,11 @@ def handleSensorStatus(payload):
         return
     mask = payload[0]
     sensors = [
-        {"name": "IR 1", "state": 1 if mask & 0x01 else 0},
-        {"name": "IR 2", "state": 1 if mask & 0x02 else 0},
-        {"name": "IR 3", "state": 1 if mask & 0x04 else 0},
-        {"name": "IR 4", "state": 1 if mask & 0x08 else 0},
-        {"name": "IR 5", "state": 1 if mask & 0x10 else 0},
+        {"name": "SCAN", "state": 1 if mask & 0x01 else 0},
+        {"name": "NEXT", "state": 1 if mask & 0x02 else 0},
+        {"name": "ORDER", "state": 1 if mask & 0x04 else 0},
+        {"name": "STOCK", "state": 1 if mask & 0x08 else 0},
+        {"name": "PASS", "state": 1 if mask & 0x10 else 0},
     ]
     try:
         requests.post(f"{BACKEND_URL}/api/stats/sensors", json={"sensors": sensors}, timeout=2)
