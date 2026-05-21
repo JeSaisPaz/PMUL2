@@ -28,7 +28,8 @@ volatile unsigned long btn2UpdateTime = 0;
 volatile bool systemOn = true;
 volatile bool modeAffichage = false;
 volatile bool modeAffichageChanged = true; // Forcer l'affichage initial
-uint16_t totalArticlesTries = 0; 
+
+uint16_t completedOrdersCount = 0; 
 
 // Com Raspberry Pi via USB
 Pmul2Lib objetPmul(Serial);
@@ -324,7 +325,7 @@ void loop() {
       lcd.setCursor(0, 0);
       lcd.print("Completed Orders:");
       lcd.setCursor(0, 1);
-      lcd.print(totalArticlesTries);
+      lcd.print(completedOrdersCount);
     } else{
       if(currentDecision != ItemDecision::NO_DECISION) {
         lcd.clear();
@@ -355,6 +356,12 @@ void loop() {
     }
   }
 
+ 
+  // 4.5 RECEPTION DU NOMBRE DE COMMANDES
+ newCount = objetPmul.readCompletedCount(newCount)
+ if(completedOrdersCount != newCount) {
+  completedOrdersCount = newCount;
+ }
   // 5. RECEPTION COULEURS DU BACKEND
   uint8_t colors[4];
   uint8_t count;
