@@ -240,13 +240,12 @@ def handleLocalOrder(payload):
     if lineCount == 0 or len(payload) < 1 + lineCount * 2:
         return
 
-    # same map as fetchAndSendColors — single source of truth
     name_to_byte = {
-        "jaune": 0x01, "yellow": 0x01,
-        "bleu":  0x02, "blue":   0x02,
-        "magenta": 0x03, "pink": 0x03,
-        "brun":  0x04, "brown":  0x04,
-        "orange": 0x05
+        "blue":    0x01,
+        "yellow":  0x02,
+        "magenta": 0x03,
+        "brown":   0x04,
+        "orange":  0x05
     }
 
     try:
@@ -282,22 +281,6 @@ def handleLocalOrder(payload):
 
     except Exception as e:
         print(f"  [!] Backend injoignable: {e}")
-def handleSensorStatus(payload):
-    """L'Arduino envoie l'etat des capteurs IR - on POST au backend."""
-    if len(payload) < 1:
-        return
-    mask = payload[0]
-    sensors = [
-        {"name": "IR Scan", "state": 1 if mask & 0x01 else 0},
-        {"name": "IR Next", "state": 1 if mask & 0x02 else 0},
-        {"name": "IR Stock", "state": 1 if mask & 0x04 else 0},
-        {"name": "IR Order", "state": 1 if mask & 0x08 else 0},
-        {"name": "IR Pass", "state": 1 if mask & 0x10 else 0},
-    ]
-    try:
-        requests.post(f"{BACKEND_URL}/api/stats/sensors", json={"sensors": sensors}, timeout=2)
-    except Exception:
-        pass  # backend down, tant pis
 
 def handleArduinoFrame():
     """Lit et dispatche une trame entrante de l'Arduino."""
