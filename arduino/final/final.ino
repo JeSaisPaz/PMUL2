@@ -164,7 +164,7 @@ void updateIRStates() {
     if (i == 0 || i == 2) {
       int valeurAnalogique = analogRead(pinsIR[i]);
       // Ajustez la valeur 500 selon vos tests de luminosité
-      etat = (valeurAnalogique < 500); 
+      etat = (valeurAnalogique < 800); 
     } 
     // Traitement des capteurs numériques (Index 1, 3 et 4)
     else {
@@ -195,7 +195,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(btn2), basculeAffichage, RISING);
 
   for (uint8_t i = 0; i < 5; i++) {
-    pinMode(pinsIR[i], INPUT);
+    pinMode(pinsIR[i], INPUT_PULLUP);
   }
 
   servoScan.attach(11);
