@@ -383,7 +383,6 @@ void loop() {
        updateIRStates();
         servoScan.write(SERVO_BLOQUE);
         if(etatsIR[IR_SCAN]) {
-          updateIRStates();
           //[ETAT 0] Boite detectee - demande scan"
           objetPmul.sendScanNeeded();
           etapeActu = 1; 
