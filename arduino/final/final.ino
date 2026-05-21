@@ -355,13 +355,6 @@ void loop() {
       }
     }
   }
-
- 
-  // 4.5 RECEPTION DU NOMBRE DE COMMANDES
- newCount = objetPmul.readCompletedCount(newCount)
- if(completedOrdersCount != newCount) {
-  completedOrdersCount = newCount;
- }
   // 5. RECEPTION COULEURS DU BACKEND
   uint8_t colors[4];
   uint8_t count;
@@ -492,6 +485,10 @@ void loop() {
         if(confirmed) {
           totalArticlesTries++;
           objetPmul.sendScanResult(currentItemId, ItemStatus::CONFIRMED);
+         newCount = objetPmul.readCompletedCount(newCount);
+         if(completedOrdersCount != newCount) {
+          completedOrdersCount = newCount;
+         }
           etapeActu = 0;
           currentDecision = ItemDecision::NO_DECISION;
           modeAffichageChanged = true;
