@@ -13,12 +13,13 @@ module.exports = function (io) {
 
     // handle pour eviter de repeter le try/catch partout
     const handle = (fn) => async (req, res) => {
-        try {
-            await fn(req, res);
-        } catch (error) {
-            const code = error.code || 500;
-            console.log(error.message)
-        }
+    try {
+        await fn(req, res);
+    } catch (error) {
+        const code = error.status || error.code || 500;
+        console.error(`[ERROR] ${error.message}`);
+        res.status(code).json({ error: error.message }); // ← actually respond
+    }
     };
 
     router.get('/health', (req, res) => {
