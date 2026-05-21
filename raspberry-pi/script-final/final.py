@@ -234,36 +234,54 @@ def handleScanResult(payload):
         print(f"  [!] Backend injoignable: {e}")
 
 def handleLocalOrder(payload):
-    """L'Arduino a saisi une commande au keypad, on l'envoie au backend."""
     if len(payload) < 2:
         return
     lineCount = payload[0]
     if lineCount == 0 or len(payload) < 1 + lineCount * 2:
         return
-    color_names = {0x01: "jaune", 0x02: "bleu", 0x03: "magenta", 0x04: "brun", 0x05: "orange"}
-    print(f"[ARDUINO] Commande keypad")
+
+    # same map as fetchAndSendColors — single source of truth
+    name_to_byte = {
+        "jaune": 0x01, "yellow": 0x01,
+        "bleu":  0x02, "blue":   0x02,
+        "magenta": 0x03, "pink": 0x03,
+        "brun":  0x04, "brown":  0x04,
+        "orange": 0x05
+    }
+
     try:
         r_colors = requests.get(f"{BACKEND_URL}/api/colors", timeout=10)
         if r_colors.status_code != 200:
-            print("  [!] Impossible de recuperer les couleurs de la DB")
             return
-        db_colors = {c["name"].lower(): c["id"] for c in r_colors.json()}
+
+        # build byte → {db_name, db_id} directly from the DB response
+        byte_to_color = {}
+        for c in r_colors.json():
+            name = (c.get("name") or "").lower()
+            bid = name_to_byte.get(name)
+            if bid:
+                byte_to_color[bid] = {"name": name, "id": c["id"]}
+
         order_lines = []
         for i in range(lineCount):
             colorByte = payload[1 + i * 2]
             qty       = payload[1 + i * 2 + 1]
-            name = color_names.get(colorByte)
-            cid  = db_colors.get(name) if name else None
-            if cid and qty > 0:
-                order_lines.append({"quantity": qty, "id": cid})
+            color = byte_to_color.get(colorByte)
+            if color and qty > 0:
+                order_lines.append({"quantity": qty, "id": color["id"]})
+
+        if not order_lines:
+            print("  [!] Aucune ligne valide dans la commande keypad")
+            return
+
         r = requests.post(f"{BACKEND_URL}/api/neworder", json={"lines": order_lines}, timeout=5)
-        if r.status_code == 200:
-            print(f"  [BACKEND] Commande creee ({lineCount} lignes)")
+        if r.status_code == 204:
+            print(f"  [BACKEND] Commande creee ({len(order_lines)} lignes)")
         else:
-            print(f"  [!] POST /neworder {r.status_code}")
+            print(f"  [!] POST /neworder {r.status_code}: {r.text}")
+
     except Exception as e:
         print(f"  [!] Backend injoignable: {e}")
-
 def handleSensorStatus(payload):
     """L'Arduino envoie l'etat des capteurs IR - on POST au backend."""
     if len(payload) < 1:
