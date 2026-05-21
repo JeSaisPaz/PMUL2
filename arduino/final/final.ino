@@ -58,8 +58,8 @@ Servo servoScan;      // pin 11
 Servo servoStock;     // pin 10
 Servo servoCommande;  // pin 9
 
-#define SERVO_BLOQUE    10  
-#define SERVO_LIBRE     0   
+#define SERVO_BLOQUE    0 
+#define SERVO_LIBRE     10   
 #define SERVO_AIGUILLAGE  0   
 #define SERVO_NEUTRE    45  
 
@@ -303,7 +303,6 @@ void loop() {
         lcd.clear();
         lcd.setCursor(0,0);
         lcd.print("Cmd Envoyee!");
-        delay(1000); // Petit delai visuel tolérable ici car l'ordre est envoyé
         modeAffichageChanged = true;
       }
     }
