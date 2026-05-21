@@ -35,7 +35,6 @@ uint8_t etapePrecedente = 255;
 unsigned long tempsEntreeEtat = 0;  
 const unsigned long TIMEOUT_SCAN = 5000;          
 const unsigned long TIMEOUT_CONFIRMATION = 10000; 
-const unsigned long TIMEOUT_ATTENTE_BOITE = 30000; 
 
 bool previousBoxCleared = false;
 bool entreeEtat2 = false;
@@ -52,6 +51,7 @@ bool capteursOntChange = false;
 #define IR_STOCK   2  // pin 6 
 #define IR_ORDER   3  // pin 5 
 #define IR_PASS    4  // pin 4 
+#define IR_SCAN    0  // pin 8
 
 // Servo Moteurs
 Servo servoScan;      // pin 11
@@ -74,8 +74,6 @@ char keys[ROWS][COLS] = {
   {'*','0','#','D'}
 };
 
-/* ATTENTION: Sur Nano/Uno, A6 et A7 sont EXCLUSIVEMENT analogiques et ne 
-   marcheront pas ici. Si vous utilisez une carte Mega, cela fonctionne. */
 uint8_t rowPins[ROWS] = {A3, A2, A1, A0}; 
 uint8_t colPins[COLS] = {A7, A6, 13, 12}; 
 
@@ -105,22 +103,17 @@ uint8_t orderQuantities[6];
 // Interruptions
 void basculeSystem(){
   systemOn = !systemOn;
-  Serial1.println(systemOn ? "[SYS] ON" : "[SYS] OFF (maintenance)");
 }
 
 void basculeAffichage(){
   modeAffichage = !modeAffichage;
-  Serial1.print("[AFF] BP2 -> mode ");
-  Serial1.println(modeAffichage);
   modeAffichageChanged = true;
 }
 
 void setup() {
   Serial.begin(9600);
-  Serial1.begin(9600);
 
   Serial.write('R');
-  Serial1.println("Ready.");
 
   lcd.init();
   lcd.backlight();
@@ -202,7 +195,7 @@ void loop() {
     orderPage = 0;
     orderLineCount = 0; 
     menuNeedsUpdate = true;
-    Serial1.println("[ORDER] Mode saisie active");
+    //[ORDER] Mode saisie active"
     key = 0; // On consomme la touche pour ne pas l'utiliser dans le menu
   }
 
@@ -287,7 +280,7 @@ void loop() {
       if(key == 'C') { // Annuler
         modeOrder = false;
         orderLineCount = 0;
-        Serial1.println("[ORDER] Annulee");
+        //[ORDER] Annulee"
         modeAffichageChanged = true;
       } 
       else if(key == 'D') { // Confirmer
@@ -296,7 +289,7 @@ void loop() {
           orderQuantities[i] = orderLine[i][1];
         }
         objetPmul.sendLocalOrder(orderLineCount, orderColors, orderQuantities);
-        Serial1.println("[ORDER] Envoyee");
+        //[ORDER] Envoyee"
         modeOrder = false;
         orderLineCount = 0;
         
@@ -366,29 +359,23 @@ void loop() {
       
       case 0: // ATTENTE BOITE
         servoScan.write(SERVO_BLOQUE);
-        if(etatsIR[IR_NEXT]) {
-          Serial1.println("[ETAT 0] Boite detectee - demande scan");
+        if(etatsIR[IR_SCAN]) {
+          //[ETAT 0] Boite detectee - demande scan"
           objetPmul.sendScanNeeded();
           etapeActu = 1; 
-        }
-        if (millis() - tempsEntreeEtat > TIMEOUT_ATTENTE_BOITE) {
-          tempsEntreeEtat = millis(); 
         }
         break;
       
       case 1: // ATTENTE SCAN
         if (millis() - tempsEntreeEtat > TIMEOUT_SCAN) {
-          Serial1.println("[TIMEOUT] Scan non recu, passage en PASS");
+          //[TIMEOUT] Scan non recu, passage en PASS"
           currentDecision = ItemDecision::PASS;
           currentItemId = 0; currentOrderId = 0;
           etapeActu = 2;
           break;
         }
         if(objetPmul.readItemInfo(currentItemId, currentDecision, currentOrderId, currentHue, currentSaturation, currentValue, currentTeam)) {
-          Serial1.print("[SCAN OK] Item #");
-          Serial1.print(currentItemId);
-          Serial1.print(" Decision: ");
-          Serial1.println((int)currentDecision);
+          //"[SCAN OK] Item ");
           etapeActu = 2;
         }
         break;
@@ -396,19 +383,19 @@ void loop() {
       case 2: // AIGUILLAGE
         if (!entreeEtat2) {
           entreeEtat2 = true; 
-          Serial1.print("[ETAT 2] Aiguillage: ");
+          //[ETAT 2] Aiguillage
           switch (currentDecision) {
             case ItemDecision::ORDER:
-              Serial1.println("ORDER");
+              //[ETAT 2] Aiguillage - ORDER
               servoCommande.write(SERVO_AIGUILLAGE);  
               break;
             case ItemDecision::STOCK:
-              Serial1.println("STOCK");
+              //[ETAT 2] Aiguillage - STOCK
               servoStock.write(SERVO_AIGUILLAGE);     
               break;
             case ItemDecision::PASS:
             default:
-              Serial1.println("PASS");
+              //[ETAT 2] Aiguillage - PASS
               break;
           }
         }
@@ -416,7 +403,7 @@ void loop() {
         break;
       
       case 3: // LIBERATION
-        Serial1.println("[ETAT 3] Liberation");
+        //[ETAT 3] Liberation
         servoScan.write(SERVO_LIBRE);  
         etapeActu = 4; 
         break;
@@ -424,18 +411,18 @@ void loop() {
       case 4: // ATTENTE PROCHAINE BOITE
         if(!previousBoxCleared && !etatsIR[IR_NEXT]) {
           previousBoxCleared = true;  
-          Serial1.println("[ETAT 4] Boite actuelle sortie");
+          //[ETAT 4] Boite actuelle sortie"
         }
         if(previousBoxCleared && etatsIR[IR_NEXT]) {
           servoScan.write(SERVO_BLOQUE);
-          Serial1.println("[ETAT 4] Nouvelle boite - BLOCAGE");
+          //[ETAT 4] Nouvelle boite - BLOCAGE"
           etapeActu = 5; 
         }
         break;
       
       case 5: // CONFIRMATION
         if (millis() - tempsEntreeEtat > TIMEOUT_CONFIRMATION) {
-          Serial1.println("[TIMEOUT] Confirmation");
+          //[TIMEOUT] Confirmation
           servoStock.write(SERVO_NEUTRE);
           servoCommande.write(SERVO_NEUTRE);
           currentDecision = ItemDecision::NO_DECISION;  
