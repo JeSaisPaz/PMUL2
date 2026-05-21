@@ -380,6 +380,7 @@ void loop() {
     switch(etapeActu) {
       
       case 0: // ATTENTE BOITE
+       updateIRStates();
         servoScan.write(SERVO_BLOQUE);
         if(etatsIR[IR_SCAN]) {
           updateIRStates();
