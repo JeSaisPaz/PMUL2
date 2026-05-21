@@ -127,7 +127,7 @@ def decodeFrame(frame_bgr):
         (rx + rw + 15, cy - (patch_size // 2))           # droite
     ]
 
-    hues, sats, vals = [], [] ,[]
+    hues, sats, vals = [], [], []
     for sx, sy in test_points:
         # securite: on reste dans les limites du frame
         if (0 <= sx <= w - patch_size) and (0 <= sy <= h - patch_size):
@@ -146,7 +146,6 @@ def decodeFrame(frame_bgr):
     avgVal = int(np.mean(vals))
 
     return qr_text, avgHue, avgSat, avgVal
-
 
 # handlers des trames Arduino
 
@@ -234,41 +233,6 @@ def handleScanResult(payload):
     except Exception as e:
         print(f"  [!] Backend injoignable: {e}")
 
-def handleSensorStatus(payload):
-    """L'Arduino envoie l'etat des capteurs IR - on POST au backend.
-       payload[0] = bitmask: 0x01=SCAN, 0x02=NEXT, 0x04=STOCK, 0x08=ORDER, 0x10=PASS"""
-    if not payload or len(payload) < 1:
-        return
-
-    mask = payload[0]
-    sensors = [
-        {"name": "SCAN",  "state": 1 if mask & 0x01 else 0},
-        {"name": "NEXT",  "state": 1 if mask & 0x02 else 0},
-        {"name": "STOCK", "state": 1 if mask & 0x04 else 0},
-        {"name": "ORDER", "state": 1 if mask & 0x08 else 0},
-        {"name": "PASS",  "state": 1 if mask & 0x10 else 0},
-    ]
-
-    # log seulement quand les etats changent
-    if not hasattr(handleSensorStatus, "_last"):
-        handleSensorStatus._last = {}
-    current = {s["name"]: s["state"] for s in sensors}
-    if current != handleSensorStatus._last:
-        handleSensorStatus._last = current
-        active = [s["name"] for s in sensors if s["state"]]
-        print(f"[SENSORS] {active if active else 'tous OFF'}")
-
-    try:
-        r = requests.post(f"{BACKEND_URL}/api/stats/sensors", json={"sensors": sensors}, timeout=2)
-        if r.status_code != 204:
-            ct = r.headers.get("content-type", "")
-            if "html" in ct.lower():
-                print(f"  [!] Backend a renvoye du HTML (HTTP {r.status_code}) — endpoint /api/stats/sensors introuvable?")
-            else:
-                print(f"  [!] POST /stats/sensors -> HTTP {r.status_code}")
-    except Exception:
-        pass  # backend down, tant pis
-
 def handleLocalOrder(payload):
     if len(payload) < 2:
         return
@@ -276,13 +240,13 @@ def handleLocalOrder(payload):
     if lineCount == 0 or len(payload) < 1 + lineCount * 2:
         return
 
-    # SOURCE OF TRUTH: English only.
+    # same map as fetchAndSendColors — single source of truth
     name_to_byte = {
-        "blue":    0x01,
-        "yellow":  0x02,
-        "magenta": 0x03,
-        "brown":   0x04,
-        "orange":  0x05
+        "jaune": 0x01, "yellow": 0x01,
+        "bleu":  0x02, "blue":   0x02,
+        "magenta": 0x03, "pink": 0x03,
+        "brun":  0x04, "brown":  0x04,
+        "orange": 0x05
     }
 
     try:
@@ -318,6 +282,22 @@ def handleLocalOrder(payload):
 
     except Exception as e:
         print(f"  [!] Backend injoignable: {e}")
+def handleSensorStatus(payload):
+    """L'Arduino envoie l'etat des capteurs IR - on POST au backend."""
+    if len(payload) < 1:
+        return
+    mask = payload[0]
+    sensors = [
+        {"name": "IR Scan", "state": 1 if mask & 0x01 else 0},
+        {"name": "IR Next", "state": 1 if mask & 0x02 else 0},
+        {"name": "IR Stock", "state": 1 if mask & 0x04 else 0},
+        {"name": "IR Order", "state": 1 if mask & 0x08 else 0},
+        {"name": "IR Pass", "state": 1 if mask & 0x10 else 0},
+    ]
+    try:
+        requests.post(f"{BACKEND_URL}/api/stats/sensors", json={"sensors": sensors}, timeout=2)
+    except Exception:
+        pass  # backend down, tant pis
 
 def handleArduinoFrame():
     """Lit et dispatche une trame entrante de l'Arduino."""
@@ -344,7 +324,7 @@ def handleArduinoFrame():
         handleScanResult(payload)
 
     elif pid == SerialTransfer.PID_SENSOR_STATUS:
-        handleSensorStatus(payload) # Now points to the safe stub created above
+        handleSensorStatus(payload)
 
     elif pid == SerialTransfer.PID_LOCAL_ORDER:
         handleLocalOrder(payload)
@@ -367,16 +347,10 @@ def fetchAndSendColors():
         r = requests.get(f"{BACKEND_URL}/api/colors", timeout=3)
         if r.status_code != 200:
             return
-            
-        # FIXED: English only to match handleLocalOrder exactly.
-        name_to_byte = {
-            "blue":    0x01,
-            "yellow":  0x02,
-            "magenta": 0x03,
-            "brown":   0x04,
-            "orange":  0x05
-        }
-        
+        name_to_byte = {"jaune": 0x01, "yellow": 0x01, "bleu": 0x02, "blue": 0x02,
+                        "magenta": 0x03, "pink": 0x03,
+                        "brun": 0x04, "brown": 0x04,
+                        "orange": 0x05}
         active = []
         for c in r.json():
             # le backend filtre deja status:true, mais on double-check
@@ -384,11 +358,9 @@ def fetchAndSendColors():
                 bid = name_to_byte.get((c.get("name") or "").lower())
                 if bid:
                     active.append(bid)
-                    
         if active:
             st.send(SerialTransfer.PID_COLOR_LIST, bytes([len(active)] + active))
-            # FIXED: Diagnostic names matched exactly to the English list
-            names = {0x01: "Blue", 0x02: "Yellow", 0x03: "Magenta", 0x04: "Brown", 0x05: "Orange"}
+            names = {0x01:"Jaune",0x02:"Bleu",0x03:"Magenta",0x04:"Brun",0x05:"Orange"}
             print(f"[COLORS] {len(active)} actives envoyees: "
                   f"{[names.get(b,'?') for b in active]}")
     except Exception:
