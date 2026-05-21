@@ -110,7 +110,7 @@ uint8_t orderQuantities[6];
 
 // Interruptions
 void basculeSystem(){
-  unsigned long currentTime = millis();https:
+  unsigned long currentTime = millis();
   if(currentTime - btn1UpdateTime < 200) return;
   btn1UpdateTime = currentTime; 
   systemOn = !systemOn;
@@ -118,13 +118,11 @@ void basculeSystem(){
 }
 
 void basculeAffichage(){
- if(!systemOn) {
-  unsigned long currentTime = millis();
-  if(currentTime - btn2UpdateTime < 200) return;
-  btn2UpdateTime = currentTime;
-   modeAffichage = !modeAffichage;
-   modeAffichageChanged = true;
- }
+ unsigned long currentTime = millis();
+ if(currentTime - btn2UpdateTime < 200) return;
+ btn2UpdateTime = currentTime;
+  modeAffichage = !modeAffichage;
+  modeAffichageChanged = true;
 }
 
 String colorDisplayFormatById(uint8_t colorId, bool shortFormat) {
