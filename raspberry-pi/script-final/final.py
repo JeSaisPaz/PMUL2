@@ -186,7 +186,8 @@ def handleScanNeeded():
         decision = data["decision"]
         orderId  = data.get("orderId") or 0
         # le backend renvoie le nom de la couleur en string: "yellow"
-        color_name = data.get("color", "").lower()
+        color_raw = data.get("color")
+        color_name = color_raw.lower() if color_raw else ""
 
         team_raw = data.get("team")
 
