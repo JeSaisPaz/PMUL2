@@ -235,9 +235,44 @@ def handleScanResult(payload):
         print(f"  [!] Backend injoignable: {e}")
 
 def handleSensorStatus(payload):
-    """Stubbed handler to prevent NameError when Arduino sends PID_SENSOR_STATUS"""
-    # Parse the sensor status payload here if needed in the future
-    pass
+    """L'Arduino envoie l'etat des capteurs (1 octet, bitmask) - on forward au backend."""
+    if not payload or len(payload) < 1:
+        return
+
+    # L'Arduino envoie 1 seul octet contenant les 5 capteurs:
+    # ir1=0x01, ir2=0x02, ir3=0x04, ir4=0x08, ir5=0x10
+    mask = payload[0]
+    
+    # On decode le bitmask en booleens (True/False)
+    ir1 = bool(mask & 0x01)
+    ir2 = bool(mask & 0x02)
+    ir3 = bool(mask & 0x04)
+    ir4 = bool(mask & 0x08)
+    ir5 = bool(mask & 0x10)
+
+    # Debug: affichage des etats
+    print(f"[CAPTEURS] IR1:{ir1} IR2:{ir2} IR3:{ir3} IR4:{ir4} IR5:{ir5}")
+
+    # Formatage pour le backend 
+    # (Adaptez les cles du JSON selon ce que votre backend attend)
+    sensor_data = {
+        "sensors": {
+            "ir1": ir1,
+            "ir2": ir2,
+            "ir3": ir3,
+            "ir4": ir4,
+            "ir5": ir5
+        }
+    }
+
+    try:
+        r = requests.post(f"{BACKEND_URL}/api/sensors", json=sensor_data, timeout=5)
+        
+        if r.status_code not in (200, 201, 204):
+            print(f"  [!] POST /api/sensors a repondu HTTP {r.status_code}: {r.text}")
+
+    except Exception as e:
+        print(f"  [!] Backend injoignable (capteurs): {e}")
 
 def handleLocalOrder(payload):
     if len(payload) < 2:
