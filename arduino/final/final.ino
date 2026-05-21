@@ -340,6 +340,7 @@ void loop() {
 
       }
     }
+  }
 
   // 5. RECEPTION COULEURS DU BACKEND
   uint8_t colors[4];
