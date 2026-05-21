@@ -48,7 +48,7 @@ bool previousBoxCleared = false;
 bool entreeEtat2 = false;
 
 // Capteurs IR: pin, role, confirmation associee
-uint8_t pinsIR[] = {8, 7, 6, 5, 4};
+uint8_t pinsIR[] = {A0, 7, 6, A1, 4};
 bool etatsIR[] = {0, 0, 0, 0, 0};
 bool etatsIRPrecedents[] = {0, 0, 0, 0, 0};
 unsigned long dernierEnvoiCapteurs = 0;
