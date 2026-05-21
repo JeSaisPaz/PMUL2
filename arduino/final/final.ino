@@ -359,6 +359,22 @@ void setup() {
 
   etapeActu = 0;
 
+   // 5. RECEPTION COULEURS DU BACKEND
+
+  uint8_t colors[4];
+
+  uint8_t count;
+
+  if (objetPmul.readColorList(colors, count)) {
+
+    activeColorCount = count;
+
+    for (uint8_t i = 0; i < count; i++) {
+
+      activeColors[i] = colors[i];
+
+    }
+
 }
 
 
@@ -680,21 +696,7 @@ void loop() {
 
   }
 
-  // 5. RECEPTION COULEURS DU BACKEND
 
-  uint8_t colors[4];
-
-  uint8_t count;
-
-  if (objetPmul.readColorList(colors, count)) {
-
-    activeColorCount = count;
-
-    for (uint8_t i = 0; i < count; i++) {
-
-      activeColors[i] = colors[i];
-
-    }
 
     modeAffichageChanged = true; // Forcer refresh si changement
 
