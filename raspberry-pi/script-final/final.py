@@ -127,7 +127,7 @@ def decodeFrame(frame_bgr):
         (rx + rw + 15, cy - (patch_size // 2))           # droite
     ]
 
-    hues, sats, vals = [], [], []
+    hues, sats, vals = [], [] ,[]
     for sx, sy in test_points:
         # securite: on reste dans les limites du frame
         if (0 <= sx <= w - patch_size) and (0 <= sy <= h - patch_size):
@@ -146,6 +146,7 @@ def decodeFrame(frame_bgr):
     avgVal = int(np.mean(vals))
 
     return qr_text, avgHue, avgSat, avgVal
+
 
 # handlers des trames Arduino
 
@@ -233,6 +234,11 @@ def handleScanResult(payload):
     except Exception as e:
         print(f"  [!] Backend injoignable: {e}")
 
+def handleSensorStatus(payload):
+    """Stubbed handler to prevent NameError when Arduino sends PID_SENSOR_STATUS"""
+    # Parse the sensor status payload here if needed in the future
+    pass
+
 def handleLocalOrder(payload):
     if len(payload) < 2:
         return
@@ -240,6 +246,7 @@ def handleLocalOrder(payload):
     if lineCount == 0 or len(payload) < 1 + lineCount * 2:
         return
 
+    # SOURCE OF TRUTH: English only.
     name_to_byte = {
         "blue":    0x01,
         "yellow":  0x02,
@@ -307,7 +314,7 @@ def handleArduinoFrame():
         handleScanResult(payload)
 
     elif pid == SerialTransfer.PID_SENSOR_STATUS:
-        handleSensorStatus(payload)
+        handleSensorStatus(payload) # Now points to the safe stub created above
 
     elif pid == SerialTransfer.PID_LOCAL_ORDER:
         handleLocalOrder(payload)
@@ -330,10 +337,16 @@ def fetchAndSendColors():
         r = requests.get(f"{BACKEND_URL}/api/colors", timeout=3)
         if r.status_code != 200:
             return
-        name_to_byte = {"jaune": 0x01, "yellow": 0x01, "bleu": 0x02, "blue": 0x02,
-                        "magenta": 0x03, "pink": 0x03,
-                        "brun": 0x04, "brown": 0x04,
-                        "orange": 0x05}
+            
+        # FIXED: English only to match handleLocalOrder exactly.
+        name_to_byte = {
+            "blue":    0x01,
+            "yellow":  0x02,
+            "magenta": 0x03,
+            "brown":   0x04,
+            "orange":  0x05
+        }
+        
         active = []
         for c in r.json():
             # le backend filtre deja status:true, mais on double-check
@@ -341,9 +354,11 @@ def fetchAndSendColors():
                 bid = name_to_byte.get((c.get("name") or "").lower())
                 if bid:
                     active.append(bid)
+                    
         if active:
             st.send(SerialTransfer.PID_COLOR_LIST, bytes([len(active)] + active))
-            names = {0x01:"Jaune",0x02:"Bleu",0x03:"Magenta",0x04:"Brun",0x05:"Orange"}
+            # FIXED: Diagnostic names matched exactly to the English list
+            names = {0x01: "Blue", 0x02: "Yellow", 0x03: "Magenta", 0x04: "Brown", 0x05: "Orange"}
             print(f"[COLORS] {len(active)} actives envoyees: "
                   f"{[names.get(b,'?') for b in active]}")
     except Exception:
