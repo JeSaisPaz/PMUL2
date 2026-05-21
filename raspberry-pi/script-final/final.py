@@ -221,9 +221,11 @@ def handleScanResult(payload):
     print(f"[ARDUINO] Resultat: Item #{itemId} {decisionStatus}")
 
     try:
-        requests.patch(f"{BACKEND_URL}/api/items/{itemId}/status", json={
+        res = requests.patch(f"{BACKEND_URL}/api/items/{itemId}/status", json={
             "status": {"status": decisionStatus}
         }, timeout=5)
+        data = res.json()
+        st.send(SerialTransfer.PID_COMPLETE_COUNT, payload)
     except Exception as e:
         print(f"  [!] Backend injoignable: {e}")
 
