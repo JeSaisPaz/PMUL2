@@ -322,7 +322,7 @@ void loop() {
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Item: #")
-      lcd.print(itemId)
+      lcd.print(itemId);
       lcd.setCursor(0, 1);
       switch(currentDecision) {
         case ItemDecision::ORDER:
@@ -474,4 +474,4 @@ void loop() {
     servoCommande.write(SERVO_NEUTRE);
     etapeActu = 0;
   }
-}//
+}
