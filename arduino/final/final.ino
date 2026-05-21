@@ -408,16 +408,13 @@ void loop() {
         etapeActu = 4; 
         break;
       
-      case 4: // ATTENTE PROCHAINE BOITE
-        if(!previousBoxCleared && !etatsIR[IR_NEXT]) {
-          previousBoxCleared = true;  
-          //[ETAT 4] Boite actuelle sortie"
+      case 4: 
+        while(!etatsIR[IR_SCAN]) { 
+
         }
-        if(previousBoxCleared && etatsIR[IR_NEXT]) {
-          servoScan.write(SERVO_BLOQUE);
-          //[ETAT 4] Nouvelle boite - BLOCAGE"
-          etapeActu = 5; 
-        }
+        servoScan.write(SERVO_BLOQUE);
+        previousBoxCleared = true;
+        etapeActu = 5; 
         break;
       
       case 5: // CONFIRMATION
@@ -426,21 +423,30 @@ void loop() {
           servoStock.write(SERVO_NEUTRE);
           servoCommande.write(SERVO_NEUTRE);
           currentDecision = ItemDecision::NO_DECISION;  
-          etapeActu = 0;  
+          etapeActu = 0;
+          objetPmul.sendScanResult(currentItemId, ItemStatus::FAILED);
           break;
         }
         
         bool confirmed = false;
         switch(currentDecision) {
           case ItemDecision::ORDER:
-            if(etatsIR[IR_ORDER]) { servoCommande.write(SERVO_NEUTRE); confirmed = true; }
+            if(etatsIR[IR_ORDER] && !(etatsIR[IR_STOCK] || etatsIR[IR_PASS])) {
+              confirmed = true; 
+            }
+            servoCommande.write(SERVO_NEUTRE);
             break;
           case ItemDecision::STOCK:
-            if(etatsIR[IR_STOCK]) { servoStock.write(SERVO_NEUTRE); confirmed = true; }
+            if(etatsIR[IR_STOCK] && !(etatsIR[IR_ORDER] || etatsIR[IR_PASS])) { 
+              confirmed = true; 
+            }
             break;
           case ItemDecision::PASS:
-            if(etatsIR[IR_PASS]) { confirmed = true; }
+            if(etatsIR[IR_PASS] && !(etatsIR[IR_ORDER] || etatsIR[IR_STOCK])) { 
+              confirmed = true; 
+            }
             break;
+            
           default:
             confirmed = true;
             break;
@@ -448,9 +454,12 @@ void loop() {
         
         if(confirmed) {
           totalArticlesTries++;
-          currentDecision = ItemDecision::NO_DECISION;  
-          etapeActu = 0;  
+          objetPmul.sendScanResult(currentItemId, ItemStatus::CONFIRMED);
         }
+
+        currentDecision = ItemDecision::NO_DECISION;  
+        etapeActu = 0;  
+
         break;
     }
   }
