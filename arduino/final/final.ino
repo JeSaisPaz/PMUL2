@@ -118,11 +118,13 @@ void basculeSystem(){
 }
 
 void basculeAffichage(){
+ if(!systemOn) {
   unsigned long currentTime = millis();
   if(currentTime - btn2UpdateTime < 200) return;
-  btn2UpdateTime = currentTime; 
-  modeAffichage = !modeAffichage;
-  modeAffichageChanged = true;
+  btn2UpdateTime = currentTime;
+   modeAffichage = !modeAffichage;
+   modeAffichageChanged = true;
+ }
 }
 
 String colorDisplayFormatById(uint8_t colorId, bool shortFormat) {
