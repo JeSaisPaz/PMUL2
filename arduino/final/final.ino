@@ -81,8 +81,8 @@ char keys[ROWS][COLS] = {
   {'*','0','#','D'}
 };
 
-uint8_t rowPins[ROWS] = {A3, A2, A1, A0}; 
-uint8_t colPins[COLS] = {A7, A6, 13, 12}; 
+uint8_t rowPins[ROWS] = {31, 33, 35, 37}; 
+uint8_t colPins[COLS] = {43, 45, 47, 49}; 
 
 Keypad customKeypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS); 
 
