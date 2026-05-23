@@ -1,0 +1,175 @@
+{% extends "layout.twig" %}
+
+{% block body %}
+<div class="card" x-data="colorsApp()" x-init="init()">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h1>{{title}}</h1>
+        <div>
+            <button class="btn btn-primary" @click="saveAsJson()">Save as JSON</button>
+            <button class="btn btn-primary" @click="initColors()">Load JSON</button>
+        </div>
+    </div>
+    <div class="card-body p-3">
+
+        <!--dernier scan-->
+        <template x-if="lastScan">
+            <div class="alert alert-dark border-0 shadow-sm position-relative mb-3 py-2">
+                <button type="button" class="btn-close btn-close-white position-absolute end-0 top-0 m-2" @click="lastScan = null"></button>
+                <strong>Last scan HSV</strong>
+                <div class="row align-items-center text-center">
+                    <div class="col-md-3 text-start">
+                        <small class="text-primary fw-bold">Scanned at :</small>
+                        <span class="small ms-1" x-text="new Date(lastScan.scannedAt).toLocaleTimeString()"></span>
+                    </div>
+                    <div class="col-md-3">H: <strong class="text-primary" x-text="lastScan.hue"></strong></div>
+                    <div class="col-md-3">S: <strong class="text-info" x-text="lastScan.saturation"></strong></div>
+                    <div class="col-md-3">V: <strong class="text-warning" x-text="lastScan.value"></strong></div>
+                </div>
+            </div>
+        </template>
+
+        <div class="row g-3">
+            <template x-for="color in colors" :key="color.name">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row align-items-center g-3">
+
+                                <div class="col-md-2 d-flex align-items-center gap-2">
+                                    <span class="rounded-circle border flex-shrink-0"
+                                        :style="`background:${color.hex};width:32px;height:32px;display:inline-block`"></span>
+                                    <span class="fw-semibold" x-text="color.name"></span>
+                                </div>
+
+                                <div class="col-md-1">
+                                    <label class="form-label text-muted small mb-1">Hex</label>
+                                    <input type="color" class="form-control form-control-color w-100" style="height:38px" x-model="color.hex">
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label class="form-label text-muted small mb-1">Hue</label>
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" class="form-control" x-model.number="color.hueMin" style="min-width: 60px;">
+                                        <span class="input-group-text">—</span>
+                                        <input type="number" class="form-control" x-model.number="color.hueMax" style="min-width: 60px;">
+                                    </div>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label class="form-label text-muted small mb-1">Saturation</label>
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" class="form-control" x-model.number="color.saturationMin" style="min-width: 60px;">
+                                        <span class="input-group-text">—</span>
+                                        <input type="number" class="form-control" x-model.number="color.saturationMax" style="min-width: 60px;">
+                                    </div>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label class="form-label text-muted small mb-1">Value</label>
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" class="form-control" placeholder="Min" x-model.number="color.valueMin" style="min-width: 60px;">
+                                        <span class="input-group-text">—</span>
+                                        <input type="number" class="form-control" placeholder="Max" x-model.number="color.valueMax" style="min-width: 60px;">
+                                    </div>
+                                </div>
+
+                                <div class="col-md-1 d-flex flex-column align-items-center">
+                                    <label class="form-label text-muted small mb-1">Status</label>
+                                    <input class="form-check-input" type="checkbox" role="switch"
+                                        style="width:2.5em;height:1.3em" x-model="color.status">
+                                </div>
+
+                                <div class="col-md-2 d-flex justify-content-end">
+                                    <button class="btn btn-sm w-100"
+                                            :class="color._state === 'success' ? 'btn-success' : color._state === 'error' ? 'btn-danger' : 'btn-primary'"
+                                            :disabled="color._loading"
+                                            @click="update(color)">
+                                        <span x-show="color._loading" class="spinner-border spinner-border-sm"></span>
+                                        <template x-if="!color._loading">
+                                            <span x-text="color._state === 'success' ? 'Saved' : color._state === 'error' ? 'Error' : 'Save'"></span>
+                                        </template>
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('colorsApp', () => ({
+        colors: [],
+        lastScan: null,
+
+        async init() {
+            await this.load();
+            await this.loadLastScan();
+            
+            // Mise à jour en temps réel via Socket.io
+            socket.on('db_event', () => {
+                this.load();
+                this.loadLastScan();
+            });
+        },
+
+        async load() {
+            const data = await fetch('/api/colors').then(r => r.json());
+            this.colors = data.map(c => ({ ...c, _loading: false, _state: 'idle' }));
+        },
+
+        async loadLastScan() {
+            try {
+                // On récupère le dernier scan via l'API
+                const scans = await fetch('/api/scans').then(r => r.json());
+                if (scans && scans.length > 0) {
+                    this.lastScan = scans[0]; // Le plus récent (trié par scannedAt: 'desc' côté serveur)
+                }
+            } catch (e) {
+                console.error(e.message);
+            }
+        },
+
+        async update(color) {
+            color._loading = true;
+            color._state = 'idle';
+            try {
+                const res = await fetch(`/api/colors/${color.name}/update`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ color })
+                });
+                color._state = res.ok ? 'success' : 'error';
+            } catch (e) {
+                color._state = 'error';
+            } finally {
+                setTimeout(() => color._state = 'idle', 2000);
+                color._loading = false;
+            }
+        },
+        async initColors(){
+            try{
+                const res = await fetch(`/api/colors/init`, { method: 'POST' });
+                if(res.ok) alert('Success.');
+                else alert('Error.');
+            }catch(error){
+                console.log(error.message);
+            }
+        },
+        async saveAsJson(){
+            try{
+                const res = await fetch(`/api/colors/json`, { method: 'POST' });
+                if(res.ok) alert('Success.');
+                else alert('Error.');
+            }catch(error){
+                console.log(error.message);
+            }
+        }
+    }));
+});
+</script>
+{% endblock %}

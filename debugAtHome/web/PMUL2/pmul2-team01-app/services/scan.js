@@ -1,0 +1,99 @@
+const { prisma, ORDER_STATUS, ITEM_STATUS, DECISION} = require("../routes/adapter");
+const { incrementColorStat } = require("../services/stats");
+
+async function getScans() {
+    return prisma.rEAD_CYCLE.findMany({
+        include: { ITEM: { include: { COLOR: true } } },
+        orderBy: { scannedAt: 'desc' }
+    });
+}
+
+async function deleteScan(id) {
+    const scan = await prisma.rEAD_CYCLE.findUnique({ where: { id } });
+    if (!scan) throw { code: 404, message: "Scan not found" };
+    await prisma.rEAD_CYCLE.delete({ where: { id } });
+}
+
+async function createScan(scan) {
+    const readCycle = await prisma.rEAD_CYCLE.create({
+        data: {
+            qrValue: scan.qrValue,
+            hue: scan.hue,
+            saturation: scan.saturation,
+            value: scan.value
+        }
+    });
+
+    const color = await prisma.cOLOR.findFirst({
+        where: {
+            hueMin: { lte: scan.hue }, hueMax: { gte: scan.hue },
+            saturationMin: { lte: scan.saturation }, saturationMax: { gte: scan.saturation },
+            valueMin: { lte: scan.value }, valueMax: { gte: scan.value },
+        }
+    });
+    let validColor = null;
+    if(color){
+        incrementColorStat(color);
+        validColor = (color.status === true) ? color : null;
+    }
+
+    if (scan.qrValue === "TEAM 01") {
+        //on récupère toutes les lignes de commandes contenant la couleur et en incluant les items ordered ou in process
+        let orderLineInNeed = null;
+        if(validColor){
+            const orderLines = await prisma.oRDER_LINE.findMany({
+                where: {
+                    COLOR_id: validColor.id,
+                    ORDER: { status: ORDER_STATUS.PROCESS },
+                    status: ORDER_STATUS.PROCESS,
+                },
+                orderBy: { ORDER: { createdAt: 'asc' } },
+                include: {
+                    ITEM: {
+                        where: { status: { in: [ITEM_STATUS.ORDERED, ITEM_STATUS.PROCESS] } }
+                    }
+                }
+            });
+            orderLineInNeed = orderLines.find(line => line.ITEM.length < line.quantity) ?? null;  
+        }
+        //on prend la commande la plus vielle ('asc') avec de la place 
+        const newItem = await prisma.iTEM.create({
+            data: {
+                team: scan.qrValue,
+                decision: orderLineInNeed ? DECISION.ORDER : DECISION.STOCK,
+                COLOR_id: color ? color.id : null,
+                READ_CYCLE_id: readCycle.id,
+                ORDER_LINE_id: orderLineInNeed ? orderLineInNeed.id : null,
+                SELECTION_HISTORY: { create: {} }
+            }
+        });
+        return{
+            itemId: newItem.id,
+            decision: newItem.decision,
+            orderId: orderLineInNeed ? orderLineInNeed.ORDER_id : null,
+            team: newItem.team,
+            color: color ? color.name : null
+        }
+    } else {
+        const TEAMS = ["TEAM 01", "TEAM 02", "TEAM 03", "TEAM 04", "TEAM 05"];
+        const validTeam = TEAMS.includes(scan.qrValue);
+        const newItem = await prisma.iTEM.create({
+            data: {
+                team: validTeam ? scan.qrValue : null,
+                decision: DECISION.PASS,
+                COLOR_id: color ? color.id : null,
+                READ_CYCLE_id: readCycle.id,
+                SELECTION_HISTORY: { create: {} }
+            }
+        });
+        return {
+            itemId: newItem.id,
+            decision: newItem.decision,
+            orderId: null,
+            team: validTeam ? newItem.team : null,
+            color: color ? color.name : null
+        };
+    }
+}
+
+module.exports = { getScans, deleteScan, createScan };

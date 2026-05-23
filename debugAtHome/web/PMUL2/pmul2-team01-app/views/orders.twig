@@ -1,0 +1,98 @@
+{% extends "layout.twig" %}
+
+{% block body %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h1>{{title}}</h1>
+        <a href="/neworder" class="btn btn-primary">✚ Order</a>
+    </div>
+    <div class="card-body p-3">
+        <table id="ordersTable" class="table table-striped border" width="100%">
+            <thead>
+                <tr>
+                    <th>Created at</th>
+                    <th>ID</th>
+                    <th>Updated at</th>
+                    <th>Completed at</th>
+                    <th>Status</th>
+                    <th data-orderable="false" class="all">Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // On stocke l'instance de la table dans une variable
+    const table = $('#ordersTable').DataTable({
+        ajax: { 
+            url: '/api/orders', 
+            dataSrc: '' 
+        },
+        responsive: true,
+        autoWidth: false,
+        columns: [
+            { 
+                data: 'createdAt', 
+                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>' 
+            },
+            { 
+                data: 'id',
+                render: (id) => `<a href="/orders/${id}" class="fw-bold">#${id}</a>`
+            },
+            { 
+                data: 'updatedAt', 
+                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>' 
+            },
+            { 
+                data: 'completedAt', 
+                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>' 
+            },
+            {
+                data: 'status',
+                render: (status) => {
+                    const classes = {
+                        'COMPLETED':  'bg-success',
+                        'CANCELLED':  'bg-danger',
+                        'PROCESS': 'bg-info'
+                    }
+                    const badge = classes[status] ?? 'bg-secondary'
+                    return `<span class="badge rounded-pill ${badge}">${status}</span>`
+                }
+            },
+            {
+                data: 'id',
+                render: (id) => `<div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-danger" onclick="deleteOrder(${id})">Delete</button>
+                                    <button class="btn btn-sm btn-danger" onclick="cancelOrder(${id})">Cancel</button>
+                                 </div>`
+            }
+        ],
+        order: [[0, 'desc']]
+    });
+
+    // update a chaque event de la db
+    socket.on('db_event', function() {
+        table.ajax.reload(null, false); 
+    });
+});
+
+async function deleteOrder(id) {
+    if (confirm('Delete order #' + id + ' ?')) {
+        await fetch(`/api/orders/${id}/delete`, { method: 'DELETE' });
+        $('#ordersTable').DataTable().ajax.reload(null, false);
+    }
+}
+
+async function cancelOrder(id) {
+    if (confirm('Cancel order #' + id + ' ?')) {
+        await fetch(`/api/orders/${id}/cancel`, { 
+            method: 'PATCH',
+        });
+        $('#ordersTable').DataTable().ajax.reload(null, false);
+    }
+}
+</script>
+{% endblock %}

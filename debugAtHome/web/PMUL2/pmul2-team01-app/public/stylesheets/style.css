@@ -1,0 +1,24 @@
+
+/*Pour que le footer soit en bas de l'écran*/
+body {
+  /*active le flex sur le body*/
+  display: flex;
+  /* empile les enfants verticalement (nav, main, footer) */           
+  flex-direction: column;
+  min-height: 100vh;
+
+  /* pour éviter de sélectionner le texte en double-cliquant */
+  user-select: none;
+}
+main {
+  /* le main prend tout l'espace restant, pousse le footer en bas */
+  flex: 1;
+}
+
+
+/*meilleur scroll bar*/
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(64, 60, 70, 0.35) transparent;
+}

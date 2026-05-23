@@ -1,0 +1,182 @@
+{% extends "layout.twig" %}
+
+{% block body %}
+<div class="card" x-data="dashboard()">
+  <div class="card-header">
+    <h1>{{ title }}</h1>
+  </div>
+  <div class="card-body p-3">
+    <div class="container">
+
+      <div class="row g-3 mb-3">
+
+        <div class="col-md-4">
+          <div class="card p-3 h-100">
+            <h5 class="card-title">Total Orders</h5>
+            <p class="display-6 mb-0 text-primary" x-text="stats.totalOrders ?? '—'"></p>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="card p-3 h-100">
+            <h5 class="card-title">Total Requested</h5>
+            <p class="display-6 mb-0 text-warning" x-text="stats.totalRequested ?? '—'"></p>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="card p-3 h-100">
+            <h5 class="card-title">Total Acquired</h5>
+            <p class="display-6 mb-0 text-success" x-text="stats.totalAcquired ?? '—'"></p>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="row g-3 mb-3">
+
+        <div class="col-md-6">
+          <div class="card p-3 h-100">
+            <button class="btn btn-outline-danger" @click="resetStats()">Reset</button>
+            <div style="position: relative; height: 450px; width: 100%;">
+              <canvas id="chartAllColors"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="card p-3 h-100">
+            <div style="position: relative; height: 450px; width: 100%;">
+              <canvas id="chartRequestedReceived"></canvas>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-12">
+          <div class="card p-3">
+            <h5 class="card-title">Sensors</h5>
+            <div class="row g-3">
+              <template x-for="sensor in stats.sensors ?? []">
+                <div class="col">
+                  <div class="card p-3 text-center h-100" :class="sensor.state ? 'border-success' : 'border-danger'">
+                    <h6 class="card-title" x-text="sensor.name"></h6>
+                    <span class="badge fs-6" :class="sensor.state ? 'bg-success' : 'bg-danger'"
+                          x-text="sensor.state ? '1' : '0'">
+                    </span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="/js/chart.js"></script>
+  <script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('dashboard', () => ({
+      stats: {},
+      chartColor: null,
+      chartQuantity: null,
+
+      async fetchStats() {
+        try {
+          const res = await fetch('/api/stats');
+          if (!res.ok) throw new Error(`Error : ${res.status}`);
+          this.stats = await res.json();
+          // $nextTick garantit que le DOM est à jour avant de dessiner
+          this.$nextTick(() => this.drawChart());
+        } catch (e) {
+          console.error(e);
+        }
+      },
+
+      async resetStats() {
+        await fetch('/api/stats/reset', { method: 'POST' });
+        this.fetchStats();
+      },
+
+      // Récupère le canvas par id (plus fiable que $refs dans ce contexte)
+      getCanvas(id) {
+        const el = document.getElementById(id);
+        if (!el) {
+          console.warn(`Canvas #${id} introuvable`);
+          return null;
+        }
+        return el;
+      },
+
+      drawChart() {
+        if (!this.stats?.colorStats) return;
+
+        const canvasColors   = this.getCanvas('chartAllColors');
+        const canvasQuantity = this.getCanvas('chartRequestedReceived');
+
+        // --- Graphique Pie : répartition par couleur ---
+        if (canvasColors) {
+          if (this.chartColor) {
+            this.chartColor.destroy();
+            this.chartColor = null;
+          }
+          this.chartColor = new Chart(canvasColors, {
+            type: 'pie',
+            data: {
+              labels: this.stats.colorStats.map(item => item.name),
+              datasets: [{
+                data: this.stats.colorStats.map(item => item.count),
+                backgroundColor: this.stats.colorStats.map(item => item.hex),
+                borderColor: '#252525',
+                borderWidth: 2
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: 'right' } }
+            }
+          });
+        }
+
+        // --- Graphique Bar : Requested / Acquired ---
+        if (canvasQuantity) {
+          if (this.chartQuantity) {
+            this.chartQuantity.destroy();
+            this.chartQuantity = null;
+          }
+          this.chartQuantity = new Chart(canvasQuantity, {
+            type: 'bar',
+            data: {
+              labels: ['Total Requested', 'Total Acquired'],
+              datasets: [{
+                label: 'Requested/Acquired',
+                data: [this.stats.totalRequested, this.stats.totalAcquired],
+                backgroundColor: ['#ffc107', '#198754'],
+                borderColor: '#252525',
+                borderWidth: 1
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false
+            }
+          });
+        }
+      },
+
+      async init() {
+        await this.fetchStats();
+        socket.on('db_event', () => this.fetchStats());
+      }
+    }));
+  });
+  </script>
+{% endblock %}

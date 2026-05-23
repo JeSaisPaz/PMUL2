@@ -1,0 +1,106 @@
+{% extends "layout.twig" %}
+
+{% block body %}
+
+<div class="card" x-data="orderCreate()">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h1>{{ title }}</h1>
+        <a href="/orders" class="btn btn-primary">View orders</a>
+    </div>
+
+    <div class="card-body">
+
+        <!-- Loader -->
+        <div x-show="!colors" class="text-center mt-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p>Loading...</p>
+        </div>
+
+        <div x-show="colors" class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mb-4">
+            <template x-for="color in colors" :key="color.id">
+                <div class="col">
+                    <div class="card h-100" :class="quantities[color.id] > 0 ? 'border-warning' : ''">
+                        <div class="card-body d-flex flex-column gap-2">
+                            <div class="rounded w-100" :style="`background-color: ${color.hex}; aspect-ratio: 10/7;`"></div>
+                            <div class="fw-bold" x-text="color.name"></div>
+                            <div class="input-group input-group-sm mt-auto">
+                                <button class="btn btn-outline-secondary" @click="decrement(color.id)" :disabled="quantities[color.id] === 0">−</button>
+                                <input type="number" class="form-control text-center" min="0" max="10"
+                                       :value="quantities[color.id]"
+                                       @input="setQuantity(color.id, $event.target.value)"
+                                       @focus="$event.target.select()">
+                                <button class="btn btn-outline-warning" @click="increment(color.id)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <button class="btn btn-warning fw-bold"
+                @click="submitOrder()"
+                :disabled="selectedCount() === 0">
+            Order
+        </button>
+
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('orderCreate', () => ({
+        colors: null,
+        quantities: {},
+
+        async init() {
+            try {
+                const res = await fetch('/api/colors');
+                if (!res.ok) throw new Error(res.status);
+                const data = await res.json();
+                this.colors = data.filter(c => c.status);
+                this.colors.forEach(c => this.quantities[c.id] = 0);
+            } catch (e) {
+                alert('Loading error.');
+            }
+        },
+
+        getQuantity(colorId) {
+            return this.quantities[colorId] ?? 0;
+        },
+        setQuantity(colorId, value) {
+            this.quantities[colorId] = Math.max(0, Math.min(10, parseInt(value) || 0));
+        },
+        increment(colorId) { this.setQuantity(colorId, this.getQuantity(colorId) + 1); },
+        decrement(colorId) { this.setQuantity(colorId, this.getQuantity(colorId) - 1); },
+
+        selectedCount() {
+            if (!this.colors) return 0;
+            return this.colors.filter(c => this.getQuantity(c.id) > 0).length;
+        },
+
+        async submitOrder() {
+            if (this.selectedCount() === 0) return;
+            try {
+                const lines = this.colors
+                    .filter(c => this.getQuantity(c.id) > 0)
+                    .map(c => ({ id: c.id, quantity: this.getQuantity(c.id) }));
+
+                const res = await fetch('/api/neworder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lines }),
+                });
+                if (res.ok){
+                    const data = await res.json();
+                    window.location.href = `/orders/${data.id}`;
+                }
+                else        alert('Error.');
+            } catch (e) {
+                alert('Server unreachable');
+            }
+        },
+    }));
+});
+</script>
+
+{% endblock %}
