@@ -14,9 +14,11 @@ module.exports = function (io) {
     // handle pour eviter de repeter le try/catch partout
     const handle = (fn) => async (req, res) => {
         try {
+            console.log(" OK ");
             await fn(req, res);
         } catch (error) {
             //const code = error.status || error.code || 500;
+            console.log(" KO ");
             console.error(error);
             //res.status(code).json({ error: error.message }); // ← actually respond
         }
