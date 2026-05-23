@@ -1,7 +1,6 @@
 var express = require('express');
 var router = express.Router();
 
-// Fonction handle adaptée aux routes Web (res.render)
 const handle = (fn) => async (req, res, next) => {
     try {
         await fn(req, res, next);
