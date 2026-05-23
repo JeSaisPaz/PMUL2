@@ -16,7 +16,7 @@ module.exports = function (io) {
         try {
             await fn(req, res);
         } catch (error) {
-            const code = error.status || error.code || 500;
+            //const code = error.status || error.code || 500;
             console.log(error.message);
             //res.status(code).json({ error: error.message }); // ← actually respond
         }
