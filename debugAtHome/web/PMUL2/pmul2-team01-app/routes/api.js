@@ -18,7 +18,7 @@ module.exports = function (io) {
         } catch (error) {
             //const code = error.status || error.code || 500;
 
-            console.error("API error : " + error)
+            console.error("API error : " + error.message)
             res.status(500).json({ error: error.message }); // ← actually respond
         }
     };
