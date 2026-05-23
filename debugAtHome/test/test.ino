@@ -37,7 +37,7 @@ char keys[ROWS][COLS] = {
   {'*','0','#','D'}
 };
 uint8_t rowPins[ROWS] = {31, 33, 35, 37};
-uint8_t colPins[COLS] = {49, 41, 43, 45};
+uint8_t colPins[COLS] = {39, 41, 43, 45};
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
 // ── Communication Pi ────────────────────────────────────────
@@ -54,11 +54,11 @@ uint8_t      lastTeam     = 0;
 
 // ── État du test ────────────────────────────────────────────
 enum TestState {
-  IDLE,          // Écran d'accueil, attente touche
-  WAIT_REPLY,    // sendScanNeeded envoyé, on attend PID_ITEM_INFO
-  GOT_REPLY,     // Réponse reçue, attente confirmation (2 ou 3)
+  TS_IDLE,       // Écran d'accueil, attente touche
+  TS_WAIT_REPLY, // sendScanNeeded envoyé, on attend PID_ITEM_INFO
+  TS_GOT_REPLY,  // Réponse reçue, attente confirmation (2 ou 3)
 };
-TestState testState = IDLE;
+TestState testState = TS_IDLE;
 
 unsigned long scanSentAt       = 0;
 const unsigned long REPLY_TIMEOUT = 7000; // 7s (Pi scan + backend)
@@ -109,12 +109,12 @@ void loop() {
 
       // ── Touche 1 : simuler un bloc détecté ─────────────────
       case '1':
-        if (testState == WAIT_REPLY) {
+        if (testState == TS_WAIT_REPLY) {
           lcdPrint("Deja en attente", "Patiente...");
           break;
         }
         scanCount++;
-        testState  = WAIT_REPLY;
+        testState  = TS_WAIT_REPLY;
         scanSentAt = millis();
         lastItemId = 0;
         lastDecision = ItemDecision::NO_DECISION;
@@ -130,25 +130,25 @@ void loop() {
 
       // ── Touche 2 : confirmer CONFIRMED ─────────────────────
       case '2':
-        if (testState != GOT_REPLY || lastItemId == 0) {
+        if (testState != TS_GOT_REPLY || lastItemId == 0) {
           lcdPrint("Pas d'item actif", "Fais 1 d'abord");
           break;
         }
         com.sendScanResult(lastItemId, ItemStatus::CONFIRMED);
         lcdPrint("CONFIRMED envoye", ("Item #" + String(lastItemId)).c_str());
-        testState  = IDLE;
+        testState  = TS_IDLE;
         lastItemId = 0;
         break;
 
       // ── Touche 3 : confirmer FAILED ────────────────────────
       case '3':
-        if (testState != GOT_REPLY || lastItemId == 0) {
+        if (testState != TS_GOT_REPLY || lastItemId == 0) {
           lcdPrint("Pas d'item actif", "Fais 1 d'abord");
           break;
         }
         com.sendScanResult(lastItemId, ItemStatus::FAILED);
         lcdPrint("FAILED envoye", ("Item #" + String(lastItemId)).c_str());
-        testState  = IDLE;
+        testState  = TS_IDLE;
         lastItemId = 0;
         break;
 
@@ -180,7 +180,7 @@ void loop() {
 
       // ── Touche B : retour accueil ───────────────────────────
       case 'B':
-        testState = IDLE;
+        testState = TS_IDLE;
         lastItemId = 0;
         lcdPrint("TEST COM/SCAN", "1:Scan A:Info");
         break;
@@ -194,7 +194,7 @@ void loop() {
   }
 
   // ── 2. Réception réponse Pi -> Arduino (PID_ITEM_INFO) ────
-  if (testState == WAIT_REPLY) {
+  if (testState == TS_WAIT_REPLY) {
     uint16_t     itemId;
     ItemDecision decision;
     uint8_t      orderId, hue, sat, val, team;
@@ -208,7 +208,7 @@ void loop() {
       lastSat      = sat;
       lastVal      = val;
       lastTeam     = team;
-      testState    = GOT_REPLY;
+      testState    = TS_GOT_REPLY;
 
       // Affichage résultat sur LCD
       lcd.clear();
@@ -224,7 +224,7 @@ void loop() {
 
     // Timeout
     if (millis() - scanSentAt > REPLY_TIMEOUT) {
-      testState = IDLE;
+      testState = TS_IDLE;
       lcdPrint("TIMEOUT!", "Pi pas repondu");
     }
   }
