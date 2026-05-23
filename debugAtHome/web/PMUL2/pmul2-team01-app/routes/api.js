@@ -19,7 +19,7 @@ module.exports = function (io) {
             //const code = error.status || error.code || 500;
 
             console.error("API error : " + error.message)
-            res.status(500).json({ error: error.message }); // ← actually respond
+            res.status(res.code).json({ error: error.message }); // ← actually respond
         }
     };
 
