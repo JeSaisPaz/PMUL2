@@ -6,8 +6,9 @@ const handle = (fn) => async (req, res, next) => {
         await fn(req, res, next);
     } catch (error) {
         console.error("Routing error : " + error.message);
+        const code = error.code || 500;
         // On renvoie une erreur 500 explicite pour voir le problème côté client
-        res.status(error.status).send("Server error : " + error.message);
+        res.status(code).send("Server error : " + error.message);
     }
 };
 

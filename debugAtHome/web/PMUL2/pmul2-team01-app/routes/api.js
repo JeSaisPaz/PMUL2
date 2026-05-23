@@ -16,10 +16,10 @@ module.exports = function (io) {
         try {
             await fn(req, res);
         } catch (error) {
-            //const code = error.status || error.code || 500;
+            const code = error.status || error.code || 500;
 
             console.error("API error : " + error.message)
-            res.status(error.status).json({ error: error.message }); // ← actually respond
+            res.status(code).json({ error: error.message }); // ← actually respond
         }
     };
 
