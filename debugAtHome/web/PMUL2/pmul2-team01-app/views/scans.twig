@@ -42,7 +42,7 @@ $(document).ready(function() {
             { 
                 data: 'qrValue',
                 render: (data) => {
-                    if (!data) return '<span class="text-muted small">---</span>';
+                    if (!data || data == 0) return '<span class="text-muted small">---</span>';
                     const badgeClass = (data === 'TEAM 01') ? 'badge bg-success' : 'badge bg-secondary';
                     if (data.length > 10) return'<span class="badge bg-warning">Too long </span>'
                     return `<span class="${badgeClass}">${data}</span>`
