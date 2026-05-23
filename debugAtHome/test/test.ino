@@ -1,83 +1,206 @@
 /*
- * TEST SCAN + COMMUNICATION
- * ========================
- * Script de test minimal pour valider:
- *   1. La communication SerialTransfer Arduino <-> Pi
- *   2. La simulation d'un scan de bloc
- *   3. La réception de la réponse du backend (via Pi)
+ * TEST COMMUNICATION + SCAN + API
+ * =================================
+ * Utilise exactement le même câblage que final.ino :
+ *   - LCD I2C  : 0x27, 16x2
+ *   - Keypad   : rows=A3,A2,A1,A0 / cols=A7,A6,13,12
+ *   - Serial   : communication avec le Pi (9600 baud)
  *
- * UTILISATION:
- *   - Ouvre le Serial Monitor à 9600 baud
- *   - Appuie sur '1' pour simuler un bloc détecté
- *   - Appuie sur '2' pour simuler un ping
- *   - Appuie sur '3' pour afficher l'état des capteurs
- *   - La réponse du backend s'affiche automatiquement
+ * TOUCHES DU KEYPAD :
+ *   1 → Simuler détection bloc  (sendScanNeeded)
+ *   2 → Confirmer CONFIRMED     (après avoir reçu une réponse)
+ *   3 → Confirmer FAILED        (après avoir reçu une réponse)
+ *   4 → Envoyer état capteurs IR (tous actifs)
+ *   A → Afficher dernier item reçu sur LCD
+ *   B → Réinitialiser / revenir à l'écran d'accueil
+ *   # → Ping
  *
- * CABLAGE:
- *   - Arduino connecté au Pi via USB (Serial)
- *   - Pas besoin de capteurs IR ni servos pour ce test
+ * LCD :
+ *   Ligne 0 : état courant du test
+ *   Ligne 1 : détail (item ID, décision, erreur...)
  */
 
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <Keypad.h>
 #include "pmul2-lib.h"
 
-// --- Lib de com vers le Pi via USB ---
+// ── Périphériques ──────────────────────────────────────────
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+const uint8_t ROWS = 4;
+const uint8_t COLS = 4;
+char keys[ROWS][COLS] = {
+  {'1','2','3','A'},
+  {'4','5','6','B'},
+  {'7','8','9','C'},
+  {'*','0','#','D'}
+};
+uint8_t rowPins[ROWS] = {A3, A2, A1, A0};
+uint8_t colPins[COLS] = {A7, A6, 13, 12};
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+// ── Communication Pi ────────────────────────────────────────
 Pmul2Lib com(Serial);
 
-// --- Variables du dernier item reçu ---
-uint16_t     lastItemId    = 0;
-ItemDecision lastDecision  = ItemDecision::NO_DECISION;
-uint8_t      lastOrderId   = 0;
-uint8_t      lastHue       = 0;
-uint8_t      lastSat       = 0;
-uint8_t      lastVal       = 0;
-uint8_t      lastTeam      = 0;
+// ── Données du dernier item reçu ───────────────────────────
+uint16_t     lastItemId   = 0;
+ItemDecision lastDecision = ItemDecision::NO_DECISION;
+uint8_t      lastOrderId  = 0;
+uint8_t      lastHue      = 0;
+uint8_t      lastSat      = 0;
+uint8_t      lastVal      = 0;
+uint8_t      lastTeam     = 0;
 
-// --- Compteur de blocs simulés ---
-uint16_t scanCount = 0;
+// ── État du test ────────────────────────────────────────────
+enum TestState {
+  IDLE,          // Écran d'accueil, attente touche
+  WAIT_REPLY,    // sendScanNeeded envoyé, on attend PID_ITEM_INFO
+  GOT_REPLY,     // Réponse reçue, attente confirmation (2 ou 3)
+};
+TestState testState = IDLE;
 
-// --- Timer pour la réponse ---
-unsigned long scanSentAt   = 0;
-bool          waitingReply = false;
-const unsigned long REPLY_TIMEOUT = 6000; // 6s pour que le Pi scan + backend réponde
+unsigned long scanSentAt       = 0;
+const unsigned long REPLY_TIMEOUT = 7000; // 7s (Pi scan + backend)
 
-void setup() {
-  Serial.begin(9600);
+uint16_t scanCount = 0; // Compteur de blocs simulés
 
-  // Le Pi attend ce caractère pour savoir que l'Arduino est prêt
-  Serial.write('R');
-
-  // Petit délai pour laisser le Pi démarrer
-  delay(500);
-
-  Serial.println("=== TEST SCAN COMMUNICATION ===");
-  Serial.println("Commandes disponibles dans ce moniteur serie:");
-  Serial.println("  1 -> Simuler detection de bloc (sendScanNeeded)");
-  Serial.println("  2 -> Envoyer un ping");
-  Serial.println("  3 -> Envoyer etat capteurs IR (tous HIGH)");
-  Serial.println("  4 -> Confirmer le dernier item comme CONFIRMED");
-  Serial.println("  5 -> Confirmer le dernier item comme FAILED");
-  Serial.println("================================");
+// ── Helpers LCD ─────────────────────────────────────────────
+void lcdPrint(const char* line0, const char* line1 = "") {
+  lcd.clear();
+  lcd.setCursor(0, 0); lcd.print(line0);
+  lcd.setCursor(0, 1); lcd.print(line1);
 }
 
+void lcdPrint(const char* line0, String line1) {
+  lcd.clear();
+  lcd.setCursor(0, 0); lcd.print(line0);
+  lcd.setCursor(0, 1); lcd.print(line1);
+}
+
+// Traduit ItemDecision en texte court pour le LCD
+const char* decisionLabel(ItemDecision d) {
+  switch(d) {
+    case ItemDecision::ORDER: return "ORDER";
+    case ItemDecision::STOCK: return "STOCK";
+    case ItemDecision::PASS:  return "PASS";
+    default:                  return "???";
+  }
+}
+
+// ── Setup ───────────────────────────────────────────────────
+void setup() {
+  Serial.begin(9600);
+  Serial.write('R'); // Signal "Arduino prêt" pour le Pi
+
+  lcd.init();
+  lcd.backlight();
+  lcdPrint("TEST COM/SCAN", "1:Scan A:Info");
+}
+
+// ── Loop ────────────────────────────────────────────────────
 void loop() {
 
-  // --- Lecture des commandes depuis le Serial Monitor ---
-  // IMPORTANT: on lit avec peek() pour pas interférer avec SerialTransfer
-  // SerialTransfer lit aussi sur Serial, donc on doit être prudent.
-  // Ici on utilise un simple check du buffer côté Arduino monitor.
-  // En vrai projet, utiliser Serial1 ou Serial2 pour le debug.
-  //
-  // Pour ce test: les commandes '1'-'5' sont tapées AVANT que le Pi
-  // commence à écouter (ou via un terminal séparé sur /dev/ttyUSB0).
+  // ── 1. Lecture keypad ─────────────────────────────────────
+  char key = keypad.getKey();
 
-  // --- Réception réponse Pi -> Arduino ---
-  if (waitingReply) {
+  if (key) {
+    switch(key) {
+
+      // ── Touche 1 : simuler un bloc détecté ─────────────────
+      case '1':
+        if (testState == WAIT_REPLY) {
+          lcdPrint("Deja en attente", "Patiente...");
+          break;
+        }
+        scanCount++;
+        testState  = WAIT_REPLY;
+        scanSentAt = millis();
+        lastItemId = 0;
+        lastDecision = ItemDecision::NO_DECISION;
+
+        com.sendScanNeeded();
+
+        lcd.clear();
+        lcd.setCursor(0, 0); lcd.print("Scan #");
+        lcd.print(scanCount);
+        lcd.print(" envoye");
+        lcd.setCursor(0, 1); lcd.print("Attente Pi...");
+        break;
+
+      // ── Touche 2 : confirmer CONFIRMED ─────────────────────
+      case '2':
+        if (testState != GOT_REPLY || lastItemId == 0) {
+          lcdPrint("Pas d'item actif", "Fais 1 d'abord");
+          break;
+        }
+        com.sendScanResult(lastItemId, ItemStatus::CONFIRMED);
+        lcdPrint("CONFIRMED envoye", ("Item #" + String(lastItemId)).c_str());
+        testState  = IDLE;
+        lastItemId = 0;
+        break;
+
+      // ── Touche 3 : confirmer FAILED ────────────────────────
+      case '3':
+        if (testState != GOT_REPLY || lastItemId == 0) {
+          lcdPrint("Pas d'item actif", "Fais 1 d'abord");
+          break;
+        }
+        com.sendScanResult(lastItemId, ItemStatus::FAILED);
+        lcdPrint("FAILED envoye", ("Item #" + String(lastItemId)).c_str());
+        testState  = IDLE;
+        lastItemId = 0;
+        break;
+
+      // ── Touche 4 : envoyer état capteurs IR ────────────────
+      case '4':
+        com.sendSensorStatus(1, 1, 1, 1, 1);
+        lcdPrint("IR envoye", "Tous actifs");
+        delay(800);
+        com.sendSensorStatus(0, 0, 0, 0, 0);
+        lcdPrint("IR envoye", "Tous inactifs");
+        break;
+
+      // ── Touche A : afficher les infos du dernier item ───────
+      case 'A':
+        if (lastItemId == 0) {
+          lcdPrint("Aucun item recu", "Lance un scan");
+        } else {
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("#"); lcd.print(lastItemId);
+          lcd.print(" "); lcd.print(decisionLabel(lastDecision));
+          lcd.print(" O:"); lcd.print(lastOrderId);
+          lcd.setCursor(0, 1);
+          lcd.print("H:"); lcd.print(lastHue);
+          lcd.print(" S:"); lcd.print(lastSat);
+          lcd.print(" V:"); lcd.print(lastVal);
+        }
+        break;
+
+      // ── Touche B : retour accueil ───────────────────────────
+      case 'B':
+        testState = IDLE;
+        lastItemId = 0;
+        lcdPrint("TEST COM/SCAN", "1:Scan A:Info");
+        break;
+
+      // ── Touche # : ping ─────────────────────────────────────
+      case '#':
+        com.sendPong();
+        lcdPrint("Ping envoye", "Attente pong...");
+        break;
+    }
+  }
+
+  // ── 2. Réception réponse Pi -> Arduino (PID_ITEM_INFO) ────
+  if (testState == WAIT_REPLY) {
     uint16_t     itemId;
     ItemDecision decision;
     uint8_t      orderId, hue, sat, val, team;
 
     if (com.readItemInfo(itemId, decision, orderId, hue, sat, val, team)) {
-      waitingReply = false;
+      // Réponse reçue !
       lastItemId   = itemId;
       lastDecision = decision;
       lastOrderId  = orderId;
@@ -85,101 +208,31 @@ void loop() {
       lastSat      = sat;
       lastVal      = val;
       lastTeam     = team;
+      testState    = GOT_REPLY;
 
-      Serial.println("\n>>> REPONSE RECUE DU BACKEND <<<");
-      Serial.print("  Item ID  : #"); Serial.println(itemId);
-      Serial.print("  Decision : ");
-      switch(decision) {
-        case ItemDecision::ORDER: Serial.println("ORDER"); break;
-        case ItemDecision::STOCK: Serial.println("STOCK"); break;
-        case ItemDecision::PASS:  Serial.println("PASS");  break;
-        default:                  Serial.println("???");   break;
+      // Affichage résultat sur LCD
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("#"); lcd.print(itemId);
+      lcd.print(" "); lcd.print(decisionLabel(decision));
+      if (decision == ItemDecision::ORDER) {
+        lcd.print(" Ord:"); lcd.print(orderId);
       }
-      Serial.print("  Order ID : "); Serial.println(orderId);
-      Serial.print("  HSV      : H="); Serial.print(hue);
-      Serial.print(" S="); Serial.print(sat);
-      Serial.print(" V="); Serial.println(val);
-      Serial.print("  Team ID  : "); Serial.println(team);
-      Serial.println(">>> FIN REPONSE <<<\n");
+      lcd.setCursor(0, 1);
+      lcd.print("2:OK 3:FAIL");
     }
 
-    // Timeout si pas de réponse
+    // Timeout
     if (millis() - scanSentAt > REPLY_TIMEOUT) {
-      waitingReply = false;
-      Serial.println("[TIMEOUT] Pas de reponse du backend apres 6s");
-      Serial.println("  -> Verifier que le Pi tourne et que le backend repond");
+      testState = IDLE;
+      lcdPrint("TIMEOUT!", "Pi pas repondu");
     }
   }
 
-  // --- Ping automatique ---
+  // ── 3. Ping auto (répond si le Pi envoie un ping) ────────
   if (com.handlePing()) {
-    Serial.println("[PING] Pong envoye au Pi");
+    // Pas d'affichage pour ne pas perturber l'écran en cours
   }
 
-  // --- Lecture commandes clavier via Serial Monitor ---
-  // NOTE: ceci ne fonctionne que si le Pi n'est pas connecté au même port.
-  // En test réel, commenter ce bloc et utiliser uniquement les envois automatiques.
-  if (Serial.available()) {
-    char cmd = Serial.read();
-
-    switch(cmd) {
-      case '1': {
-        scanCount++;
-        Serial.print("\n[TEST] Simulation detection bloc #");
-        Serial.println(scanCount);
-        Serial.println("  -> Envoi sendScanNeeded() au Pi...");
-        com.sendScanNeeded();
-        scanSentAt   = millis();
-        waitingReply = true;
-        break;
-      }
-
-      case '2': {
-        Serial.println("\n[TEST] Envoi Ping au Pi...");
-        com.sendPong(); // On envoie un pong spontané pour tester la trame
-        Serial.println("  -> Pong envoye (trame PID_PING)");
-        break;
-      }
-
-      case '3': {
-        Serial.println("\n[TEST] Envoi etat capteurs IR (tous actifs)...");
-        // Simule 5 capteurs tous déclenchés
-        com.sendSensorStatus(1, 1, 1, 1, 1);
-        Serial.println("  -> SensorStatus envoye (mask=0x1F)");
-        delay(500);
-        // Puis tous éteints
-        com.sendSensorStatus(0, 0, 0, 0, 0);
-        Serial.println("  -> SensorStatus envoye (mask=0x00)");
-        break;
-      }
-
-      case '4': {
-        if (lastItemId == 0) {
-          Serial.println("[ERREUR] Pas d'item en cours (fais d'abord '1')");
-        } else {
-          Serial.print("\n[TEST] Confirmation CONFIRMED pour item #");
-          Serial.println(lastItemId);
-          com.sendScanResult(lastItemId, ItemStatus::CONFIRMED);
-          Serial.println("  -> ScanResult CONFIRMED envoye");
-          lastItemId = 0; // reset
-        }
-        break;
-      }
-
-      case '5': {
-        if (lastItemId == 0) {
-          Serial.println("[ERREUR] Pas d'item en cours (fais d'abord '1')");
-        } else {
-          Serial.print("\n[TEST] Confirmation FAILED pour item #");
-          Serial.println(lastItemId);
-          com.sendScanResult(lastItemId, ItemStatus::FAILED);
-          Serial.println("  -> ScanResult FAILED envoye");
-          lastItemId = 0;
-        }
-        break;
-      }
-    }
-  }
-
-  delay(10); // Laisser respirer le loop
+  delay(10);
 }
