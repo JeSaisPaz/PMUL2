@@ -32,11 +32,10 @@ def capture_loop():
     )
     cam.configure(cfg)
     cam.set_controls({
-        "AwbEnable":    False,
-        "ExposureTime": 9000,
-        "AnalogueGain": 1.0,
-        "ColourGains":  (1.3, 1.7),
-        "Saturation":   0.9
+        "AwbEnable":  True,   # AWB auto, bien plus fiable pour Pi Camera V2
+        "AwbMode":    1,      # 1 = Indoor (lumiere artificielle)
+        "Saturation": 1.2,    # leger boost couleur
+        "Sharpness":  1.5,
     })
     cam.start()
     time.sleep(1.0)  # laisser l'AE se stabiliser
@@ -45,7 +44,7 @@ def capture_loop():
     interval = 1.0 / FRAMERATE
     while True:
         buf = io.BytesIO()
-        cam.capture_file(buf, format="jpeg")
+        cam.capture_file(buf, format="jpeg")  # picamera2 encode directement en JPEG correct
         with frame_lock:
             latest_frame = buf.getvalue()
         time.sleep(interval)
