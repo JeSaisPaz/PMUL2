@@ -22,19 +22,42 @@ import socketio
 BAUD        = 9600
 BACKEND_URL = "http://localhost:3000"
 
-# init serie (auto-detect)
-PORT_CANDIDATES = ["/dev/ttyACM0", "/dev/ttyACM1","/dev/ttyUSB0", "/dev/ttyUSB1"]
-port = None
-for c in PORT_CANDIDATES:
-    if os.path.exists(c):
-        port = c
-        break
+# init serie - detection par VID/PID USB (Arduino Mega 2560)
+ARDUINO_VID = "2341"  # Arduino SA
+ARDUINO_PID = "0042"  # Mega 2560
+
+def find_arduino_port():
+    """
+    Cherche le port serie de l'Arduino Mega via son VID/PID USB.
+    Plus fiable que chercher /dev/ttyACM0 a l'aveugle.
+    """
+    try:
+        import serial.tools.list_ports
+        for p in serial.tools.list_ports.comports():
+            if p.vid is not None and p.pid is not None:
+                vid = format(p.vid, "04x")
+                pid = format(p.pid, "04x")
+                if vid == ARDUINO_VID and pid == ARDUINO_PID:
+                    print(f"[SERIAL] Arduino Mega detecte sur {p.device} "
+                          f"(VID={vid} PID={pid} SN={p.serial_number})")
+                    return p.device
+        # Fallback: cherche ttyACM/ttyUSB si pyserial pas assez recent
+        fallback = ["/dev/ttyACM0", "/dev/ttyACM1", "/dev/ttyUSB0", "/dev/ttyUSB1"]
+        for c in fallback:
+            if os.path.exists(c):
+                print(f"[SERIAL] Fallback: {c} (VID/PID non verifiable)")
+                return c
+    except Exception as e:
+        print(f"[SERIAL] Erreur detection: {e}")
+    return None
+
+port = find_arduino_port()
 
 if port is None:
-    print("[!] Aucun port serie trouve")
+    print("[!] Arduino Mega introuvable (VID=2341 PID=0042)")
+    print("    Verifie le cable USB et que le sketch est flash")
     sys.exit(1)
 
-print(f"[SERIAL] {port}")
 s = serial.Serial(port, BAUD, timeout=0.5)
 
 # attend le 'R' de l'Arduino (evite de parler au bootloader)
@@ -248,12 +271,22 @@ def handleScanResult(payload):
         r = requests.patch(f"{BACKEND_URL}/api/items/{itemId}/status", json={
             "status": {"status": decisionStatus}
         }, timeout=5)
+
+        if r.status_code not in (200, 201, 204):
+            print(f"  [!] PATCH /items/{itemId}/status -> HTTP {r.status_code}")
+            return
+
+        # Le backend peut repondre 204 sans body ou 200 avec JSON
+        if r.status_code == 204 or not r.content:
+            print(f"  [OK] Status mis a jour (pas de completedCount dans la reponse)")
+            return
+
         data = r.json()
         if "completedOrdersCount" in data:
             count = data["completedOrdersCount"]
             payload = bytes([(count >> 8) & 0xFF, count & 0xFF])
             st.send(SerialTransfer.PID_COMPLETED_COUNT, payload)
-            print(f"  [COMPLETED] {count} orders completed")
+            print(f"  [COMPLETED] {count} commandes completes")
     except Exception as e:
         print(f"  [!] Backend injoignable: {e}")
 
