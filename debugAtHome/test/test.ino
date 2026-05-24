@@ -40,6 +40,32 @@ uint8_t rowPins[ROWS] = {31, 33, 35, 37};
 uint8_t colPins[COLS] = {39, 41, 43, 45};
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
+// ── Capteurs IR ─────────────────────────────────────────────
+#define IR_SCAN    0  // pin 8 — bloc en position de scan
+#define IR_NEXT    1  // pin 7 — bloc passé au suivant
+#define IR_STOCK   2  // pin 6 — bloc en zone stock
+#define IR_ORDER   3  // pin 5 — bloc en zone commande
+#define IR_PASS    4  // pin 4 — bloc en zone pass
+
+const uint8_t pinsIR[] = {8, 7, 6, 5, 4};
+bool etatsIR[]          = {0, 0, 0, 0, 0};
+bool etatsIRPrev[]      = {0, 0, 0, 0, 0};
+
+unsigned long dernierEnvoiIR      = 0;
+const unsigned long INTERVALLE_IR = 1000; // envoi forcé toutes les 1s même sans changement
+bool irChanged                    = false;
+
+void updateIR() {
+  irChanged = false;
+  for (uint8_t i = 0; i < 5; i++) {
+    bool etat = digitalRead(pinsIR[i]) == LOW; // LOW = objet detecte (capteur NPN)
+    if (etat != etatsIRPrev[i]) {
+      etatsIR[i] = etat;
+      irChanged  = true;
+    }
+  }
+}
+
 // ── Communication Pi ────────────────────────────────────────
 Pmul2Lib com(Serial);
 
@@ -92,6 +118,10 @@ const char* decisionLabel(ItemDecision d) {
 void setup() {
   Serial.begin(9600);
   Serial.write('R'); // Signal "Arduino prêt" pour le Pi
+
+  for (uint8_t i = 0; i < 5; i++) {
+    pinMode(pinsIR[i], INPUT_PULLUP);
+  }
 
   lcd.init();
   lcd.backlight();
@@ -152,14 +182,21 @@ void loop() {
         lastItemId = 0;
         break;
 
-      // ── Touche 4 : envoyer état capteurs IR ────────────────
-      case '4':
-        com.sendSensorStatus(1, 1, 1, 1, 1);
-        lcdPrint("IR envoye", "Tous actifs");
-        delay(800);
-        com.sendSensorStatus(0, 0, 0, 0, 0);
-        lcdPrint("IR envoye", "Tous inactifs");
+      // ── Touche 4 : lire et afficher l'état réel des capteurs IR ──
+      case '4': {
+        updateIR();
+        // Affiche l'état sur le LCD : 1=actif 0=inactif, ordre: SCAN NEXT STOCK ORDER PASS
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("SC NX ST OR PA");
+        lcd.setCursor(0, 1);
+        for (uint8_t i = 0; i < 5; i++) {
+          lcd.print(etatsIR[i] ? "1 " : "0 ");
+        }
+        // Envoie aussi au Pi
+        com.sendSensorStatus(etatsIR[0], etatsIR[1], etatsIR[2], etatsIR[3], etatsIR[4]);
         break;
+      }
 
       // ── Touche A : afficher les infos du dernier item ───────
       case 'A':
@@ -232,6 +269,32 @@ void loop() {
   // ── 3. Ping auto (répond si le Pi envoie un ping) ────────
   if (com.handlePing()) {
     // Pas d'affichage pour ne pas perturber l'écran en cours
+  }
+
+  // ── 4. Lecture et envoi capteurs IR ───────────────────────
+  updateIR();
+  unsigned long now = millis();
+  if (irChanged || (now - dernierEnvoiIR > INTERVALLE_IR)) {
+    com.sendSensorStatus(etatsIR[0], etatsIR[1], etatsIR[2], etatsIR[3], etatsIR[4]);
+    for (uint8_t i = 0; i < 5; i++) etatsIRPrev[i] = etatsIR[i];
+    dernierEnvoiIR = now;
+    irChanged      = false;
+  }
+
+  // ── 5. Détection automatique bloc sur IR_SCAN ─────────────
+  // Appuie sur '1' OU le capteur IR_SCAN détecte un bloc
+  if (etatsIR[IR_SCAN] && testState == TS_IDLE) {
+    scanCount++;
+    testState  = TS_WAIT_REPLY;
+    scanSentAt = millis();
+    lastItemId = 0;
+    lastDecision = ItemDecision::NO_DECISION;
+    com.sendScanNeeded();
+
+    lcd.clear();
+    lcd.setCursor(0, 0); lcd.print("Bloc detecte #");
+    lcd.print(scanCount);
+    lcd.setCursor(0, 1); lcd.print("Attente Pi...");
   }
 
   delay(10);
