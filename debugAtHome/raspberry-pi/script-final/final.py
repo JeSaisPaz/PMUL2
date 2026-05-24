@@ -167,15 +167,11 @@ def decodeFrame(cam):
     rh  = int(pts[:, 1].max()) - ry
     cy, ps = ry + rh//2, 16
 
-    # zones d'echantillonnage a gauche et a droite du QR
-    # 15 pixels de marge pour rester dans le bloc colore
     sample_pts = [(rx-15-ps, cy-ps//2), (rx+rw+15, cy-ps//2)]
     hues, sats, vals = [], [], []
     for sx, sy in sample_pts:
-        # securite: on reste dans les limites du frame
         if 0 <= sx <= w-ps and 0 <= sy <= h-ps:
             patch = hsv[sy:sy+ps, sx:sx+ps]
-            # mediane plutot que moyenne pour ignorer les speckles
             hues.append(int(np.median(patch[:, :, 0])))
             sats.append(int(np.median(patch[:, :, 1])))
             vals.append(int(np.median(patch[:, :, 2])))
@@ -226,15 +222,12 @@ def handleScanNeeded():
 
         # envoie l'info a l'Arduino pour l'aiguillage + affichage HSV/team
         decisionByte = {"ORDER": 0x01, "STOCK": 0x02}.get(decision, 0x00)
+        # payload: itemId (2B) + decision (1B) + orderId (1B) = 4 bytes
         payload = bytes([
             (itemId >> 8) & 0xFF,
             itemId & 0xFF,
             decisionByte,
             orderId & 0xFF,
-            hue,
-            sat,
-            val,
-            team_raw.get("id", 0) if isinstance(team_raw, dict) else 0
         ])
         st.send(SerialTransfer.PID_ITEM_INFO, payload)
 

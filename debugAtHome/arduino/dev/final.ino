@@ -1,21 +1,12 @@
  /*
-
  * PMUL2 - Systeme de Tri Automatise
-
  * 
-
  * NOUVEAU PROCESSUS DE BLOCAGE/DEBLOCAGE & MENU ASYNCHRONE
-
  * =========================================
-
  * - Menu de commande locale non-bloquant (utilisation d'une machine à états)
-
  * - Plus aucun 'while' pour le clavier -> le ping et les capteurs restent réactifs
-
  * - Remplacement de la touche '=' (inexistante) par '#' pour valider la quantité
-
  */
-
 
  //IMPORTANT AFFICHER LE VRAI NOMBRE DE COMMANDE COMPLETE AVEC LA REPONSE DE L'API
 
@@ -23,603 +14,318 @@
 
 
 #include <Servo.h>
-
 #include <Wire.h>
-
 #include <LiquidCrystal_I2C.h>
-
 #include <Keypad.h>
-
 #include "pmul2-lib.h"
-
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-
 uint8_t btn1 = 2;
-
 uint8_t btn2 = 3;
 
-
 volatile unsigned long btn1UpdateTime = 0;
-
 volatile unsigned long btn2UpdateTime = 0;
 
-
 volatile bool systemOn = true;
-
 volatile bool modeAffichage = false;
-
 volatile bool modeAffichageChanged = true; // Forcer l'affichage initial
 
-
 uint16_t completedOrdersCount = 0; 
-
 uint16_t newCount = 0;
 
-
 // Com Raspberry Pi via USB
-
 Pmul2Lib objetPmul(Serial);
 
-
 // Machine a etats pour le processus de tri
-
 uint8_t etapeActu = 0;
-
 uint8_t etapePrecedente = 255; 
 
-
 // Gestion des timeouts
-
 unsigned long tempsEntreeEtat = 0;  
-
 const unsigned long TIMEOUT_SCAN = 5000;          
-
 const unsigned long TIMEOUT_CONFIRMATION = 10000; 
 
-
 bool previousBoxCleared = false;
-
 bool entreeEtat2 = false;
 
-
 // Capteurs IR: pin, role, confirmation associee
-
 uint8_t pinsIR[] = {8, 7, 6, 5, 4};
-
 bool etatsIR[] = {0, 0, 0, 0, 0};
-
 bool etatsIRPrecedents[] = {0, 0, 0, 0, 0};
 
 unsigned long dernierEnvoiCapteurs = 0;
-
 const unsigned long INTERVALLE_ENVOI_CAPTEURS = 1000; 
-
 bool capteursOntChange = false;
 
 
 #define IR_NEXT    1  // pin 7 
-
 #define IR_STOCK   2  // pin 6 
-
 #define IR_ORDER   3  // pin 5 
-
 #define IR_PASS    4  // pin 4 
-
 #define IR_SCAN    0  // pin 8
 
-
 // Servo Moteurs
-
 Servo servoScan;      // pin 11
-
 Servo servoStock;     // pin 10
-
 Servo servoCommande;  // pin 9
 
-
 #define SERVO_BLOQUE    0 
-
 #define SERVO_LIBRE     20
-
 #define SERVO_AIGUILLAGE  0   
-
 #define SERVO_NEUTRE    50
 
-
 // --- KEYPAD ---
-
 const uint8_t ROWS = 4; 
-
 const uint8_t COLS = 4; 
 
-
 char keys[ROWS][COLS] = {
-
   {'1','2','3','A'},
-
   {'4','5','6','B'},
-
   {'7','8','9','C'},
-
   {'*','0','#','D'}
-
 };
 
-
 uint8_t rowPins[ROWS] = {31, 33, 35, 37}; 
-
 uint8_t colPins[COLS] = {43, 45, 47, 49}; 
-
 
 Keypad customKeypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS); 
 
-
 // Infos du bloc en cours de scan
-
 uint16_t    currentItemId = 0;
-
 ItemDecision currentDecision = ItemDecision::NO_DECISION;
-
 uint8_t     currentOrderId  = 0;
-
 uint8_t     currentHue = 0, currentSaturation = 0, currentValue = 0, currentTeam = 0;
 
-
 // Variables pour le Menu Local Non-Bloquant
-
 bool modeOrder = false;
-
 uint8_t orderPage = 0; // 0=Choix Couleur, 1=Confirmation, 2=Saisie Qte
-
 bool menuNeedsUpdate = true; // Pour ne rafraichir le LCD que quand necessaire
-
 uint8_t tempQty = 0;
-
 uint8_t selectedColorForQty = 0;
 
-
 uint8_t activeColors[4] = {COLOR_BLUE, COLOR_YELLOW, COLOR_MAGENTA};
-
 uint8_t activeColorCount = 3;
 
-
 uint8_t orderLine[6][2];
-
 uint8_t orderLineCount = 0;
-
 uint8_t orderColors[6];
-
 uint8_t orderQuantities[6];
 
-
 // Interruptions
-
 void basculeSystem(){
-
   unsigned long currentTime = millis();https:
-
   if(currentTime - btn1UpdateTime < 200) return;
-
   btn1UpdateTime = currentTime; 
-
   systemOn = !systemOn;
-
   modeAffichageChanged = true;
-
 }
-
 
 void basculeAffichage(){
-
  if(!systemOn) {
-
   unsigned long currentTime = millis();
-
   if(currentTime - btn2UpdateTime < 200) return;
-
   btn2UpdateTime = currentTime;
-
-   modeAffichage = !modeAffichage;
-
-   modeAffichageChanged = true;
-
+  modeAffichage = !modeAffichage;
+  modeAffichageChanged = true;
  }
-
 }
-
 
 String colorDisplayFormatById(uint8_t colorId, bool shortFormat) {
-
   switch(colorId) {
-
     case COLOR_BLUE: return shortFormat ? "BL" : "BL:1";    
-
     case COLOR_YELLOW: return shortFormat ? "YL" : "YL:2";  
-
     case COLOR_MAGENTA: return shortFormat ? "MG" : "MG:3"; 
-
     case COLOR_BROWN: return shortFormat ? "BR" : "BR:4";   
-
     case COLOR_ORANGE: return shortFormat ? "OR" : "OR:5";  
-
     default: return "?";            
-
   }
-
 }
-
 
 uint8_t colorIndexCharToId(char c) {
-
   switch(c) {
-
     case '1': return activeColors[0];
-
     case '2': return activeColors[1];
-
     case '3': return activeColors[2];
-
     case '4': return activeColors[3];
-
     default: return 0xFF; 
-
   }
-
 }
-
 
 bool isColorInOrder(uint8_t colorId) {
-
   for (uint8_t i = 0; i < orderLineCount; i++) {
-
     if (orderLine[i][0] == colorId) return true;
-
   }
-
   return false;
-
 }
 
-
 void updateIRStates() {
-
   capteursOntChange = false;
 
-  
-
   for (uint8_t i = 0; i < 5; i++) {
-
     // Read everything as digital
-
     bool etat = (digitalRead(pinsIR[i]) == LOW);
 
-    
-
     if (etat != etatsIRPrecedents[i]) {
-
       etatsIR[i] = etat;
-
       capteursOntChange = true;
-
     }
-
   }
-
 }
 
 
 
 void setup() {
-
   Serial.begin(9600);
-
-
   Serial.write('R');
-
-
   lcd.init();
-
   lcd.backlight();
-
   lcd.print("System ready");
-
-
   pinMode(btn1, INPUT_PULLUP);
-
   pinMode(btn2, INPUT_PULLUP);
-
-
   attachInterrupt(digitalPinToInterrupt(btn1), basculeSystem, RISING);
-
   attachInterrupt(digitalPinToInterrupt(btn2), basculeAffichage, RISING);
-
-
-  for (uint8_t i = 0; i < 5; i++) {
-
-     pinMode(pinsIR[i], INPUT_PULLUP);
-
-  }
-
-
+  for (uint8_t i = 0; i < 5; i++) pinMode(pinsIR[i], INPUT_PULLUP);
   servoScan.attach(11);
-
   servoStock.attach(10);
-
   servoCommande.attach(9);
-
-
   servoScan.write(SERVO_BLOQUE);      
-
   servoStock.write(SERVO_NEUTRE);     
-
   servoCommande.write(SERVO_NEUTRE);  
-
-
   etapeActu = 0;
-
+  
    // 5. RECEPTION COULEURS DU BACKEND
-
   uint8_t colors[4];
-
   uint8_t count;
-
   if (objetPmul.readColorList(colors, count)) {
-
     activeColorCount = count;
-
-    for (uint8_t i = 0; i < count; i++) {
-
-      activeColors[i] = colors[i];
-
-    }
-
+    for (uint8_t i = 0; i < count; i++) activeColors[i] = colors[i];
 }
 
 
 void loop() {
-
   // 1. GESTION DES CAPTEURS 
-
  updateIRStates(); 
-
  unsigned long maintenant = millis();
-
+ 
   if (capteursOntChange || (maintenant - dernierEnvoiCapteurs > INTERVALLE_ENVOI_CAPTEURS)) {
-
     objetPmul.sendSensorStatus(etatsIR[0], etatsIR[1], etatsIR[2], etatsIR[3], etatsIR[4]);
-
     dernierEnvoiCapteurs = maintenant;
-
     for (uint8_t i = 0; i < 5; i++) etatsIRPrecedents[i] = etatsIR[i];
-
   }
-
 
   // 2. LECTURE CLAVIER
-
   char key = customKeypad.getKey();
 
-
   // Activer modeOrder si * pressee et tri pas en cours
-
   if(key == '*' && !modeOrder && (etapeActu == 0 || etapeActu == 1)) {
-
     modeOrder = true;
-
     orderPage = 0;
-
     orderLineCount = 0; 
-
     menuNeedsUpdate = true;
-
     //[ORDER] Mode saisie active"
-
     key = 0; // On consomme la touche pour ne pas l'utiliser dans le menu
-
   }
-
 
   // 3. GESTION DU MENU DE COMMANDE LOCALE (MACHINE A ETATS NON BLOQUANTE)
-
   if(modeOrder) {
-
-    
-
     // --- Page 0 : Choix de la couleur ---
-
     if(orderPage == 0) {
-
       if(menuNeedsUpdate) {
-
         lcd.clear();
-
         lcd.setCursor(0,0);
-
         for (uint8_t i = 0; i < activeColorCount && i < 3; i++) {
-
           lcd.print(colorDisplayFormatById(activeColors[i], false));
-
         }
-
         lcd.setCursor(0,1);
-
         if(activeColorCount >= 4) lcd.print(colorDisplayFormatById(activeColors[3], false));
-
         lcd.print(" #:Suite");
-
         menuNeedsUpdate = false;
-
       }
-
 
       if(key >= '1' && key <= '4') {
-
         uint8_t colorId = colorIndexCharToId(key);
-
         if(colorId != 0xFF && !isColorInOrder(colorId) && orderLineCount < 6) {
-
           selectedColorForQty = colorId;
-
           tempQty = 0;
-
           orderPage = 2; // On passe a la page de saisie de quantite
-
           menuNeedsUpdate = true;
-
         }
-
       } 
-
       else if(key == '#') {
-
         if(orderLineCount > 0) {
-
           orderPage = 1; // On passe a la page confirmation
-
           menuNeedsUpdate = true;
-
         }
-
       }
-
     }
-
-    
-
+	
     // --- Page 2 : Saisie de la Quantité ---
-
     else if(orderPage == 2) {
-
       if(menuNeedsUpdate) {
-
         lcd.clear();
-
         lcd.setCursor(0, 0);
-
         lcd.print("Qty: ");
-
         lcd.print(colorDisplayFormatById(selectedColorForQty, true));
-
         lcd.print(" 1+ 2- #OK");
-
         lcd.setCursor(0, 1);
-
         lcd.print(tempQty);
-
         menuNeedsUpdate = false;
-
       }
-
 
       if(key == '1') {
-
         if(tempQty < 10) tempQty++;
-
         menuNeedsUpdate = true;
-
       } 
-
       else if(key == '2') {
-
         if(tempQty > 0) tempQty--;
-
         menuNeedsUpdate = true;
-
       } 
-
       else if(key == '#') { // Valider la quantite
-
         orderLine[orderLineCount][0] = selectedColorForQty;
-
         orderLine[orderLineCount][1] = tempQty;
-
         orderLineCount++;
-
         orderPage = 0; // Retour choix couleurs
-
         menuNeedsUpdate = true;
-
       }
-
     }
-
-    
-
+	
     // --- Page 1 : Confirmation ---
-
     else if(orderPage == 1) {
-
       if(menuNeedsUpdate) {
-
         lcd.clear();
-
         lcd.setCursor(0, 0);
-
         for(uint8_t i = 0; i < orderLineCount && i < 3; i++) {
-
           lcd.print(colorDisplayFormatById(orderLine[i][0], true));
-
           lcd.print(":"); lcd.print(orderLine[i][1]); lcd.print(" ");
-
         }
-
         lcd.setCursor(0, 1);
-
         lcd.print("C:Annul  D:Conf.");
-
         menuNeedsUpdate = false;
-
       }
-
 
       if(key == 'C') { // Annuler
-
         modeOrder = false;
-
         orderLineCount = 0;
-
         //[ORDER] Annulee"
-
         modeAffichageChanged = true;
-
       } 
-
       else if(key == 'D') { // Confirmer
-
         for(uint8_t i = 0; i < orderLineCount; i++) {
-
           orderColors[i] = orderLine[i][0];
-
           orderQuantities[i] = orderLine[i][1];
-
         }
-
         objetPmul.sendLocalOrder(orderLineCount, orderColors, orderQuantities);
-
         //[ORDER] Envoyee"
-
         modeOrder = false;
-
         orderLineCount = 0;
-
-        
-
         lcd.clear();
-
         lcd.setCursor(0,0);
-
         lcd.print("Cmd Envoyee!");
-
         modeAffichageChanged = true;
-
       }
-
     }
-
   }
-
 
   // 4. AFFICHAGE STANDARD (Si pas dans le menu de commande)
 
