@@ -14,10 +14,8 @@ import os
 import requests
 import cv2
 import numpy as np
-from pyzbar.pyzbar import decode
-from picamera2 import Picamera2, Preview
+from picamera2 import Picamera2
 from serial_transfer import SerialTransfer
-import re
 import socketio
 
 # config
@@ -53,32 +51,31 @@ else:
 
 st = SerialTransfer(s)
 
-# init camera (RGB888 = BGR en sortie, on corrige dans decodeFrame)
-print("[CAM] Initialising Sensor...")
+# init camera
+print("[CAM] Initialisation...")
 cam = Picamera2()
 
 config = cam.create_preview_configuration()
-config["main"]["size"] = (640, 480)
+config["main"]["size"]   = (640, 480)
 config["main"]["format"] = "RGB888"
 
 cam.configure(config)
 cam.start()
-
-# delay pour que le capteur demarre
 time.sleep(0.5)
 
-# desactive l'auto white balance pour eviter que le canal bleu soit
-# detruit par la camera. On lock les gains rouge/bleu manuellement
 cam.set_controls({
-    "AwbEnable": False,
-    "ExposureTime": 9000,
-    "AnalogueGain": 1.0,
-    "ColourGains": (1.3, 1.7),
-    "Saturation": 0.9
+    "AwbEnable":  True,   # AWB auto, fiable pour Pi Camera V2
+    "AwbMode":    1,      # 1 = Indoor (lumiere artificielle)
+    "Saturation": 1.0,    # Neutre - ajuste entre 0.8 et 1.4
+    "Sharpness":  1.5,
 })
 
-# laisse l'auto-exposure se stabiliser avec nos parametres
+# laisse l'AWB se stabiliser
 time.sleep(1.0)
+print("[CAM] Prete")
+
+# Nombre de captures max si le QR rate
+MAX_SCAN_RETRIES = 4
 
 # etat minimal
 running = True
@@ -96,56 +93,97 @@ def cleanup(signum=None, frame=None):
 signal.signal(signal.SIGINT, cleanup)
 signal.signal(signal.SIGTERM, cleanup)
 
-# detection QR + echantillonnage couleur avec mediane (ignore le bruit)
+# detection QR + echantillonnage couleur
 
-def decodeFrame(frame_bgr):
-    # picamera2 sort du BGR, on corrige en RGB pour pyzbar et HSV
-    bgr = np.ascontiguousarray(frame_bgr[:, :, :3])
-    frame = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-    h, w = frame.shape[:2]
+def _decode_qr(frame, w, h):
+    """
+    Decode un QR code depuis un frame BGR via OpenCV.
+    Essaie 4 preprocessings differents pour maximiser le taux de detection.
+    Retourne (qr_str, points) ou (None, None).
+    """
+    gray     = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    clahe    = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    detector = cv2.QRCodeDetector()
 
-    hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+    def _try(img, scale=1.0):
+        data, pts, _ = detector.detectAndDecode(img)
+        if data and pts is not None:
+            return data, pts if scale == 1.0 else pts / scale
+        return None, None
 
-    qr_results = decode(frame)
-    if not qr_results:
-        return None, None, None, None
+    # 1. Gris direct
+    qr, pts = _try(gray)
+    if qr: return qr, pts
 
-    obj = qr_results[0]
-    try:
-        qr_text = obj.data.decode("utf-8")
-    except Exception:
-        return None, None, None, None
+    # 2. CLAHE (contraste adaptatif)
+    qr, pts = _try(clahe.apply(gray))
+    if qr: return qr, pts
 
-    rx, ry, rw, rh = obj.rect.left, obj.rect.top, obj.rect.width, obj.rect.height
-    cy = ry + (rh // 2)
-    patch_size = 16
+    # 3. Zoom x2 + CLAHE
+    zoomed = cv2.resize(gray, (w*2, h*2), interpolation=cv2.INTER_CUBIC)
+    qr, pts = _try(clahe.apply(zoomed), scale=2.0)
+    if qr: return qr, pts
+
+    # 4. Seuillage adaptatif (dernier recours)
+    binary = cv2.adaptiveThreshold(
+        clahe.apply(gray), 255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+    qr, pts = _try(binary)
+    return qr, pts
+
+
+def decodeFrame(cam):
+    """
+    Capture jusqu'a MAX_SCAN_RETRIES frames et tente de decoder le QR.
+    Retourne (qr_text, hue, sat, val).
+    Si le QR est introuvable, retourne ("", 0, 0, 0) pour que le backend
+    puisse quand meme traiter l'item (decision manuelle possible).
+    """
+    qr, points, frame = None, None, None
+
+    for attempt in range(1, MAX_SCAN_RETRIES + 1):
+        frame = cam.capture_array()
+        h, w  = frame.shape[:2]
+        qr, points = _decode_qr(frame, w, h)
+
+        if qr:
+            print(f"  [QR] Decode en {attempt} tentative(s)")
+            break
+
+        print(f"  [QR] Tentative {attempt}/{MAX_SCAN_RETRIES} ratee")
+        if attempt < MAX_SCAN_RETRIES:
+            time.sleep(0.15)
+
+    if not qr or points is None:
+        print("  [QR] Echec total - envoi scan vide au backend")
+        return "", 0, 0, 0
+
+    # Calcul HSV sur les zones colorees a gauche et droite du QR
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    pts = points[0].astype(int)
+    rx  = int(pts[:, 0].min())
+    ry  = int(pts[:, 1].min())
+    rw  = int(pts[:, 0].max()) - rx
+    rh  = int(pts[:, 1].max()) - ry
+    cy, ps = ry + rh//2, 16
 
     # zones d'echantillonnage a gauche et a droite du QR
     # 15 pixels de marge pour rester dans le bloc colore
-    test_points = [
-        (rx - 15 - patch_size, cy - (patch_size // 2)),  # gauche
-        (rx + rw + 15, cy - (patch_size // 2))           # droite
-    ]
-
+    sample_pts = [(rx-15-ps, cy-ps//2), (rx+rw+15, cy-ps//2)]
     hues, sats, vals = [], [], []
-    for sx, sy in test_points:
+    for sx, sy in sample_pts:
         # securite: on reste dans les limites du frame
-        if (0 <= sx <= w - patch_size) and (0 <= sy <= h - patch_size):
-            patch = hsv[sy:sy + patch_size, sx:sx + patch_size]
+        if 0 <= sx <= w-ps and 0 <= sy <= h-ps:
+            patch = hsv[sy:sy+ps, sx:sx+ps]
             # mediane plutot que moyenne pour ignorer les speckles
             hues.append(int(np.median(patch[:, :, 0])))
             sats.append(int(np.median(patch[:, :, 1])))
             vals.append(int(np.median(patch[:, :, 2])))
 
     if not hues:
-        return qr_text, 0, 0, 0
+        return qr, 0, 0, 0
 
-    # moyenne des medianes de gauche et droite
-    avgHue = int(np.mean(hues))
-    avgSat = int(np.mean(sats))
-    avgVal = int(np.mean(vals))
-
-    return qr_text, avgHue, avgSat, avgVal
+    return qr, int(np.mean(hues)), int(np.mean(sats)), int(np.mean(vals))
 
 # handlers des trames Arduino
 
@@ -153,15 +191,7 @@ def handleScanNeeded():
     """Un bloc est bloque par l'Arduino - on scanne et on demande l'info au backend."""
     print("[ARDUINO] Bloc en position - scan...")
 
-    frame = cam.capture_array()
-    if frame is None:
-        print("  [!] Camera: pas de frame")
-        return
-
-    qr_text, hue, sat, val = decodeFrame(frame)
-    if qr_text is None:
-        print("  [!] Scan: QR pas detecte")
-        return
+    qr_text, hue, sat, val = decodeFrame(cam)
 
     print(f"  [SCAN] QR={qr_text} H={hue} S={sat} V={val}")
 
