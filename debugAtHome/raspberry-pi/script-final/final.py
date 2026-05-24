@@ -442,7 +442,12 @@ def main():
     sio.connect(BACKEND_URL)
 
     while running:
-        handleArduinoFrame()
+        try:
+            handleArduinoFrame()
+        except OSError as e:
+            print(f"\n[!] Arduino debranche ou port perdu: {e}")
+            print("[!] Reconnecte l'Arduino et relance le script")
+            cleanup()
         time.sleep(0.05)
 
 
