@@ -22,6 +22,16 @@ import socketio
 BAUD        = 9600
 BACKEND_URL = "http://localhost:3000"
 
+def log(msg):
+    """Print + envoi au backend via API REST pour affichage web."""
+    print(msg)
+    try:
+        requests.post(f"{BACKEND_URL}/api/python/logs",
+                      json={"msg": msg, "time": time.strftime("%H:%M:%S")},
+                      timeout=1)
+    except Exception:
+        pass
+
 # init serie - detection par VID/PID USB (Arduino Mega 2560)
 ARDUINO_VID = "2341"  # Arduino SA
 ARDUINO_PID = "0042"  # Mega 2560
@@ -391,16 +401,6 @@ def handleArduinoFrame():
 # couleurs actives via Socket.IO (le backend previent quand ca change)
 
 sio = socketio.Client()
-
-def log(msg):
-    """Print + envoi au backend via API REST pour affichage web."""
-    print(msg)
-    try:
-        requests.post(f"{BACKEND_URL}/api/python/logs",
-                      json={"msg": msg, "time": time.strftime("%H:%M:%S")},
-                      timeout=1)
-    except Exception:
-        pass
 
 @sio.on('color_update')
 def on_color_update():
