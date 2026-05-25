@@ -80,20 +80,15 @@ void Pmul2Com::sendLocalOrder(uint8_t lineCount, const uint8_t* colors, const ui
 
 // lecture Pi vers Arduino
 
-bool Pmul2Com::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId,
-                            uint8_t& hue, uint8_t& saturation, uint8_t& value, uint8_t& team) {
+bool Pmul2Com::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId) {
     if (!_checkPacket(PID_ITEM_INFO)) return false;
 
-    // payload: itemId (2B) + decision (1B) + orderId (1B) + hue (1B) + sat (1B) + val (1B) + team (1B) = 8 bytes
+    // payload: itemId (2B) + decision (1B) + orderId (1B) = 4 bytes
     uint8_t high, low, rawDecision;
     _transfer.packet.rxObj(high, 0);
     _transfer.packet.rxObj(low, 1);
     _transfer.packet.rxObj(rawDecision, 2);
     _transfer.packet.rxObj(orderId, 3);
-    _transfer.packet.rxObj(hue, 4);
-    _transfer.packet.rxObj(saturation, 5);
-    _transfer.packet.rxObj(value, 6);
-    _transfer.packet.rxObj(team, 7);
 
     _consumePacket();
 
@@ -102,8 +97,8 @@ bool Pmul2Com::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& o
     switch (rawDecision) {
         case static_cast<uint8_t>(ItemDecision::ORDER): decision = ItemDecision::ORDER; break;
         case static_cast<uint8_t>(ItemDecision::STOCK): decision = ItemDecision::STOCK; break;
-        case static_cast<uint8_t>(ItemDecision::PASS) : decision = ItemDecision:: PASS; break;
-        default:                                        decision = ItemDecision::NO_DECISION;  break;
+        case static_cast<uint8_t>(ItemDecision::PASS) : decision = ItemDecision::PASS;  break;
+        default:                                        decision = ItemDecision::NO_DECISION; break;
     }
 
     return true;

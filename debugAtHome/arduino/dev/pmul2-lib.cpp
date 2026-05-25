@@ -18,7 +18,7 @@ Pmul2Lib::Pmul2Lib(Stream &serialPort) : _com(serialPort) {
 }
 
 void Pmul2Lib::version() {
-    _serial->println("Pmul2Lib version: beta-v0.0.1");
+    _serial->println("Pmul2Lib version: beta-v0.0.2");
 }
 
 void Pmul2Lib::sendOrderDone() {
@@ -53,9 +53,8 @@ void Pmul2Lib::sendLocalOrder(uint8_t lineCount, const uint8_t* colors, const ui
     _com.sendLocalOrder(lineCount, colors, qtys);
 }
 
-bool Pmul2Lib::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId,
-                            uint8_t& hue, uint8_t& saturation, uint8_t& value, uint8_t& team) {
-    return _com.readItemInfo(itemId, decision, orderId, hue, saturation, value, team);
+bool Pmul2Lib::readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId) {
+    return _com.readItemInfo(itemId, decision, orderId);
 }
 
 bool Pmul2Lib::readColorList(uint8_t* colors, uint8_t& count) {

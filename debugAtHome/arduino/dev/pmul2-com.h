@@ -45,8 +45,7 @@ class Pmul2Com {
         void sendLocalOrder(uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys);
 
         // lecture (Pi vers Arduino)
-        bool readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId,
-                          uint8_t& hue, uint8_t& saturation, uint8_t& value, uint8_t& team);
+        bool readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId);
         // recoit la liste des couleurs actives (max 4)
         bool readColorList(uint8_t* colors, uint8_t& count);
         // recoit le nombre de commandes completes du backend
