@@ -13,18 +13,6 @@
   },
   {
     "id": 2,
-    "name": "Orange",
-    "hueMin": 5,
-    "hueMax": 17,
-    "saturationMin": 120,
-    "saturationMax": 255,
-    "valueMin": 110,
-    "valueMax": 255,
-    "hex": "#FF8000",
-    "status": false
-  },
-  {
-    "id": 3,
     "name": "Brown",
     "hueMin": 5,
     "hueMax": 17,
@@ -36,7 +24,7 @@
     "status": false
   },
   {
-    "id": 4,
+    "id": 3,
     "name": "Blue",
     "hueMin": 85,
     "hueMax": 134,
@@ -48,7 +36,7 @@
     "status": true
   },
   {
-    "id": 5,
+    "id": 4,
     "name": "Magenta",
     "hueMin": 135,
     "hueMax": 179,
