@@ -159,7 +159,7 @@
       async init() {
         await this.fetchStats();
         socket.on('db_event', () => this.fetchStats());
-
+        await this.fetchSensors();
         socket.on('sensor_event', () => this.fetchSensors());
       }
     }));
