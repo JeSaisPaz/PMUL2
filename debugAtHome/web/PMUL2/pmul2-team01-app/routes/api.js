@@ -8,7 +8,7 @@ const { getColors, updateColors, initColors, saveAsJson } = require("../services
 const { getStats, resetColorStats, incrementColorStat, setSensors } = require("../services/stats");
 
 module.exports = function (io) {
-
+    const pyLogs = [];
     const notifyClients = () => io.emit('db_event');
 
     // handle pour eviter de repeter le try/catch partout
@@ -141,11 +141,17 @@ module.exports = function (io) {
     }));
 
     //Python Logs
-    router.post('/python/logs', handle ((req, res) => {
+    router.post('/python/logs', (req, res) => {
         const { msg, time } = req.body;
+        pyLogs.unshift({ msg, time }); // plus récent en premier
+        if (pyLogs.length > 200) pyLogs.pop(); // limite
         io.emit('py_log', { msg, time });
         res.sendStatus(204);
-    }));
+    });
 
+
+    router.get('/python/logs', (req, res) => {
+        res.json(pyLogs);
+    });
     return router;
 };
