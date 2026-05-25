@@ -140,5 +140,12 @@ module.exports = function (io) {
         res.sendStatus(204);
     }));
 
+    //Python Logs
+    router.post('/python/logs', handle ((req, res) => {
+        const { msg, time } = req.body;
+        io.emit('py_log', { msg, time });
+        res.sendStatus(204);
+    }));
+
     return router;
 };

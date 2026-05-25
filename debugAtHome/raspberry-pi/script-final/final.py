@@ -396,7 +396,7 @@ def log(msg):
     """Print + envoi au backend via API REST pour affichage web."""
     print(msg)
     try:
-        requests.post(f"{BACKEND_URL}/api/logs",
+        requests.post(f"{BACKEND_URL}/api/python/logs",
                       json={"msg": msg, "time": time.strftime("%H:%M:%S")},
                       timeout=1)
     except Exception:

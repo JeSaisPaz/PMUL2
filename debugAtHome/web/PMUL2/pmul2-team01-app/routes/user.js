@@ -54,4 +54,8 @@ router.get('/logs', handle(async (req, res) => {
     res.render('logs', { title: 'Logs' });
 }));
 
+router.get('/python/logs', handle(async (req, res) => {
+    res.render('pyLogs', { title: 'Python logs' });
+}));
+
 module.exports = router;

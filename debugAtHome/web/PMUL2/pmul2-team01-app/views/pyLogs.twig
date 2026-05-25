@@ -1,0 +1,50 @@
+{% extends "layout.twig" %}
+
+{% block body %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h1>{{ title }}</h1>
+        <button class="btn btn-sm btn-outline-secondary" onclick="clearLogs()">Clear</button>
+    </div>
+    <div class="card-body p-3">
+        <div id="logsBox"
+             style="font-family: monospace; font-size: 0.85em; height: 500px;
+                    overflow-y: auto; background: #1e1e1e; color: #d4d4d4;
+                    border-radius: 6px; padding: 12px;">
+            <span class="text-muted">Waiting for logs...</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const box = document.getElementById('logsBox');
+
+    function addLog(time, msg) {
+        // Couleur selon le contenu du message
+        let color = '#d4d4d4';
+        if (msg.includes('[!]'))         color = '#f48771'; // rouge
+        else if (msg.includes('CONFIRMED')) color = '#89d185'; // vert
+        else if (msg.includes('FAILED'))    color = '#f48771'; // rouge
+        else if (msg.includes('[SCAN]'))    color = '#dcdcaa'; // jaune
+        else if (msg.includes('[BACKEND]')) color = '#9cdcfe'; // bleu clair
+        else if (msg.includes('[BOOT]') || msg.includes('[SIO]')) color = '#c586c0'; // violet
+
+        const line = document.createElement('div');
+        line.innerHTML = `<span style="color:#6a9955">${time}</span>  <span style="color:${color}">${msg}</span>`;
+        box.prepend(line);
+
+        // Garde max 200 lignes
+        while (box.children.length > 200) {
+            box.removeChild(box.lastChild);
+        }
+    }
+
+    function clearLogs() {
+        box.innerHTML = '<span class="text-muted">Empty logs.</span>';
+    }
+
+    socket.on('py_log', (data) => {
+        addLog(data.time, data.msg);
+    });
+</script>
+{% endblock %}
