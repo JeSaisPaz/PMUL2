@@ -2,7 +2,7 @@ var express = require('express');
 var router = express.Router();
 
 const { getScans, createScan, deleteScan } = require("../services/scan");
-const { getOrders, getOrderDetails, createOrder, deleteOrder, cancelOrder } = require("../services/order");
+const { getOrders, getOrderDetails, createOrder, deleteOrder, cancelOrder, getCurrentOrder } = require("../services/order");
 const { getItems, deleteItem, updateItemStatus, getLogs, getItemDetails } = require("../services/item");
 const { getColors, updateColors, initColors, saveAsJson } = require("../services/color");
 const { getStats, resetColorStats, incrementColorStat } = require("../services/stats");
@@ -44,13 +44,19 @@ module.exports = function (io) {
         res.json(await getOrderDetails(parseInt(req.params.id)));
     }));
 
+    router.get('/orders/current', handle(async (req, res) => {
+        res.json(await getCurrentOrder());
+    }));
+
     router.post('/neworder', handle(async (req, res) => {
         res.json(await createOrder(req.body.lines));
+        io.emit('order_event');
         notifyClients();
     }));
 
     router.patch('/orders/:id/cancel', handle(async (req, res) => {
         await cancelOrder(parseInt(req.params.id));
+        io.emit('order_event');
         notifyClients();
         res.sendStatus(204);
     }));
@@ -58,6 +64,7 @@ module.exports = function (io) {
     router.delete('/orders/:id/delete', handle(async (req, res) => {
         await deleteOrder(parseInt(req.params.id));
         notifyClients();
+        io.emit('order_event');
         res.sendStatus(204);
     }));
 
