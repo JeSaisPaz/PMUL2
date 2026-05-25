@@ -393,11 +393,12 @@ def handleArduinoFrame():
 sio = socketio.Client()
 
 def log(msg):
-    """Print + envoi au backend via Socket.IO pour affichage web."""
+    """Print + envoi au backend via API REST pour affichage web."""
     print(msg)
     try:
-        if sio.connected:
-            sio.emit('pi_log', {"msg": msg, "time": time.strftime("%H:%M:%S")})
+        requests.post(f"{BACKEND_URL}/api/logs",
+                      json={"msg": msg, "time": time.strftime("%H:%M:%S")},
+                      timeout=1)
     except Exception:
         pass
 
