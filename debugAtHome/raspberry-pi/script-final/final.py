@@ -65,7 +65,7 @@ print("[BOOT] Attente de l'Arduino...")
 t0 = time.time()
 while time.time() - t0 < 15:
     if s.in_waiting and s.read(1) == b'R':
-        print("[BOOT] Arduino pret !")
+        log("[BOOT] Arduino pret !")
         break
     time.sleep(0.1)
 else:
@@ -95,7 +95,7 @@ cam.set_controls({
 
 # laisse l'AWB se stabiliser
 time.sleep(1.0)
-print("[CAM] Prete")
+log("[CAM] Prete")
 
 # Nombre de captures max si le QR rate
 MAX_SCAN_RETRIES = 4
@@ -170,15 +170,15 @@ def decodeFrame(cam):
         qr, points = _decode_qr(frame, w, h)
 
         if qr:
-            print(f"  [QR] Decode en {attempt} tentative(s)")
+            log(f"  [QR] Decode en {attempt} tentative(s)")
             break
 
-        print(f"  [QR] Tentative {attempt}/{MAX_SCAN_RETRIES} ratee")
+        log(f"  [QR] Tentative {attempt}/{MAX_SCAN_RETRIES} ratee")
         if attempt < MAX_SCAN_RETRIES:
             time.sleep(0.15)
 
     if not qr or points is None:
-        print("  [QR] Echec total - envoi scan vide au backend")
+        log("  [QR] Echec total - envoi scan vide au backend")
         return "", 0, 0, 0
 
     # Calcul HSV sur les zones colorees a gauche et droite du QR
@@ -208,11 +208,11 @@ def decodeFrame(cam):
 
 def handleScanNeeded():
     """Un bloc est bloque par l'Arduino - on scanne et on demande l'info au backend."""
-    print("[ARDUINO] Bloc en position - scan...")
+    log("[ARDUINO] Bloc en position - scan...")
 
     qr_text, hue, sat, val = decodeFrame(cam)
 
-    print(f"  [SCAN] QR={qr_text} H={hue} S={sat} V={val}")
+    log(f"  [SCAN] QR={qr_text} H={hue} S={sat} V={val}")
 
     # POST /api/scans - le backend cree l'item et renvoie tout direct
     try:
@@ -227,7 +227,7 @@ def handleScanNeeded():
 
         # le backend renvoie 201 avec {itemId, decision, orderId}
         if r.status_code != 201:
-            print(f"  [!] POST /scans a repondu HTTP {r.status_code}: {r.text}")
+            log(f"  [!] POST /scans -> HTTP {r.status_code}: {r.text}")
             return
 
         data = r.json()
@@ -240,8 +240,7 @@ def handleScanNeeded():
 
         team_raw = data.get("team")
 
-        print(f"  [BACKEND] Item #{itemId} decision={decision} orderId={orderId}"
-              f" team={team_raw} color={color_name}")
+        log(f"  [BACKEND] Item #{itemId} decision={decision} orderId={orderId} team={team_raw} color={color_name}")
 
         # envoie l'info a l'Arduino pour l'aiguillage + affichage HSV/team
         decisionByte = {"ORDER": 0x01, "STOCK": 0x02}.get(decision, 0x00)
@@ -255,7 +254,7 @@ def handleScanNeeded():
         st.send(SerialTransfer.PID_ITEM_INFO, payload)
 
     except Exception as e:
-        print(f"  [!] Backend injoignable: {e}")
+        log(f"  [!] Backend injoignable: {e}")
 
 def handleScanResult(payload):
     """L'Arduino a confirme le tri du bloc - on forward au backend."""
@@ -265,7 +264,7 @@ def handleScanResult(payload):
     itemId = (payload[0] << 8) | payload[1]
     decisionStatus = "CONFIRMED" if payload[2] == 0x00 else "FAILED"
 
-    print(f"[ARDUINO] Resultat: Item #{itemId} {decisionStatus}")
+    log(f"[ARDUINO] Resultat: Item #{itemId} {decisionStatus}")
 
     try:
         r = requests.patch(f"{BACKEND_URL}/api/items/{itemId}/status", json={
@@ -273,12 +272,12 @@ def handleScanResult(payload):
         }, timeout=5)
 
         if r.status_code not in (200, 201, 204):
-            print(f"  [!] PATCH /items/{itemId}/status -> HTTP {r.status_code}")
+            log(f"  [!] PATCH /items/{itemId}/status -> HTTP {r.status_code}")
             return
 
         # Le backend peut repondre 204 sans body ou 200 avec JSON
         if r.status_code == 204 or not r.content:
-            print(f"  [OK] Status mis a jour (pas de completedCount dans la reponse)")
+            log(f"  [OK] Status mis a jour")
             return
 
         data = r.json()
@@ -286,9 +285,9 @@ def handleScanResult(payload):
             count = data["completedOrdersCount"]
             payload = bytes([(count >> 8) & 0xFF, count & 0xFF])
             st.send(SerialTransfer.PID_COMPLETED_COUNT, payload)
-            print(f"  [COMPLETED] {count} commandes completes")
+            log(f"  [COMPLETED] {count} commandes completes")
     except Exception as e:
-        print(f"  [!] Backend injoignable: {e}")
+        log(f"  [!] Backend injoignable: {e}")
 
 def handleLocalOrder(payload):
     if len(payload) < 2:
@@ -328,17 +327,17 @@ def handleLocalOrder(payload):
                 order_lines.append({"quantity": qty, "id": color["id"]})
 
         if not order_lines:
-            print("  [!] Aucune ligne valide dans la commande keypad")
+            log("  [!] Aucune ligne valide dans la commande keypad")
             return
 
         r = requests.post(f"{BACKEND_URL}/api/neworder", json={"lines": order_lines}, timeout=5)
         if r.status_code == 204:
-            print(f"  [BACKEND] Commande creee ({len(order_lines)} lignes)")
+            log(f"  [BACKEND] Commande creee ({len(order_lines)} lignes)")
         else:
-            print(f"  [!] POST /neworder {r.status_code}: {r.text}")
+            log(f"  [!] POST /neworder {r.status_code}: {r.text}")
 
     except Exception as e:
-        print(f"  [!] Backend injoignable: {e}")
+        log(f"  [!] Backend injoignable: {e}")
 def handleSensorStatus(payload):
     """L'Arduino envoie l'etat des capteurs IR - on POST au backend."""
     if len(payload) < 1:
@@ -371,11 +370,11 @@ def handleArduinoFrame():
         if code == SerialTransfer.STATUS_SCAN_NEEDED:
             handleScanNeeded()
         elif code == SerialTransfer.STATUS_DONE:
-            print("[ARDUINO] Commande terminee")
+            log("[ARDUINO] Commande terminee")
         elif code == SerialTransfer.STATUS_BUSY:
-            print("[ARDUINO] Occupe")
+            log("[ARDUINO] Occupe")
         elif code == SerialTransfer.STATUS_READY:
-            print("[ARDUINO] Dispo")
+            log("[ARDUINO] Dispo")
 
     elif pid == SerialTransfer.PID_SCAN_RESULT:
         handleScanResult(payload)
@@ -387,11 +386,20 @@ def handleArduinoFrame():
         handleLocalOrder(payload)
 
     elif pid == SerialTransfer.PID_PING:
-        print("[ARDUINO] Ping recu (diag)")
+        log("[ARDUINO] Ping recu (diag)")
 
 # couleurs actives via Socket.IO (le backend previent quand ca change)
 
 sio = socketio.Client()
+
+def log(msg):
+    """Print + envoi au backend via Socket.IO pour affichage web."""
+    print(msg)
+    try:
+        if sio.connected:
+            sio.emit('pi_log', {"msg": msg, "time": time.strftime("%H:%M:%S")})
+    except Exception:
+        pass
 
 @sio.on('color_update')
 def on_color_update():
@@ -418,25 +426,24 @@ def fetchAndSendColors():
         if active:
             st.send(SerialTransfer.PID_COLOR_LIST, bytes([len(active)] + active))
             names = {0x01:"Jaune",0x02:"Bleu",0x03:"Magenta",0x04:"Brun",0x05:"Orange"}
-            print(f"[COLORS] {len(active)} actives envoyees: "
-                  f"{[names.get(b,'?') for b in active]}")
+            log(f"[COLORS] {len(active)} actives envoyees: {[names.get(b, '?') for b in active]}")
     except Exception:
         pass  # backend down, on retentera au prochain event
 
 @sio.on('connect')
 def on_connect():
-    print("[SIO] Connecte au backend")
+    log("[SIO] Connecte au backend")
     fetchAndSendColors()  # charge les couleurs direct au connect
 
 @sio.on('disconnect')
 def on_disconnect():
-    print("[SIO] Deconnecte du backend")
+    log("[SIO] Deconnecte du backend")
 
 # boucle principale
 
 def main():
     global running
-    print("[PI_DRIVER] Pret. En attente de blocs...")
+    log("[PI_DRIVER] Pret. En attente de blocs...")
 
     # connexion Socket.IO pour les updates de couleur
     sio.connect(BACKEND_URL)
@@ -445,8 +452,8 @@ def main():
         try:
             handleArduinoFrame()
         except OSError as e:
-            print(f"\n[!] Arduino debranche ou port perdu: {e}")
-            print("[!] Reconnecte l'Arduino et relance le script")
+            log(f"[!] Arduino debranche ou port perdu: {e}")
+            log("[!] Reconnecte l'Arduino et relance le script")
             cleanup()
         time.sleep(0.05)
 
