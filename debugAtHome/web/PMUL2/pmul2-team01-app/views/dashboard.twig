@@ -39,7 +39,7 @@
           <div class="card p-3 h-100">
             <button class="btn btn-outline-danger" @click="resetStats()">Reset</button>
             <div style="position: relative; height: 450px; width: 100%;">
-              <canvas id="chartAllColors"></canvas>
+              <canvas x-ref="allColors"></canvas>
             </div>
           </div>
         </div>
@@ -47,7 +47,7 @@
         <div class="col-md-6">
           <div class="card p-3 h-100">
             <div style="position: relative; height: 450px; width: 100%;">
-              <canvas id="chartRequestedReceived"></canvas>
+              <canvas x-ref="requestedReceived"></canvas>
             </div>
           </div>
         </div>
@@ -85,6 +85,7 @@
   document.addEventListener('alpine:init', () => {
     Alpine.data('dashboard', () => ({
       stats: {},
+      sensors: {},
       chartColor: null,
       chartQuantity: null,
 
@@ -93,9 +94,17 @@
           const res = await fetch('/api/stats');
           if (!res.ok) throw new Error(`Error : ${res.status}`);
           this.stats = await res.json();
-          // $nextTick garantit que le DOM est à jour avant de dessiner
           this.$nextTick(() => this.drawChart());
         } catch (e) {
+          console.error(e);
+        }
+      },
+      async fetchSensors() {
+        try{
+          const res = await fetch('/api/sensors');
+          if (!res.ok) throw new Error(`Error : ${res.status}`);
+          this.sensors = await res.json();
+        }catch(e){
           console.error(e);
         }
       },
@@ -105,76 +114,53 @@
         this.fetchStats();
       },
 
-      // Récupère le canvas par id (plus fiable que $refs dans ce contexte)
-      getCanvas(id) {
-        const el = document.getElementById(id);
-        if (!el) {
-          console.warn(`Canvas #${id} introuvable`);
-          return null;
-        }
-        return el;
-      },
-
       drawChart() {
         if (!this.stats?.colorStats) return;
 
-        const canvasColors   = this.getCanvas('chartAllColors');
-        const canvasQuantity = this.getCanvas('chartRequestedReceived');
-
-        // --- Graphique Pie : répartition par couleur ---
-        if (canvasColors) {
-          if (this.chartColor) {
-            this.chartColor.destroy();
-            this.chartColor = null;
+        if (this.chartColor) this.chartColor.destroy();
+        this.chartColor = new Chart(this.$refs.allColors, {
+          type: 'pie',
+          data: {
+            labels: this.stats.colorStats.map(item => item.name),
+            datasets: [{
+              data: this.stats.colorStats.map(item => item.count),
+              backgroundColor: this.stats.colorStats.map(item => item.hex),
+              borderColor: '#252525',
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'right' } }
           }
-          this.chartColor = new Chart(canvasColors, {
-            type: 'pie',
-            data: {
-              labels: this.stats.colorStats.map(item => item.name),
-              datasets: [{
-                data: this.stats.colorStats.map(item => item.count),
-                backgroundColor: this.stats.colorStats.map(item => item.hex),
-                borderColor: '#252525',
-                borderWidth: 2
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { position: 'right' } }
-            }
-          });
-        }
+        });
 
-        // --- Graphique Bar : Requested / Acquired ---
-        if (canvasQuantity) {
-          if (this.chartQuantity) {
-            this.chartQuantity.destroy();
-            this.chartQuantity = null;
+        if (this.chartQuantity) this.chartQuantity.destroy();
+        this.chartQuantity = new Chart(this.$refs.requestedReceived, {
+          type: 'bar',
+          data: {
+            labels: ['Total Requested', 'Total Acquired'],
+            datasets: [{
+              label: 'Requested/Acquired',
+              data: [this.stats.totalRequested, this.stats.totalAcquired],
+              backgroundColor: ['#ffc107', '#198754'],
+              borderColor: '#252525',
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false
           }
-          this.chartQuantity = new Chart(canvasQuantity, {
-            type: 'bar',
-            data: {
-              labels: ['Total Requested', 'Total Acquired'],
-              datasets: [{
-                label: 'Requested/Acquired',
-                data: [this.stats.totalRequested, this.stats.totalAcquired],
-                backgroundColor: ['#ffc107', '#198754'],
-                borderColor: '#252525',
-                borderWidth: 1
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false
-            }
-          });
-        }
+        });
       },
 
       async init() {
         await this.fetchStats();
         socket.on('db_event', () => this.fetchStats());
+
+        socket.on('sensor_event', () => this.fetchSensors());
       }
     }));
   });

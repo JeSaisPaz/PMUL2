@@ -5,10 +5,17 @@ const { getScans, createScan, deleteScan } = require("../services/scan");
 const { getOrders, getOrderDetails, createOrder, deleteOrder, cancelOrder } = require("../services/order");
 const { getItems, deleteItem, updateItemStatus, getLogs, getItemDetails } = require("../services/item");
 const { getColors, updateColors, initColors, saveAsJson } = require("../services/color");
-const { getStats, resetColorStats, incrementColorStat, setSensors } = require("../services/stats");
+const { getStats, resetColorStats, incrementColorStat } = require("../services/stats");
 
 module.exports = function (io) {
     const pyLogs = [];
+    let sensors = [
+        { name: "IR SCAN",  state: 0 },
+        { name: "IR NEXT",  state: 0 },
+        { name: "IR STOCK", state: 0 },
+        { name: "IR ORDER", state: 0 },
+        { name: "IR PASS",  state: 0 },
+    ];
     const notifyClients = () => io.emit('db_event');
 
     // handle pour eviter de repeter le try/catch partout
@@ -133,13 +140,6 @@ module.exports = function (io) {
         res.sendStatus(204);
     }));
 
-    router.post('/stats/sensors', handle (async(req, res) => {
-        const { sensors } = req.body;
-        setSensors(sensors);
-        notifyClients();
-        res.sendStatus(204);
-    }));
-
     //Python Logs
     router.post('/python/logs', (req, res) => {
         const { msg, time } = req.body;
@@ -149,9 +149,20 @@ module.exports = function (io) {
         res.sendStatus(204);
     });
 
-
     router.get('/python/logs', (req, res) => {
         res.json(pyLogs);
     });
+
+    //Sensors
+    router.post('/sensors', handle ((req, res) => {
+        sensors = req.body;
+        io.emit('sensor_event');
+        res.sendStatus(204);
+    }));
+
+    router.get('/sensors', handle ((req, res) => {
+       res.json(sensors);
+    }));
+
     return router;
 };
