@@ -59,7 +59,7 @@
           <div class="card p-3">
             <h5 class="card-title">Sensors</h5>
             <div class="row g-3">
-              <template x-for="sensor in stats.sensors ?? []">
+              <template x-for="sensor in sensors ?? []">
                 <div class="col">
                   <div class="card p-3 text-center h-100" :class="sensor.state ? 'border-success' : 'border-danger'">
                     <h6 class="card-title" x-text="sensor.name"></h6>
