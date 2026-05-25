@@ -18,33 +18,51 @@
 
 <script>
     const box = document.getElementById('logsBox');
+    const allLogs = [];
 
     function addLog(time, msg) {
-        // Couleur selon le contenu du message
-        let color = '#d4d4d4';
-        if (msg.includes('[!]'))         color = '#f48771'; // rouge
-        else if (msg.includes('CONFIRMED')) color = '#89d185'; // vert
-        else if (msg.includes('FAILED'))    color = '#f48771'; // rouge
-        else if (msg.includes('[SCAN]'))    color = '#dcdcaa'; // jaune
-        else if (msg.includes('[BACKEND]')) color = '#9cdcfe'; // bleu clair
-        else if (msg.includes('[BOOT]') || msg.includes('[SIO]')) color = '#c586c0'; // violet
+        allLogs.push({ time, msg });
+        renderLogs();
+    }
 
-        const line = document.createElement('div');
-        line.innerHTML = `<span style="color:#6a9955">${time}</span>  <span style="color:${color}">${msg}</span>`;
-        box.prepend(line);
+    function renderLogs() {
+        box.innerHTML = '';
 
-        // Garde max 200 lignes
-        while (box.children.length > 200) {
-            box.removeChild(box.lastChild);
+        if (allLogs.length === 0) {
+            box.innerHTML = '<span class="text-muted">Empty logs.</span>';
+            return;
         }
+
+        [...allLogs]
+            .sort((a, b) => new Date(b.time) - new Date(a.time))
+            .slice(0, 200)
+            .forEach(l => {
+                let color = '#d4d4d4';
+                const msg = l.msg;
+                if (msg.includes('[!]'))              color = '#f48771';
+                else if (msg.includes('CONFIRMED'))   color = '#89d185';
+                else if (msg.includes('FAILED'))      color = '#f48771';
+                else if (msg.includes('[SCAN]'))      color = '#dcdcaa';
+                else if (msg.includes('[BACKEND]'))   color = '#9cdcfe';
+                else if (msg.includes('[BOOT]') || msg.includes('[SIO]')) color = '#c586c0';
+
+                const line = document.createElement('div');
+                line.innerHTML = `<span style="color:#6a9955">${l.time}</span>  <span style="color:${color}">${msg}</span>`;
+                box.appendChild(line);
+            });
     }
 
     function clearLogs() {
+        allLogs.length = 0;
         box.innerHTML = '<span class="text-muted">Empty logs.</span>';
     }
+
     fetch('/api/python/logs')
         .then(r => r.json())
-        .then(logs => logs.forEach(l => addLog(l.time, l.msg)));
+        .then(logs => {
+            allLogs.push(...logs);
+            renderLogs();
+        });
 
     socket.on('py_log', (data) => addLog(data.time, data.msg));
 </script>
