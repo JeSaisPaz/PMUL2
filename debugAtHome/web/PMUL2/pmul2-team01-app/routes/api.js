@@ -155,7 +155,7 @@ module.exports = function (io) {
 
     //Sensors
     router.post('/sensors', handle ((req, res) => {
-        sensors = req.body;
+        sensors = req.body.sensors;
         io.emit('sensor_event');
         res.sendStatus(204);
     }));
