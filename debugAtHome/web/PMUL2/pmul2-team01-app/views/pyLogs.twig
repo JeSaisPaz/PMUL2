@@ -42,10 +42,10 @@
     function clearLogs() {
         box.innerHTML = '<span class="text-muted">Empty logs.</span>';
     }
-    fetch('/api/logs')
+    fetch('/python/logs')
         .then(r => r.json())
         .then(logs => logs.forEach(l => addLog(l.time, l.msg)));
-        
-    socket.on('pi_log', (data) => addLog(data.time, data.msg));
+
+    socket.on('py_log', (data) => addLog(data.time, data.msg));
 </script>
 {% endblock %}
