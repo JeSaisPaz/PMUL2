@@ -89,7 +89,7 @@ module.exports = function (io) {
     }));
 
     router.delete('/logs/clear', handle(async (req, res) => {
-        await clearLog();
+        await clearLogs();
         notifyClients();
         res.sendStatus(204);
     }));
