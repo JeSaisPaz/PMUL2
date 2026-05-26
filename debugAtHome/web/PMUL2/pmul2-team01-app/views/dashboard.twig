@@ -115,8 +115,6 @@
       },
 
       drawChart() {
-        if (!this.stats?.colorStats) return;
-
         if (this.chartColor) {
           // Update les données directement
           this.chartColor.data.labels = this.stats.colorStats.map(i => i.name);
