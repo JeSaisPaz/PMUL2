@@ -19,15 +19,10 @@ async function updateColors(color){
 }
 
 async function initColors() {
-    await Promise.all(
-        colors.map(color =>
-            prisma.cOLOR.upsert({
-                where: { name: color.name },
-                update: color,
-                create: color,
-            })
-        )
-    );
+    await prisma.cOLOR.deleteMany({});
+    await prisma.cOLOR.createMany({
+        data: colors
+    });
 }
 
 async function saveAsJson(color){

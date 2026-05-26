@@ -7,11 +7,12 @@
         <table id="logsTable" class="table table-striped border" width="100%">
             <thead>
                 <tr>
-                    <th>Date</th>
-                    <th>Item</th>
-                    <th>Decision</th>
-                    <th>Item status</th>
-                    <th>Decision status</th>
+                    <th class="all">Date</th>
+                    <th class="all">Item</th>
+                    <th class="min-tablet">Decision</th>
+                    <th class="all">Item status</th>
+                    <th class="min-tablet">Decision status</th>
+                    <th data-orderable="false" class="all"></th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -74,6 +75,10 @@ $(document).ready(function() {
                     const badge = badges[status] ?? 'bg-secondary'
                     return `<span class="badge rounded-pill ${badge}">${status}</span>`
                 }
+            },
+            {
+                data: 'id',
+                render: (id) => `<button class="btn btn-sm btn-danger" onclick="deleteLog(${id})">X</button>`
             }
         ],
         order: [[0, 'desc']]
@@ -83,5 +88,11 @@ $(document).ready(function() {
         table.ajax.reload(null, false);
     });
 });
+
+async function deleteLog(id) {
+    if (confirm('Delete log #' + id + ' ?')) {
+        await fetch(`/api/logs/${id}/delete`, { method: 'DELETE' });
+    }
+}
 </script>
 {% endblock %}

@@ -3,7 +3,7 @@ var router = express.Router();
 
 const { getScans, createScan, deleteScan } = require("../services/scan");
 const { getOrders, getOrderDetails, createOrder, deleteOrder, cancelOrder, getCurrentOrder } = require("../services/order");
-const { getItems, deleteItem, updateItemStatus, getLogs, getItemDetails } = require("../services/item");
+const { getItems, deleteItem, updateItemStatus, getLogs, deleteLog, getItemDetails } = require("../services/item");
 const { getColors, updateColors, initColors, saveAsJson } = require("../services/color");
 const { getStats, resetColorStats, incrementColorStat } = require("../services/stats");
 

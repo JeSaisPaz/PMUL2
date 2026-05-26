@@ -31,6 +31,12 @@ async function getLogs() {
     });
 }
 
+async function deleteLog(id) {
+    const log = await prisma.sELECTION_HISTORY.findUnique({ where: { id } });
+    if (!log) throw { code: 404, message: "Log not found" };
+    await prisma.sELECTION_HISTORY.delete({ where: { id } });
+}
+
 async function deleteItem(id) {
     const item = await prisma.iTEM.findUnique({
         where: { id },
@@ -129,4 +135,4 @@ async function updateItemStatus(id, status) {
     }
 }
 
-module.exports = { getItems, deleteItem, updateItemStatus, getLogs, getItemDetails };
+module.exports = { getItems, deleteItem, updateItemStatus, getLogs, deleteLog, getItemDetails };
