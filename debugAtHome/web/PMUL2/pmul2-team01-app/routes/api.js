@@ -82,6 +82,12 @@ module.exports = function (io) {
         res.json(await getLogs());
     }));
 
+    router.delete('/logs/:id/delete', handle(async (req, res) => {
+        await deleteLog(parseInt(req.params.id));
+        notifyClients();
+        res.sendStatus(204);
+    }));
+
     router.delete('/items/:id/delete', handle(async (req, res) => {
         await deleteItem(parseInt(req.params.id));
         notifyClients();
