@@ -275,28 +275,24 @@ def main():
     # 3. Écoute permanente des trames
     while running:
         try:
-            # On vérifie si l'Arduino a reset en regardant s'il y a des données
-            if s.is_open and s.in_waiting > 0:
-                # On utilise peek(1) pour regarder le premier octet SANS vider le buffer
-                try:
-                    if s.peek(1) == b'R':
-                        s.read(1) # On consomme le 'R'
-                        raise serial.SerialException("Reset de l'Arduino detecte (signal 'R')")
-                except (AttributeError, NotImplementedError):
-                    # Si peek() n'est pas supporté par l'OS, on laisse SerialTransfer gérer 
-                    # les erreurs de trames brisées en cas de reset.
-                    pass
-
-            # On laisse SerialTransfer faire son travail normalement
+            # On laisse SerialTransfer lire le port série normalement
             handleArduinoFrame()
             
+            # [ASTUCE RESET] Si st.available() a détecté une erreur critique ou 
+            # si l'Arduino a envoyé un octet "fantôme" (comme le 'R' du reset),
+            # SerialTransfer passe son statut en erreur (valeur négative).
+            if st.status < 0:
+                # On vérifie si le 'R' traîne dans le buffer pour confirmer le reset
+                if s.in_waiting > 0 and b'R' in s.read(s.in_waiting):
+                    raise serial.SerialException("Reset matériel détecté (Signal 'R')")
+
         except (OSError, serial.SerialException) as e:
             log(f"[!] Liaison perdue ou Reset Arduino : {e}")
             try: s.close()
             except: pass
-            connect_arduino() # Reconnecte et renvoie les couleurs
+            connect_arduino() # Reconnecte proprement et renvoie les couleurs !
             
-        time.sleep(0.01) # Légèrement plus rapide pour ne rien rater
+        time.sleep(0.05) # On remet le délai initial pour pas surcharger le CPU
 
 if __name__ == "__main__":
     main()
