@@ -410,7 +410,8 @@ def on_connect():
 def on_disconnect():
     log("[SIO] Deconnecte du backend")
     
-# Mapping des noms de couleurs du Backend vers les IDs Arduino
+# Mapping des noms de couleurs (doit correspondre exactement au champ 'name' de ton modèle COLOR)
+# Si ton modèle COLOR a un champ 'name', assure-toi qu'il contient "Yellow", "Blue", etc.
 COLOR_MAP = {
     "Yellow":  0x01,
     "Blue":    0x02,
@@ -430,20 +431,23 @@ def on_order_event(data=None):
             
             payload = [len(lines)]
             for line in lines:
-                # Récupération du nom de la couleur depuis l'objet JSON
-                color_name = line['COLOR']['name']
-                # Traduction via le mapping, défaut à 0x00 si inconnu
+                # 1. Utiliser le bon champ Prisma : 'quantity'
+                qty = line.get('quantity', 0) 
+                
+                # 2. Récupérer le nom de la couleur (supposé dans COLOR -> name)
+                color_name = line.get('COLOR', {}).get('name', 'Unknown')
                 arduino_id = COLOR_MAP.get(color_name, 0x00)
                 
                 payload.append(arduino_id)
-                payload.append(line['qty'])
+                payload.append(qty)
             
-            # Envoi via SerialTransfer (PID 0x04)
+            log(f"[DEBUG] Envoi payload : {payload}") # Indispensable pour voir ce qui part
+            
             link.packet.txBuff[0:len(payload)] = payload
-            link.sendData(len(payload), 0x04) 
-            log(f"[PI_DRIVER] Commande Web transmise avec {len(lines)} lignes.")
+            link.sendData(len(payload), 0x04) # PID 0x04
+            log("[PI_DRIVER] Commande Web transmise")
     except Exception as e:
-        log(f"[!] Erreur lors de la traduction ou de l'API: {e}")
+        log(f"[!] Erreur : {e}")
 
 # boucle principale
 
