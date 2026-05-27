@@ -1,4 +1,4 @@
-# Driver Raspberry Pi - pont ultra simple entre:
+# Driver Raspberry Pi - pont ultra simple entre :
 #   - l'Arduino (SerialTransfer via USB)
 #   - la camera (QR + detection couleur)
 #   - le backend (API REST)
@@ -446,8 +446,16 @@ def main():
     global running
     log("[PI_DRIVER] Pret. En attente de blocs...")
 
-    # connexion Socket.IO pour les updates de couleur
-    sio.connect(BACKEND_URL)
+    # Connexion Socket.IO avec gestion d'erreur et reconnexion automatique
+    connected = False
+    while running and not connected:
+        try:
+            # force l'utilisation des WebSockets purs pour resoudre l'erreur de déconnexion immédiate
+            sio.connect(BACKEND_URL, transports=['websocket'])
+            connected = True
+        except Exception as e:
+            print(f"[SIO] Connexion echouee au backend ({e}). Nouvelle tentative dans 5 secondes...")
+            time.sleep(5)
 
     while running:
         try:
