@@ -410,8 +410,17 @@ def on_connect():
 def on_disconnect():
     log("[SIO] Deconnecte du backend")
     
+# Mapping des noms de couleurs du Backend vers les IDs Arduino
+COLOR_MAP = {
+    "Yellow":  0x01,
+    "Blue":    0x02,
+    "Magenta": 0x03,
+    "Brown":   0x04,
+    "Orange":  0x05
+}
+
 @sio.on('order_event')
-def on_order_event():
+def on_order_event(data=None):
     log("[SIO] Evenement commande recu")
     try:
         resp = requests.get(f"{BACKEND_URL}/api/order/current", timeout=2)
@@ -419,18 +428,22 @@ def on_order_event():
             order = resp.json()
             lines = order.get('ORDER_LINE', [])
             
-            # Format trame : [count, color1, qty1, ...]
             payload = [len(lines)]
             for line in lines:
-                payload.append(line['COLOR']['id'])
+                # Récupération du nom de la couleur depuis l'objet JSON
+                color_name = line['COLOR']['name']
+                # Traduction via le mapping, défaut à 0x00 si inconnu
+                arduino_id = COLOR_MAP.get(color_name, 0x00)
+                
+                payload.append(arduino_id)
                 payload.append(line['qty'])
             
             # Envoi via SerialTransfer (PID 0x04)
             link.packet.txBuff[0:len(payload)] = payload
             link.sendData(len(payload), 0x04) 
-            log("[PI_DRIVER] Commande Web transmise")
+            log(f"[PI_DRIVER] Commande Web transmise avec {len(lines)} lignes.")
     except Exception as e:
-        log(f"[!] Erreur API: {e}")
+        log(f"[!] Erreur lors de la traduction ou de l'API: {e}")
 
 # boucle principale
 
