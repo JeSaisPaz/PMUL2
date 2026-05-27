@@ -405,7 +405,6 @@ sio = socketio.Client()
 @sio.on('connect')
 def on_connect():
     log("[SIO] Connecte au backend")
-    fetchAndSendColors()  # charge les couleurs direct au connect
 
 @sio.on('disconnect')
 def on_disconnect():
