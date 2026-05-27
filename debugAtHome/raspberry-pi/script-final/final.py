@@ -213,19 +213,6 @@ def handleSensorStatus(payload):
     try: requests.post(f"{BACKEND_URL}/api/sensors", json={"sensors": sensors}, timeout=2)
     except Exception: pass
 
-def handleArduinoFrame():
-    result = st.available()
-    if result is None: return
-    pid, payload = result
-    if pid == SerialTransfer.PID_STATUS and len(payload) >= 1:
-        code = payload[0]
-        if code == SerialTransfer.STATUS_SCAN_NEEDED: handleScanNeeded()
-        elif code == SerialTransfer.STATUS_DONE: log("[ARDUINO] Commande terminee")
-    elif pid == SerialTransfer.PID_SCAN_RESULT: handleScanResult(payload)
-    elif pid == SerialTransfer.PID_SENSOR_STATUS: handleSensorStatus(payload)
-    elif pid == SerialTransfer.PID_LOCAL_ORDER: handleLocalOrder(payload)
-    elif pid == SerialTransfer.PID_PING: log("[ARDUINO] Ping recu (diag)")
-
 # Socket.IO
 sio = socketio.Client()
 
@@ -255,7 +242,32 @@ def on_connect():
 @sio.on('disconnect')
 def on_disconnect(): log("[SIO] Deconnecte du backend")
 
-# --- Boucle principale modifiée ---
+def handleArduinoFrame():
+    """Lit et dispatche une trame entrante de l'Arduino."""
+    # On vérifie d'abord s'il y a un reset logiciel 'R' qui traîne dans le buffer
+    if s.is_open and s.in_waiting > 0:
+        try:
+            # On jette un œil sans vider tout le buffer de SerialTransfer
+            if s.read(1) == b'R':
+                raise serial.SerialException("Reset logiciel de l'Arduino détecté (signal 'R')")
+        except Exception:
+            pass
+
+    result = st.available()
+    if result is None:
+        return
+
+    pid, payload = result
+    if pid == SerialTransfer.PID_STATUS and len(payload) >= 1:
+        code = payload[0]
+        if code == SerialTransfer.STATUS_SCAN_NEEDED: handleScanNeeded()
+        elif code == SerialTransfer.STATUS_DONE: log("[ARDUINO] Commande terminee")
+    elif pid == SerialTransfer.PID_SCAN_RESULT: handleScanResult(payload)
+    elif pid == SerialTransfer.PID_SENSOR_STATUS: handleSensorStatus(payload)
+    elif pid == SerialTransfer.PID_LOCAL_ORDER: handleLocalOrder(payload)
+    elif pid == SerialTransfer.PID_PING: log("[ARDUINO] Ping recu (diag)")
+
+# --- Boucle principale corrigée ---
 def main():
     global running
     log("[PI_DRIVER] Pret. En attente de blocs...")
@@ -275,24 +287,16 @@ def main():
     # 3. Écoute permanente des trames
     while running:
         try:
-            # On laisse SerialTransfer lire le port série normalement
+            # On laisse handleArduinoFrame gérer la lecture et la détection du 'R'
             handleArduinoFrame()
             
-            # [ASTUCE RESET] Si st.available() a détecté une erreur critique ou 
-            # si l'Arduino a envoyé un octet "fantôme" (comme le 'R' du reset),
-            # SerialTransfer passe son statut en erreur (valeur négative).
-            if st.status < 0:
-                # On vérifie si le 'R' traîne dans le buffer pour confirmer le reset
-                if s.in_waiting > 0 and b'R' in s.read(s.in_waiting):
-                    raise serial.SerialException("Reset matériel détecté (Signal 'R')")
-
         except (OSError, serial.SerialException) as e:
             log(f"[!] Liaison perdue ou Reset Arduino : {e}")
             try: s.close()
             except: pass
             connect_arduino() # Reconnecte proprement et renvoie les couleurs !
             
-        time.sleep(0.05) # On remet le délai initial pour pas surcharger le CPU
+        time.sleep(0.05)
 
 if __name__ == "__main__":
     main()
