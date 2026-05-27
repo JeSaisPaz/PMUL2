@@ -407,6 +407,12 @@ def on_color_update():
     # le backend a modifie les couleurs, on refetch et on balance a l'Arduino
     fetchAndSendColors()
 
+@sio.on('color_envent')
+def on_color_event():
+    # Déclenché par l'événement "color_envent"
+    log("[SIO] Événement 'color_envent' reçu, mise à jour des couleurs...")
+    fetchAndSendColors()
+
 def fetchAndSendColors():
     """GET /api/colors -> PID_COLOR_LIST vers l'Arduino (appele au connect + sur event)."""
     try:
