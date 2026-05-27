@@ -409,8 +409,8 @@ def on_color_update():
 
 @sio.on('color_event')
 def on_color_event():
-    # Déclenché par l'événement "color_envent"
-    log("[SIO] Événement 'color_envent' reçu, mise à jour des couleurs...")
+    # Déclenché par l'événement "color_event"
+    log("[SIO] Événement 'color_event' reçu, mise à jour des couleurs...")
     fetchAndSendColors()
 
 def fetchAndSendColors():
