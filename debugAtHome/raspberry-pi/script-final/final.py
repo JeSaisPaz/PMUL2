@@ -407,7 +407,7 @@ def on_color_update():
     # le backend a modifie les couleurs, on refetch et on balance a l'Arduino
     fetchAndSendColors()
 
-@sio.on('color_envent')
+@sio.on('color_event')
 def on_color_event():
     # Déclenché par l'événement "color_envent"
     log("[SIO] Événement 'color_envent' reçu, mise à jour des couleurs...")
