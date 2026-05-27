@@ -411,7 +411,7 @@ def on_disconnect():
     log("[SIO] Deconnecte du backend")
     
 @sio.on('order_event')
-def on_order_event(data):
+def on_order_event():
     log("[SIO] Evenement commande recu")
     try:
         resp = requests.get(f"{BACKEND_URL}/api/order/current", timeout=2)
