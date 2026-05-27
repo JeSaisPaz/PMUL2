@@ -272,23 +272,31 @@ def main():
     # 2. Premier démarrage matériel de l'Arduino
     connect_arduino()
 
-    # 3. Écoute permanente des trames avec gestion de crash/reset
+    # 3. Écoute permanente des trames
     while running:
         try:
-            # Si un 'R' sauvage arrive alors que le script tourne, c'est que l'Arduino a reset !
+            # On vérifie si l'Arduino a reset en regardant s'il y a des données
             if s.is_open and s.in_waiting > 0:
-                if b'R' in s.read(s.in_waiting):
-                    raise serial.SerialException("Reset logiciel de l'Arduino détecté via 'R'")
+                # On utilise peek(1) pour regarder le premier octet SANS vider le buffer
+                try:
+                    if s.peek(1) == b'R':
+                        s.read(1) # On consomme le 'R'
+                        raise serial.SerialException("Reset de l'Arduino detecte (signal 'R')")
+                except (AttributeError, NotImplementedError):
+                    # Si peek() n'est pas supporté par l'OS, on laisse SerialTransfer gérer 
+                    # les erreurs de trames brisées en cas de reset.
+                    pass
 
+            # On laisse SerialTransfer faire son travail normalement
             handleArduinoFrame()
             
         except (OSError, serial.SerialException) as e:
             log(f"[!] Liaison perdue ou Reset Arduino : {e}")
             try: s.close()
             except: pass
-            connect_arduino() # Relance l'attente et renvoie les couleurs !
+            connect_arduino() # Reconnecte et renvoie les couleurs
             
-        time.sleep(0.05)
+        time.sleep(0.01) # Légèrement plus rapide pour ne rien rater
 
 if __name__ == "__main__":
     main()
