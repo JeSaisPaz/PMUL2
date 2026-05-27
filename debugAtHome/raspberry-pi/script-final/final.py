@@ -402,41 +402,6 @@ def handleArduinoFrame():
 
 sio = socketio.Client()
 
-@sio.on('color_update')
-def on_color_update():
-    # le backend a modifie les couleurs, on refetch et on balance a l'Arduino
-    fetchAndSendColors()
-
-@sio.on('color_event')
-def on_color_event():
-    # Déclenché par l'événement "color_event"
-    log("[SIO] Événement 'color_event' reçu, mise à jour des couleurs...")
-    fetchAndSendColors()
-
-def fetchAndSendColors():
-    """GET /api/colors -> PID_COLOR_LIST vers l'Arduino (appele au connect + sur event)."""
-    try:
-        r = requests.get(f"{BACKEND_URL}/api/colors", timeout=3)
-        if r.status_code != 200:
-            return
-        name_to_byte = {"jaune": 0x01, "yellow": 0x01, "bleu": 0x02, "blue": 0x02,
-                        "magenta": 0x03, "pink": 0x03,
-                        "brun": 0x04, "brown": 0x04,
-                        "orange": 0x05}
-        active = []
-        for c in r.json():
-            # le backend filtre deja status:true, mais on double-check
-            if c.get("status"):
-                bid = name_to_byte.get((c.get("name") or "").lower())
-                if bid:
-                    active.append(bid)
-        if active:
-            st.send(SerialTransfer.PID_COLOR_LIST, bytes([len(active)] + active))
-            names = {0x01:"Jaune",0x02:"Bleu",0x03:"Magenta",0x04:"Brun",0x05:"Orange"}
-            log(f"[COLORS] {len(active)} actives envoyees: {[names.get(b, '?') for b in active]}")
-    except Exception:
-        pass  # backend down, on retentera au prochain event
-
 @sio.on('connect')
 def on_connect():
     log("[SIO] Connecte au backend")
