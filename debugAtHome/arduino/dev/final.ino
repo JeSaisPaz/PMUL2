@@ -8,7 +8,7 @@
 Pmul2Lib objetPmul(Serial);
 
 //IR sensors
-byte pinsIR[] = {8, 7, 6, 5, 4};
+uint8_t pinsIR[] = {8, 7, 6, 5, 4};
 bool statesIR[] = {0, 0, 0, 0, 0};
 #define IR_SCAN    0  // pin 8   
 #define IR_NEXT    1  // pin 7
@@ -28,20 +28,31 @@ Servo servoOrder; // pin 9
 
 //User interface
 LiquidCrystal_I2C lcd(0x27, 16, 2);
+uint8_t selectedColor;
 bool needRedisplay = true;
 bool displayMode = true;
 bool maintenance = true;
+bool orderMode = false;
 volatile unsigned long lastBtn1;
 volatile unsigned long lastBtn2;
 #define btn1 2
 #define btn2 3
 
+const uint8_t ROWS = 4, COLS = 4; 
+char keys[ROWS][COLS] = {{'1','2','3','A'},{'4','5','6','B'},{'7','8','9','C'},{'*','0','#','D'}};
+uint8_t rowPins[ROWS] = {31, 33, 35, 37}, colPins[COLS] = {39, 41, 43, 45}; 
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+char key = 0;
+
 //Process
 uint16_t completedOrdersCount = 0;
+uint8_t orderLineCount;
 ItemDecision currentDecision = ItemDecision::NO_DECISION;
 uint16_t currentItemId = 0;
 uint8_t currentOrderId = 0;
-byte step = 0;
+uint8_t step = 0;
+uint8_t orderPage = 0;
+uint8_t activeColors[4], activeColorCount;
 
 unsigned long stepEnteredAt = 0;
 
@@ -55,6 +66,15 @@ bool updateIR() {
     }
   }
   return sensorsChanged;
+}
+
+void updateColor(){
+  uint8_t colors[4], count;
+  if (objetPmul.readColorList(colors, count)) {
+    activeColorCount = count;
+    for (uint8_t i = 0; i < count; i++) activeColors[i] = colors[i];
+    needRedisplay = true;
+  }
 }
 
 void sendIR(){
@@ -83,6 +103,37 @@ void maintenanceDisplay(){
   needRedisplay = false;
 }
 
+String colorDisplayFormatById(uint8_t id, bool shortF) {
+  switch(id) {
+    case COLOR_BLUE: return shortF ? "BLUE" : "BL:";
+    case COLOR_YELLOW: return shortF ? "YELLOW" : "YL:";
+    case COLOR_MAGENTA: return shortF ? "MAGENTA" : "MG:";
+    case COLOR_BROWN: return shortF ? "BROWN" : "BR:";
+    default: return "?";
+  }
+}
+
+void orderMenu(){
+  switch(orderPage){
+    case 0 :
+      if(key == '*'){
+        selectedColor = constrain(selectedColor - 1, 0, activeColorCount-1);
+        needRedisplay = true;
+      }
+      if(key == '#'){
+        selectedColor = selectedColor = constrain(selectedColor + 1, 0, activeColorCount-1);
+        needRedisplay = true;
+      }
+      if(needRedisplay){
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print(colorDisplayFormatById(activeColors[selectedColor], false));
+        needRedisplay = false;
+      }
+      break;
+  }
+}
+
 // Interruptions
 void switchSystem(){
   unsigned long now = millis();
@@ -104,6 +155,7 @@ void switchDisplay(){
 
 void setup() {
   Serial.begin(9600);
+  Serial.write('R');
   for(byte i=0; i<5; i++) pinMode(pinsIR[i], INPUT_PULLUP);
   pinMode(btn1, INPUT_PULLUP);
   pinMode(btn2, INPUT_PULLUP);
@@ -115,21 +167,31 @@ void setup() {
   servoScan.write(SERVO_SCAN_OFF);      
   servoStock.write(SERVO_OFF);     
   servoOrder.write(SERVO_OFF);
+  updateColor();
   lcd.init();
   lcd.backlight();
   lcd.print("System ready");
-  Serial.write('R');
 }
 
 void loop() {
   //Update des capteurs + envoie au rasberry
   if(updateIR()) sendIR();
+  //Update des couleurs
+  updateColor();
+
+  key = keypad.getKey();
+  if(key == 'A' && !orderMode) {
+    orderMode = true;
+    orderPage = 0;
+    orderLineCount = 0;
+    needRedisplay = true;
+  }
+
+  if(orderMode) orderMenu();
 
   if(!maintenance){
-    //Affichage 
-    if(needRedisplay){
-      processDisplay();
-    }
+    //affichage current order OU completed order count
+    if(needRedisplay && !orderMode) processDisplay();
 
     //Machine à états
     switch(step){
@@ -219,7 +281,7 @@ void loop() {
     servoScan.write(SERVO_SCAN_OFF);      
     servoStock.write(SERVO_OFF);     
     servoOrder.write(SERVO_OFF); 
-    if(needRedisplay){
+    if(needRedisplay && !orderMode){
       maintenanceDisplay();
     }
   }
