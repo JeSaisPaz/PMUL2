@@ -114,12 +114,14 @@ module.exports = function (io) {
 
     router.put('/colors/:name/update', handle(async (req, res) => {
         await updateColors(req.body.color);
+        io.emit('color_event');
         notifyClients();
         res.sendStatus(204);
     }));
 
     router.post('/colors/init', handle(async (req, res) => {
         await initColors();
+        io.emit('color_event');
         notifyClients();
         res.sendStatus(204);
     }));

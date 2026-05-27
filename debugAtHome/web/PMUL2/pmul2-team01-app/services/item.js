@@ -39,7 +39,7 @@ async function deleteLog(id) {
 
 async function clearLogs() {
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000); //retourne le temps en ms, on soustrait 5 min en ms(5 min * 60 s * 1000 ms).
-    const deleted = await prisma.sELECTION_HISTORY.deleteMany({
+    await prisma.sELECTION_HISTORY.deleteMany({
         where: {
             createdAt: {
                 lt: fiveMinutesAgo,//on delete les logs où createdAt est less than now - 5min
