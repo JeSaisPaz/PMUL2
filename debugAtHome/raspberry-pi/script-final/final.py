@@ -409,6 +409,28 @@ def on_connect():
 @sio.on('disconnect')
 def on_disconnect():
     log("[SIO] Deconnecte du backend")
+    
+@sio.on('order_event')
+def on_order_event(data):
+    log("[SIO] Evenement commande recu")
+    try:
+        resp = requests.get(f"{BACKEND_URL}/api/order/current", timeout=2)
+        if resp.status_code == 200:
+            order = resp.json()
+            lines = order.get('ORDER_LINE', [])
+            
+            # Format trame : [count, color1, qty1, ...]
+            payload = [len(lines)]
+            for line in lines:
+                payload.append(line['COLOR']['id'])
+                payload.append(line['qty'])
+            
+            # Envoi via SerialTransfer (PID 0x04)
+            link.packet.txBuff[0:len(payload)] = payload
+            link.sendData(len(payload), 0x04) 
+            log("[PI_DRIVER] Commande Web transmise")
+    except Exception as e:
+        log(f"[!] Erreur API: {e}")
 
 # boucle principale
 
