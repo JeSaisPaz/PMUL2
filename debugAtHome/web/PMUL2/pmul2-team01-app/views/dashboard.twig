@@ -118,51 +118,43 @@
           }
         },
 
-        destroyCharts() {
-          if (this.chartColor)    { this.chartColor.destroy();    this.chartColor    = null; }
-          if (this.chartQuantity) { this.chartQuantity.destroy(); this.chartQuantity = null; }
-        },
-
         drawCharts() {
           if (!this.stats?.colorStats) return;
 
-          this.destroyCharts();
+          if (!this.chartColor) {
+            this.chartColor = new Chart(this.$refs.allColors, {
+              type: 'pie',
+              data: {
+                labels: [],
+                datasets: [{ data: [], backgroundColor: [], borderColor: '#252525', borderWidth: 2 }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right' } }
+              }
+            });
+          }
 
-          this.chartColor = new Chart(this.$refs.allColors, {
-            type: 'pie',
-            data: {
-              labels: this.stats.colorStats.map(i => i.name),
-              datasets: [{
-                data: this.stats.colorStats.map(i => i.count),
-                backgroundColor: this.stats.colorStats.map(i => i.hex),
-                borderColor: '#252525',
-                borderWidth: 2
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { position: 'right' } }
-            }
-          });
+          if (!this.chartQuantity) {
+            this.chartQuantity = new Chart(this.$refs.requestedReceived, {
+              type: 'bar',
+              data: {
+                labels: ['Total Requested', 'Total Acquired'],
+                datasets: [{ label: 'Requested/Acquired', data: [], backgroundColor: ['#ffc107', '#198754'], borderColor: '#252525', borderWidth: 1 }]
+              },
+              options: { responsive: true, maintainAspectRatio: false }
+            });
+          }
 
-          this.chartQuantity = new Chart(this.$refs.requestedReceived, {
-            type: 'bar',
-            data: {
-              labels: ['Total Requested', 'Total Acquired'],
-              datasets: [{
-                label: 'Requested/Acquired',
-                data: [this.stats.totalRequested, this.stats.totalAcquired],
-                backgroundColor: ['#ffc107', '#198754'],
-                borderColor: '#252525',
-                borderWidth: 1
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false
-            }
-          });
+          // Update des données seulement
+          this.chartColor.data.labels                    = this.stats.colorStats.map(i => i.name);
+          this.chartColor.data.datasets[0].data          = this.stats.colorStats.map(i => i.count);
+          this.chartColor.data.datasets[0].backgroundColor = this.stats.colorStats.map(i => i.hex);
+          this.chartColor.update();
+
+          this.chartQuantity.data.datasets[0].data = [this.stats.totalRequested, this.stats.totalAcquired];
+          this.chartQuantity.update();
         },
 
         async init() {
