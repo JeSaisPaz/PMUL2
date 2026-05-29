@@ -82,12 +82,13 @@
 {% block scripts %}
   <script src="/js/chart.js"></script>
   <script>
+    let chartColorInstance = null;
+    let chartQuantityInstance = null;
+
     document.addEventListener('alpine:init', () => {
       Alpine.data('dashboard', () => ({
         stats: {},
         sensors: [],
-        chartColor: null,
-        chartQuantity: null,
 
         async fetchStats() {
           try {
@@ -121,18 +122,17 @@
         drawCharts() {
           if (!this.stats?.colorStats) return;
 
-          this.chartColor.data.labels                       = this.stats.colorStats.map(i => i.name);
-          this.chartColor.data.datasets[0].data             = this.stats.colorStats.map(i => i.count);
-          this.chartColor.data.datasets[0].backgroundColor  = this.stats.colorStats.map(i => i.hex);
-          this.chartColor.update();
+          chartColorInstance.data.labels                      = this.stats.colorStats.map(i => i.name);
+          chartColorInstance.data.datasets[0].data            = this.stats.colorStats.map(i => i.count);
+          chartColorInstance.data.datasets[0].backgroundColor = this.stats.colorStats.map(i => i.hex);
+          chartColorInstance.update();
 
-          this.chartQuantity.data.datasets[0].data = [this.stats.totalRequested, this.stats.totalAcquired];
-          this.chartQuantity.update();
+          chartQuantityInstance.data.datasets[0].data = [this.stats.totalRequested, this.stats.totalAcquired];
+          chartQuantityInstance.update();
         },
 
         async init() {
-          // Création des charts une bonne fois, canvas forcément prêt ici
-          this.chartColor = new Chart(document.getElementById('chartColors'), {
+          chartColorInstance = new Chart(document.getElementById('chartColors'), {
             type: 'pie',
             data: {
               labels: [],
@@ -145,7 +145,7 @@
             }
           });
 
-          this.chartQuantity = new Chart(document.getElementById('chartQuantity'), {
+          chartQuantityInstance = new Chart(document.getElementById('chartQuantity'), {
             type: 'bar',
             data: {
               labels: ['Total Requested', 'Total Acquired'],
