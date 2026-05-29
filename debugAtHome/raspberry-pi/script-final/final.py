@@ -22,6 +22,8 @@ import socketio
 BAUD        = 115200
 BACKEND_URL = "http://localhost:3000"
 
+PID_CURRENT_ORDER = 0x07 # Nouveau PID pour la commande courante
+
 def log(msg):
     """Print + envoi au backend via API REST pour affichage web."""
     print(msg)
@@ -306,13 +308,12 @@ def handleLocalOrder(payload):
     if lineCount == 0 or len(payload) < 1 + lineCount * 2:
         return
 
-    # same map as fetchAndSendColors — single source of truth
+    # same map as fetchAndSendColors — single source of truth (Sans Orange)
     name_to_byte = {
         "jaune": 0x01, "yellow": 0x01,
         "bleu":  0x02, "blue":   0x02,
         "magenta": 0x03, "pink": 0x03,
-        "brun":  0x04, "brown":  0x04,
-        "orange": 0x05
+        "brun":  0x04, "brown":  0x04
     }
 
     try:
@@ -348,6 +349,7 @@ def handleLocalOrder(payload):
 
     except Exception as e:
         log(f"  [!] Backend injoignable: {e}")
+
 def handleSensorStatus(payload):
     """L'Arduino envoie l'etat des capteurs IR - on POST au backend."""
     if len(payload) < 1:
@@ -398,15 +400,19 @@ def handleArduinoFrame():
     elif pid == SerialTransfer.PID_PING:
         log("[ARDUINO] Ping recu (diag)")
 
-# couleurs actives via Socket.IO (le backend previent quand ca change)
+# --- Gestion des evenements via Socket.IO ---
 
 sio = socketio.Client()
 
 @sio.on('color_event')
 def on_color_event():
-    # Déclenché par l'événement "color_event"
     log("[SIO] Événement 'color_event' reçu, mise à jour des couleurs...")
     fetchAndSendColors()
+
+@sio.on('order_event')
+def on_order_event():
+    log("[SIO] Événement 'order_event' reçu, mise à jour de la commande courante...")
+    fetchAndSendCurrentOrder()
     
 def fetchAndSendColors():
     """GET /api/colors -> PID_COLOR_LIST vers l'Arduino (appele au connect + sur event)."""
@@ -414,27 +420,77 @@ def fetchAndSendColors():
         r = requests.get(f"{BACKEND_URL}/api/colors", timeout=3)
         if r.status_code != 200:
             return
+        # Dictionnaire sans l'orange
         name_to_byte = {"jaune": 0x01, "yellow": 0x01, "bleu": 0x02, "blue": 0x02,
                         "magenta": 0x03, "pink": 0x03,
-                        "brun": 0x04, "brown": 0x04,
-                        "orange": 0x05}
+                        "brun": 0x04, "brown": 0x04}
         active = []
         for c in r.json():
-            # le backend filtre deja status:true, mais on double-check
             if c.get("status"):
                 bid = name_to_byte.get((c.get("name") or "").lower())
                 if bid:
                     active.append(bid)
         if active:
             st.send(SerialTransfer.PID_COLOR_LIST, bytes([len(active)] + active))
-            names = {0x01:"Jaune",0x02:"Bleu",0x03:"Magenta",0x04:"Brun",0x05:"Orange"}
+            names = {0x01:"Jaune",0x02:"Bleu",0x03:"Magenta",0x04:"Brun"}
             log(f"[COLORS] {len(active)} actives envoyees: {[names.get(b, '?') for b in active]}")
     except Exception:
-        pass  # backend down, on retentera au prochain event
+        pass
+
+def fetchAndSendCurrentOrder():
+    """GET /api/orders/current -> PID_CURRENT_ORDER vers l'Arduino."""
+    try:
+        r = requests.get(f"{BACKEND_URL}/api/orders/current", timeout=3)
+        
+        # S'il n'y a pas de commande en cours, on envoie un paquet vide à l'Arduino
+        if r.status_code == 404:
+            st.send(PID_CURRENT_ORDER, bytes([0, 0, 0, 0, 0]))
+            log("[ORDER] Aucune commande active (effacement sur l'Arduino).")
+            return
+            
+        if r.status_code != 200:
+            return
+
+        order_data = r.json()
+        order_id = order_data.get("id", 0)
+        
+        # Tableau des quantites: index 0=Jaune, 1=Bleu, 2=Magenta, 3=Brun
+        qtys = [0, 0, 0, 0]
+        
+        # Mapping du nom de la couleur vers l'index de notre tableau 'qtys'
+        name_to_index = {
+            "jaune": 0, "yellow": 0,
+            "bleu": 1,  "blue": 1,
+            "magenta": 2, "pink": 2,
+            "brun": 3,  "brown": 3
+        }
+
+        order_lines = order_data.get("ORDER_LINE", [])
+        
+        for line in order_lines:
+            color_info = line.get("COLOR", {})
+            c_name = (color_info.get("name") or "").lower()
+            qty = line.get("quantity", 0)
+            
+            if c_name in name_to_index:
+                idx = name_to_index[c_name]
+                qtys[idx] += qty
+                
+        # Construction du payload: 1 octet pour l'ID de la commande + 4 octets pour les quantités
+        payload = bytes([order_id & 0xFF] + qtys)
+        st.send(PID_CURRENT_ORDER, payload)
+        
+        log(f"[ORDER] Commande #{order_id} active envoyée (J:{qtys[0]} B:{qtys[1]} M:{qtys[2]} Br:{qtys[3]})")
+        
+    except Exception as e:
+        log(f"[!] Erreur lors de la récupération de la commande courante: {e}")
 
 @sio.on('connect')
 def on_connect():
     log("[SIO] Connecte au backend")
+    # On synchronise l'état au démarrage
+    fetchAndSendColors()
+    fetchAndSendCurrentOrder()
 
 @sio.on('disconnect')
 def on_disconnect():
@@ -465,7 +521,6 @@ def main():
             log("[!] Reconnecte l'Arduino et relance le script")
             cleanup()
         time.sleep(0.05)
-
 
 if __name__ == "__main__":
     main()
