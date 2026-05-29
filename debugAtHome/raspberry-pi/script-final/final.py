@@ -409,45 +409,6 @@ def on_connect():
 @sio.on('disconnect')
 def on_disconnect():
     log("[SIO] Deconnecte du backend")
-    
-# Mapping des noms de couleurs (doit correspondre exactement au champ 'name' de ton modèle COLOR)
-# Si ton modèle COLOR a un champ 'name', assure-toi qu'il contient "Yellow", "Blue", etc.
-COLOR_MAP = {
-    "Yellow":  0x01,
-    "Blue":    0x02,
-    "Magenta": 0x03,
-    "Brown":   0x04,
-    "Orange":  0x05
-}
-
-@sio.on('order_event')
-def on_order_event(data=None):
-    log("[SIO] Evenement commande recu")
-    try:
-        resp = requests.get(f"{BACKEND_URL}/api/order/current", timeout=2)
-        if resp.status_code == 200:
-            order = resp.json()
-            lines = order.get('ORDER_LINE', [])
-            
-            payload = [len(lines)]
-            for line in lines:
-                # 1. Utiliser le bon champ Prisma : 'quantity'
-                qty = line.get('quantity', 0) 
-                
-                # 2. Récupérer le nom de la couleur (supposé dans COLOR -> name)
-                color_name = line.get('COLOR', {}).get('name', 'Unknown')
-                arduino_id = COLOR_MAP.get(color_name, 0x00)
-                
-                payload.append(arduino_id)
-                payload.append(qty)
-            
-            log(f"[DEBUG] Envoi payload : {payload}") # Indispensable pour voir ce qui part
-            
-            link.packet.txBuff[0:len(payload)] = payload
-            link.sendData(len(payload), 0x04) # PID 0x04
-            log("[PI_DRIVER] Commande Web transmise")
-    except Exception as e:
-        log(f"[!] Erreur : {e}")
 
 # boucle principale
 
