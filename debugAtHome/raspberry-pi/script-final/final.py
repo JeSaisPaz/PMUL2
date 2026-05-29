@@ -19,7 +19,7 @@ from serial_transfer import SerialTransfer
 import socketio
 
 # config
-BAUD        = 9600
+BAUD        = 115200
 BACKEND_URL = "http://localhost:3000"
 
 def log(msg):
