@@ -285,7 +285,7 @@ def handleScanNeeded():
         reponse_web = r.json()
         item_id = reponse_web["itemId"]
         decision_texte = reponse_web["decision"]
-        order_id = reponse_web.get("orderId", 0)
+        order_id = reponse_web.get("orderId") or 0
         
         # Traduction de la décision en octet pour l'Arduino
         decision_octet = 0x00 # Défaut: PASS
