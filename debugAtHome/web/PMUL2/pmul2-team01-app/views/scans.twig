@@ -33,8 +33,11 @@ $(document).ready(function() {
         columns: [
             { 
                 data: 'scannedAt',
-                type: 'date', 
-                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '---' 
+                type: 'date',
+                render: (date, type) => {
+                    if (type === 'sort' || type === 'type') return date;
+                    return date ? new Date(date).toLocaleString('fr-FR') : '---';
+                }
             },
             { 
                 data: 'id',
