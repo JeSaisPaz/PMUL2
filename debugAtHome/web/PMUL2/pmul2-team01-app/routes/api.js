@@ -8,7 +8,7 @@ const { getColors, updateColors, initColors, saveAsJson } = require("../services
 const { getStats, resetColorStats, incrementColorStat } = require("../services/stats");
 
 module.exports = function (io) {
-    const pyLogs = [];
+    let pyLogs = [];
     let sensors = [
         { name: "IR SCAN",  state: 0 },
         { name: "IR NEXT",  state: 0 },
