@@ -52,7 +52,7 @@
             fetchLogs() {
                 fetch('/api/python/logs')
                     .then(r => r.json())
-                    .then(logs => { this.logs = logs; this.scrollBottom(); });
+                    .then(logs => { this.logs = logs; });
             },
 
             clearLogs() {
