@@ -139,7 +139,7 @@ module.exports = function (io) {
     }));
 
     router.post('/scans', handle(async (req, res) => {
-        res.json(await createScan(req.body.scan)); //code 201 HTTP CREATED on envoie itemId, decision et orderId si Order
+        res.json(await createScan(req.body.scan));
         notifyClients();
     }));
 

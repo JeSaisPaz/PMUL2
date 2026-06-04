@@ -352,7 +352,7 @@ def handleLocalOrder(payload):
 
         r = requests.post(f"{BACKEND_URL}/api/neworder",
                           json={"lines": order_lines}, timeout=5)
-        if r.status_code == 204:
+        if r.status_code == 200:
             log(f"  [BACKEND] Commande creee ({len(order_lines)} lignes)")
         else:
             log(f"  [!] POST /neworder {r.status_code}: {r.text}")
