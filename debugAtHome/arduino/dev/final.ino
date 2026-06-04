@@ -61,6 +61,8 @@ uint8_t step = 0;
 uint8_t orderPage = 0;
 uint8_t activeColors[4] = {COLOR_BLUE, COLOR_YELLOW, COLOR_MAGENTA, COLOR_BROWN}, activeColorCount = 4;
 uint8_t colorQuantities[5];
+uint8_t lastMaskIR = 255;
+uint8_t pendingMaskIR = 255;
 
 unsigned long stepEnteredAt = 0, sentAt = 0, lastSendIr = 0;
 
@@ -104,11 +106,17 @@ void updateColor(){
   }
 }
 
-void sendIr(){
-  if(millis() - lastSendIr > 500){
-    objetPmul.sendSensorStatus(statesIR[0], statesIR[1], statesIR[2], statesIR[3], statesIR[4]);
-    lastSendIr = millis();
-  }
+void sendIr() {
+    uint8_t mask = (statesIR[0] << 0) | (statesIR[1] << 1) | (statesIR[2] << 2) |
+                   (statesIR[3] << 3) | (statesIR[4] << 4);
+
+    if (mask != lastMaskIR) pendingMaskIR = mask;
+
+    if (pendingMaskIR != lastMaskIR && millis() - lastSendIr > 500) {
+        objetPmul.sendSensorStatus(statesIR[0], statesIR[1], statesIR[2], statesIR[3], statesIR[4]);
+        lastSendIr = millis();
+        lastMaskIR = pendingMaskIR;
+    }
 }
 
 void processDisplay(){
