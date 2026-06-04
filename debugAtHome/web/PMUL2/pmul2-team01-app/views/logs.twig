@@ -35,6 +35,7 @@ $(document).ready(function() {
         columns: [
             {
                 data: 'createdAt',
+                type: 'date',
                 render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>'
             },
             {

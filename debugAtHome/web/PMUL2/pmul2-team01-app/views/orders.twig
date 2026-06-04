@@ -44,11 +44,13 @@ $(document).ready(function() {
                 render: (id) => `<a href="/orders/${id}" class="fw-bold">#${id}</a>`
             },
             { 
-                data: 'updatedAt', 
+                data: 'updatedAt',
+                type: 'date', 
                 render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>' 
             },
             { 
-                data: 'completedAt', 
+                data: 'completedAt',
+                type: 'date', 
                 render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>' 
             },
             {

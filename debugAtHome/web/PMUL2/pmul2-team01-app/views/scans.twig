@@ -32,7 +32,8 @@ $(document).ready(function() {
         autoWidth: false,
         columns: [
             { 
-                data: 'scannedAt', 
+                data: 'scannedAt',
+                type: 'date', 
                 render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '---' 
             },
             { 
