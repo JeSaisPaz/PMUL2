@@ -29,7 +29,7 @@ $(document).ready(function() {
     const table = $('#ordersTable').DataTable({
         ajax: { 
             url: '/api/orders', 
-            dataSrc: (json) => { console.log(json[0]); return json; }
+            dataSrc: ''
         },
         responsive: true,
         autoWidth: false,
@@ -37,10 +37,7 @@ $(document).ready(function() {
             { 
                 data: 'createdAt',
                 type: 'date',
-                render: (date, type) => {
-                    if (type === 'sort' || type === 'type') return date;
-                    return date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>';
-                }
+                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>' 
             },
             { 
                 data: 'id',
