@@ -166,12 +166,18 @@ module.exports = function (io) {
         const { msg, time } = req.body;
         pyLogs.unshift({ msg, time }); // plus récent en premier
         if (pyLogs.length > 200) pyLogs.pop(); // limite
-        io.emit('py_log', { msg, time });
+        io.emit('py_log');
         res.sendStatus(204);
     });
 
     router.get('/python/logs', (req, res) => {
         res.json(pyLogs);
+    });
+
+    router.delete('/python/logs', (req, res) => {
+        pyLogs = [];
+        res.sendStatus(204);
+        io.emit('py_log');
     });
 
     //Sensors
