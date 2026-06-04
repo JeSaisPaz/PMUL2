@@ -17,8 +17,7 @@
             <template x-for="l in logs" :key="l.time + l.msg">
                 <div>
                     <span style="color:#6a9955" x-text="l.time"></span>
-                    &nbsp;&nbsp;
-                    <span :style="'color:' + color(l.msg)" x-text="l.msg"></span>
+                    <span style="margin-left: 8px;" :style="'color:' + color(l.msg)" x-text="l.msg"></span>
                 </div>
             </template>
         </div>
@@ -31,12 +30,22 @@
             logs: [],
 
             color(msg) {
-                if (msg.includes('[!]'))                              return '#f48771';
-                if (msg.includes('CONFIRMED'))                        return '#89d185';
-                if (msg.includes('FAILED'))                           return '#f48771';
-                if (msg.includes('[SCAN]'))                           return '#dcdcaa';
-                if (msg.includes('[BACKEND]'))                        return '#9cdcfe';
-                if (msg.includes('[BOOT]') || msg.includes('[SIO]')) return '#c586c0';
+                if (msg.includes('[!]'))         return '#f48771'; // erreurs / warnings
+                if (msg.includes('CONFIRMED'))   return '#89d185'; // tri confirmé
+                if (msg.includes('FAILED'))      return '#f48771'; // tri échoué
+                if (msg.includes('[QR]'))        return '#dcdcaa'; // scan QR
+                if (msg.includes('[SCAN]'))      return '#dcdcaa'; // scan générique
+                if (msg.includes('[BACKEND]'))   return '#9cdcfe'; // réponses backend
+                if (msg.includes('[ARDUINO]'))   return '#ce9178'; // trames Arduino
+                if (msg.includes('[SERIAL]'))    return '#ce9178'; // détection port série
+                if (msg.includes('[SIO]'))       return '#c586c0'; // socket.io
+                if (msg.includes('[BOOT]'))      return '#c586c0'; // démarrage
+                if (msg.includes('[CAM]'))       return '#4ec9b0'; // caméra
+                if (msg.includes('[COLORS]'))    return '#4ec9b0'; // couleurs envoyées
+                if (msg.includes('[ORDER]'))     return '#569cd6'; // commandes
+                if (msg.includes('[COMPLETED]')) return '#89d185'; // commandes complètes
+                if (msg.includes('[OK]'))        return '#89d185'; // succès génériques
+                if (msg.includes('[PI_DRIVER]')) return '#d7ba7d'; // boot principal
                 return '#d4d4d4';
             },
 
