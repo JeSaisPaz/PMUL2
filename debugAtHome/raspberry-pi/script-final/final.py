@@ -256,7 +256,7 @@ def handleScanNeeded():
             }
         }, timeout=5)
 
-        if r.status_code != 201:
+        if r.status_code != 200:
             log(f"  [!] POST /scans -> HTTP {r.status_code}: {r.text}")
             return
 
