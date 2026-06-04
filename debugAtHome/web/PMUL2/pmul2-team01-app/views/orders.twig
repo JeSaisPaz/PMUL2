@@ -29,7 +29,7 @@ $(document).ready(function() {
     const table = $('#ordersTable').DataTable({
         ajax: { 
             url: '/api/orders', 
-            dataSrc: '' 
+            dataSrc: (json) => { console.log(json[0]); return json; }
         },
         responsive: true,
         autoWidth: false,
