@@ -7,11 +7,11 @@
         <table id="scansTable" class="table table-striped border" width="100%">
             <thead>
                 <tr>
-                    <th>Scanned at</th>
-                    <th>ID</th>
-                    <th>QR Value</th>
-                    <th>HSV</th>
-                    <th>Item</th>
+                    <th class="all">Scanned at</th>
+                    <th class="all">ID</th>
+                    <th class="min-tablet">QR Value</th>
+                    <th class="min-tablet">HSV</th>
+                    <th class="min-tablet">Item</th>
                     <th class="all">Decision</th>
                     <th data-orderable="false" class="all"></th>
                 </tr>
@@ -32,8 +32,12 @@ $(document).ready(function() {
         autoWidth: false,
         columns: [
             { 
-                data: 'scannedAt', 
-                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '---' 
+                data: 'scannedAt',
+                type: 'date',
+                render: (date, type) => {
+                    if (type === 'sort' || type === 'type') return date;
+                    return date ? new Date(date).toLocaleString('fr-FR') : '---';
+                }
             },
             { 
                 data: 'id',
@@ -44,7 +48,7 @@ $(document).ready(function() {
                 render: (data) => {
                     if (!data) return '<span class="text-muted small">---</span>';
                     const badgeClass = (data === 'TEAM 01') ? 'badge bg-success' : 'badge bg-secondary';
-                    if (data.length > 10) return'<span class="badge bg-warning">Too long </span>'
+                    if (data.length > 10) return'<span class="badge bg-warning">Too long </span>';
                     return `<span class="${badgeClass}">${data}</span>`
                 }
             },

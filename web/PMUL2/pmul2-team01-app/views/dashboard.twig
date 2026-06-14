@@ -39,7 +39,7 @@
           <div class="card p-3 h-100">
             <button class="btn btn-outline-danger" @click="resetStats()">Reset</button>
             <div style="position: relative; height: 450px; width: 100%;">
-              <canvas id="chartAllColors"></canvas>
+              <canvas id="chartColors"></canvas>
             </div>
           </div>
         </div>
@@ -47,7 +47,7 @@
         <div class="col-md-6">
           <div class="card p-3 h-100">
             <div style="position: relative; height: 450px; width: 100%;">
-              <canvas id="chartRequestedReceived"></canvas>
+              <canvas id="chartQuantity"></canvas>
             </div>
           </div>
         </div>
@@ -59,7 +59,7 @@
           <div class="card p-3">
             <h5 class="card-title">Sensors</h5>
             <div class="row g-3">
-              <template x-for="sensor in stats.sensors ?? []">
+              <template x-for="sensor in sensors ?? []">
                 <div class="col">
                   <div class="card p-3 text-center h-100" :class="sensor.state ? 'border-success' : 'border-danger'">
                     <h6 class="card-title" x-text="sensor.name"></h6>
@@ -82,61 +82,61 @@
 {% block scripts %}
   <script src="/js/chart.js"></script>
   <script>
-  document.addEventListener('alpine:init', () => {
-    Alpine.data('dashboard', () => ({
-      stats: {},
-      chartColor: null,
-      chartQuantity: null,
+    let chartColorInstance = null;
+    let chartQuantityInstance = null;
 
-      async fetchStats() {
-        try {
-          const res = await fetch('/api/stats');
-          if (!res.ok) throw new Error(`Error : ${res.status}`);
-          this.stats = await res.json();
-          // $nextTick garantit que le DOM est à jour avant de dessiner
-          this.$nextTick(() => this.drawChart());
-        } catch (e) {
-          console.error(e);
-        }
-      },
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('dashboard', () => ({
+        stats: {},
+        sensors: [],
 
-      async resetStats() {
-        await fetch('/api/stats/reset', { method: 'POST' });
-        this.fetchStats();
-      },
-
-      // Récupère le canvas par id (plus fiable que $refs dans ce contexte)
-      getCanvas(id) {
-        const el = document.getElementById(id);
-        if (!el) {
-          console.warn(`Canvas #${id} introuvable`);
-          return null;
-        }
-        return el;
-      },
-
-      drawChart() {
-        if (!this.stats?.colorStats) return;
-
-        const canvasColors   = this.getCanvas('chartAllColors');
-        const canvasQuantity = this.getCanvas('chartRequestedReceived');
-
-        // --- Graphique Pie : répartition par couleur ---
-        if (canvasColors) {
-          if (this.chartColor) {
-            this.chartColor.destroy();
-            this.chartColor = null;
+        async fetchStats() {
+          try {
+            const res = await fetch('/api/stats');
+            if (!res.ok) throw new Error(`Error : ${res.status}`);
+            this.stats = await res.json();
+            this.drawCharts();
+          } catch (e) {
+            console.error(e);
           }
-          this.chartColor = new Chart(canvasColors, {
+        },
+
+        async fetchSensors() {
+          try {
+            const res = await fetch('/api/sensors');
+            if (!res.ok) throw new Error(`Error : ${res.status}`);
+            this.sensors = await res.json();
+          } catch (e) {
+            console.error(e);
+          }
+        },
+
+        async resetStats() {
+          try {
+            await fetch('/api/stats/reset', { method: 'POST' });
+          } catch (e) {
+            console.error(e);
+          }
+        },
+
+        drawCharts() {
+          if (!this.stats?.colorStats) return;
+
+          chartColorInstance.data.labels                      = this.stats.colorStats.map(i => i.name);
+          chartColorInstance.data.datasets[0].data            = this.stats.colorStats.map(i => i.count);
+          chartColorInstance.data.datasets[0].backgroundColor = this.stats.colorStats.map(i => i.hex);
+          chartColorInstance.update();
+
+          chartQuantityInstance.data.datasets[0].data = [this.stats.totalRequested, this.stats.totalAcquired];
+          chartQuantityInstance.update();
+        },
+
+        async init() {
+          chartColorInstance = new Chart(document.getElementById('chartColors'), {
             type: 'pie',
             data: {
-              labels: this.stats.colorStats.map(item => item.name),
-              datasets: [{
-                data: this.stats.colorStats.map(item => item.count),
-                backgroundColor: this.stats.colorStats.map(item => item.hex),
-                borderColor: '#252525',
-                borderWidth: 2
-              }]
+              labels: [],
+              datasets: [{ data: [], backgroundColor: [], borderColor: '#252525', borderWidth: 2 }]
             },
             options: {
               responsive: true,
@@ -144,39 +144,23 @@
               plugins: { legend: { position: 'right' } }
             }
           });
-        }
 
-        // --- Graphique Bar : Requested / Acquired ---
-        if (canvasQuantity) {
-          if (this.chartQuantity) {
-            this.chartQuantity.destroy();
-            this.chartQuantity = null;
-          }
-          this.chartQuantity = new Chart(canvasQuantity, {
+          chartQuantityInstance = new Chart(document.getElementById('chartQuantity'), {
             type: 'bar',
             data: {
               labels: ['Total Requested', 'Total Acquired'],
-              datasets: [{
-                label: 'Requested/Acquired',
-                data: [this.stats.totalRequested, this.stats.totalAcquired],
-                backgroundColor: ['#ffc107', '#198754'],
-                borderColor: '#252525',
-                borderWidth: 1
-              }]
+              datasets: [{ label: 'Requested/Acquired', data: [], backgroundColor: ['#ffc107', '#198754'], borderColor: '#252525', borderWidth: 1 }]
             },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false
-            }
+            options: { responsive: true, maintainAspectRatio: false }
           });
-        }
-      },
 
-      async init() {
-        await this.fetchStats();
-        socket.on('db_event', () => this.fetchStats());
-      }
-    }));
-  });
+          await this.fetchStats();
+          await this.fetchSensors();
+
+          socket.on('db_event',     () => this.fetchStats());
+          socket.on('sensor_event', () => this.fetchSensors());
+        },
+      }));
+    });
   </script>
 {% endblock %}

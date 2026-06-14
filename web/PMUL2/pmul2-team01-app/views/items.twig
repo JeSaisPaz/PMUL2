@@ -7,13 +7,13 @@
         <table id="itemsTable" class="table table-striped border" width="100%">
             <thead>
                 <tr>
-                    <th>Scanned at</th>
-                    <th>ID</th>
-                    <th>Color</th>
-                    <th>Team</th>
-                    <th>Status</th>
-                    <th>Decision</th>
-                    <th>Decision status</th>
+                    <th class="all">Scanned at</th>
+                    <th class="all">ID</th>
+                    <th class="all">Color</th>
+                    <th class="min-tablet">Team</th>
+                    <th class="min-tablet">Status</th>
+                    <th class="min-tablet">Decision</th>
+                    <th class="min-tablet">Decision status</th>
                     <th data-orderable="false" class="all"></th>
                 </tr>
             </thead>
@@ -34,8 +34,12 @@ $(document).ready(function() {
         autoWidth: false,
         columns: [
             { 
-                data: 'READ_CYCLE.scannedAt', 
-                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>' 
+                data: 'READ_CYCLE.scannedAt',
+                type: 'date',
+                render: (date, type) => {
+                    if (type === 'sort' || type === 'type') return date;
+                    return date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>';
+                }
             },
             { 
                 data: 'id',

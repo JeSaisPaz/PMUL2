@@ -1,46 +1,61 @@
 var express = require('express');
 var router = express.Router();
 
-router.get('/', function(req, res, next) {
-  res.render('dashboard', { title: 'Dashboard' });
-});
+const handle = (fn) => async (req, res, next) => {
+    try {
+        await fn(req, res, next);
+    } catch (error) {
+        console.error("Routing error : " + error.message);
+        const code = error.code || 500;
+        // On renvoie une erreur 500 explicite pour voir le problème côté client
+        res.status(code).send("Server error : " + error.message);
+    }
+};
 
-router.get('/orders', function(req, res, next) {
-  res.render('orders', { title: 'Orders' });
-});
+router.get('/', handle(async (req, res) => {
+    res.render('dashboard', { title: 'Dashboard' });
+}));
 
-router.get('/orders/:id', function(req, res) {
-  res.render('orderDetails', { 
-      title: "Order #" + req.params.id,
-      id: req.params.id 
-  });
-});
+router.get('/orders', handle(async (req, res) => {
+    res.render('orders', { title: 'Orders' });
+}));
 
-router.get('/neworder', function(req, res, next) {
-  res.render('neworder', { title: 'Place an order' });
-});
+router.get('/orders/:id', handle(async (req, res) => {
+    res.render('orderDetails', { 
+        title: "Order #" + req.params.id,
+        id: req.params.id 
+    });
+}));
 
-router.get('/items/:id', function(req, res) {
-  res.render('itemTracking', { 
-    title: "Item #" + req.params.id,
-    id: req.params.id 
-  });
-});
+router.get('/neworder', handle(async (req, res) => {
+    res.render('neworder', { title: 'Place an order' });
+}));
 
-router.get('/items', function (req, res) {
-  res.render('items', { title: 'Items' });
-});
+router.get('/items/:id', handle(async (req, res) => {
+    res.render('itemTracking', { 
+        title: "Item #" + req.params.id,
+        id: req.params.id 
+    });
+}));
 
-router.get('/scans', function(req, res, next) {
-  res.render('scans', { title: 'Scans' });
-});
+router.get('/items', handle(async (req, res) => {
+    res.render('items', { title: 'Items' });
+}));
 
-router.get('/colors', function(req, res, next) {
-  res.render('colors', { title: 'Colors' });
-});
+router.get('/scans', handle(async (req, res) => {
+    res.render('scans', { title: 'Scans' });
+}));
 
-router.get('/logs', function(req, res, next) {
-  res.render('logs', { title: 'Logs' });
-});
+router.get('/colors', handle(async (req, res) => {
+    res.render('colors', { title: 'Colors' });
+}));
+
+router.get('/logs', handle(async (req, res) => {
+    res.render('logs', { title: 'Logs' });
+}));
+
+router.get('/python/logs', handle(async (req, res) => {
+    res.render('pyLogs', { title: 'Python logs' });
+}));
 
 module.exports = router;

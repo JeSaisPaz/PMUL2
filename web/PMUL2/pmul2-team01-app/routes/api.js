@@ -2,24 +2,32 @@ var express = require('express');
 var router = express.Router();
 
 const { getScans, createScan, deleteScan } = require("../services/scan");
-const { getOrders, getOrderDetails, createOrder, deleteOrder, cancelOrder } = require("../services/order");
-const { getItems, deleteItem, updateItemStatus, getLogs, getItemDetails } = require("../services/item");
+const { getOrders, getOrderDetails, createOrder, deleteOrder, cancelOrder, getCurrentOrder } = require("../services/order");
+const { getItems, deleteItem, updateItemStatus, getLogs, deleteLog, clearLogs, getItemDetails } = require("../services/item");
 const { getColors, updateColors, initColors, saveAsJson } = require("../services/color");
-const { getStats, resetColorStats, incrementColorStat, setSensors } = require("../services/stats");
+const { getStats, resetColorStats, incrementColorStat } = require("../services/stats");
 
 module.exports = function (io) {
-
+    let pyLogs = [];
+    let sensors = [
+        { name: "IR SCAN",  state: 0 },
+        { name: "IR NEXT",  state: 0 },
+        { name: "IR STOCK", state: 0 },
+        { name: "IR ORDER", state: 0 },
+        { name: "IR PASS",  state: 0 },
+    ];
     const notifyClients = () => io.emit('db_event');
 
     // handle pour eviter de repeter le try/catch partout
     const handle = (fn) => async (req, res) => {
-    try {
-        await fn(req, res);
-    } catch (error) {
-        const code = error.status || error.code || 500;
-        console.error(`[ERROR] ${error.message}`);
-        res.status(code).json({ error: error.message }); // ← actually respond
-    }
+        try {
+            await fn(req, res);
+        } catch (error) {
+            const code = error.status || error.code || 500;
+
+            console.error("API error : " + error.message)
+            res.status(code).json({ error: error.message }); // ← actually respond
+        }
     };
 
     router.get('/health', (req, res) => {
@@ -36,13 +44,19 @@ module.exports = function (io) {
         res.json(await getOrderDetails(parseInt(req.params.id)));
     }));
 
+    router.get('/orders/current', handle(async (req, res) => {
+        res.json(await getCurrentOrder());
+    }));
+
     router.post('/neworder', handle(async (req, res) => {
         res.json(await createOrder(req.body.lines));
+        io.emit('order_event');
         notifyClients();
     }));
 
     router.patch('/orders/:id/cancel', handle(async (req, res) => {
         await cancelOrder(parseInt(req.params.id));
+        io.emit('order_event');
         notifyClients();
         res.sendStatus(204);
     }));
@@ -50,6 +64,7 @@ module.exports = function (io) {
     router.delete('/orders/:id/delete', handle(async (req, res) => {
         await deleteOrder(parseInt(req.params.id));
         notifyClients();
+        io.emit('order_event');
         res.sendStatus(204);
     }));
 
@@ -65,6 +80,18 @@ module.exports = function (io) {
 
     router.get('/logs', handle(async (req, res) => {
         res.json(await getLogs());
+    }));
+
+    router.delete('/logs/:id/delete', handle(async (req, res) => {
+        await deleteLog(parseInt(req.params.id));
+        notifyClients();
+        res.sendStatus(204);
+    }));
+
+    router.delete('/logs/clear', handle(async (req, res) => {
+        await clearLogs();
+        notifyClients();
+        res.sendStatus(204);
     }));
 
     router.delete('/items/:id/delete', handle(async (req, res) => {
@@ -87,12 +114,14 @@ module.exports = function (io) {
 
     router.put('/colors/:name/update', handle(async (req, res) => {
         await updateColors(req.body.color);
+        io.emit('color_event');
         notifyClients();
         res.sendStatus(204);
     }));
 
     router.post('/colors/init', handle(async (req, res) => {
         await initColors();
+        io.emit('color_event');
         notifyClients();
         res.sendStatus(204);
     }));
@@ -110,7 +139,7 @@ module.exports = function (io) {
     }));
 
     router.post('/scans', handle(async (req, res) => {
-        res.status(201).json(await createScan(req.body.scan)); //code 201 HTTP CREATED on envoie itemId, decision et orderId si Order
+        res.json(await createScan(req.body.scan));
         notifyClients();
     }));
 
@@ -132,11 +161,34 @@ module.exports = function (io) {
         res.sendStatus(204);
     }));
 
-    router.post('/stats/sensors', handle (async(req, res) => {
-        const { sensors } = req.body;
-        setSensors(sensors);
-        notifyClients();
+    //Python Logs
+    router.post('/python/logs', (req, res) => {
+        const { msg, time } = req.body;
+        pyLogs.unshift({ msg, time }); // plus récent en premier
+        if (pyLogs.length > 200) pyLogs.pop(); // limite
+        io.emit('py_log');
         res.sendStatus(204);
+    });
+
+    router.get('/python/logs', (req, res) => {
+        res.json(pyLogs);
+    });
+
+    router.delete('/python/logs', (req, res) => {
+        pyLogs = [];
+        res.sendStatus(204);
+        io.emit('py_log');
+    });
+
+    //Sensors
+    router.post('/sensors', handle ((req, res) => {
+        sensors = req.body.sensors;
+        io.emit('sensor_event');
+        res.sendStatus(204);
+    }));
+
+    router.get('/sensors', handle ((req, res) => {
+       res.json(sensors);
     }));
 
     return router;

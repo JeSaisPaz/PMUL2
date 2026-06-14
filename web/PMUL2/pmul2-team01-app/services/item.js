@@ -31,6 +31,23 @@ async function getLogs() {
     });
 }
 
+async function deleteLog(id) {
+    const log = await prisma.sELECTION_HISTORY.findUnique({ where: { id } });
+    if (!log) throw { code: 404, message: "Log not found" };
+    await prisma.sELECTION_HISTORY.delete({ where: { id } });
+}
+
+async function clearLogs() {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000); //retourne le temps en ms, on soustrait 5 min en ms(5 min * 60 s * 1000 ms).
+    await prisma.sELECTION_HISTORY.deleteMany({
+        where: {
+            createdAt: {
+                lt: fiveMinutesAgo,//on delete les logs où createdAt est less than now - 5min
+            },
+        },
+    });
+}
+
 async function deleteItem(id) {
     const item = await prisma.iTEM.findUnique({
         where: { id },
@@ -129,4 +146,4 @@ async function updateItemStatus(id, status) {
     }
 }
 
-module.exports = { getItems, deleteItem, updateItemStatus, getLogs, getItemDetails };
+module.exports = { getItems, deleteItem, updateItemStatus, getLogs, deleteLog, clearLogs, getItemDetails };

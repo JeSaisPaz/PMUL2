@@ -38,25 +38,35 @@ async function createScan(scan) {
     }
 
     if (scan.qrValue === "TEAM 01") {
-        //on récupère toutes les lignes de commandes contenant la couleur et en incluant les items ordered ou in process
+        //On récupère la commande la plus vieille en PROCESS
         let orderLineInNeed = null;
-        if(validColor){
-            const orderLines = await prisma.oRDER_LINE.findMany({
+
+        const oldestOrder = await prisma.oRDER.findFirst({
+            where: { status: ORDER_STATUS.PROCESS },
+            orderBy: { createdAt: 'asc' }
+        });
+
+        if (oldestOrder && validColor) {
+            //On cherche une ligne de commande dans cette commande qui demande la couleur scannée
+            const orderLine = await prisma.oRDER_LINE.findFirst({
                 where: {
+                    ORDER_id: oldestOrder.id,
                     COLOR_id: validColor.id,
-                    ORDER: { status: ORDER_STATUS.PROCESS },
                     status: ORDER_STATUS.PROCESS,
                 },
-                orderBy: { ORDER: { createdAt: 'asc' } },
                 include: {
                     ITEM: {
                         where: { status: { in: [ITEM_STATUS.ORDERED, ITEM_STATUS.PROCESS] } }
                     }
                 }
             });
-            orderLineInNeed = orderLines.find(line => line.ITEM.length < line.quantity) ?? null;  
+
+            // On vérifie qu'il reste de la place dans cette ligne
+            if (orderLine && orderLine.ITEM.length < orderLine.quantity) {
+                orderLineInNeed = orderLine;
+            }
         }
-        //on prend la commande la plus vielle ('asc') avec de la place 
+
         const newItem = await prisma.iTEM.create({
             data: {
                 team: scan.qrValue,

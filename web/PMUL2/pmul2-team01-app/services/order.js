@@ -27,6 +27,17 @@ async function getOrderDetails(id) {
     };
 }
 
+async function getCurrentOrder() {
+    const order = await prisma.oRDER.findFirst({
+        where: { status: ORDER_STATUS.PROCESS },
+        orderBy: { createdAt: 'asc' },
+        include: { ORDER_LINE: { include: { COLOR: true } } }
+    });
+
+    if (!order) throw { code: 404, message: "No order in process." };
+    return order;
+}
+
 async function createOrder(lines) {
     if (!Array.isArray(lines) || lines.length === 0) throw { code: 400, message: "Order must contain at least one line." };
 
@@ -34,7 +45,7 @@ async function createOrder(lines) {
     const hasInactive = await prisma.cOLOR.findFirst({ where: { id: { in: colorIds }, status: false }});
     if (hasInactive) throw { code: 400, message: "Inactive color detected." };
 
-    return prisma.oRDER.create({
+    return await prisma.oRDER.create({
         data: { ORDER_LINE: { create: lines.map(line => ({ quantity: line.quantity, COLOR_id: line.id }))}}
     });
 }
@@ -78,4 +89,4 @@ async function cancelOrder(id) {
     ]);
 }
 
-module.exports = { getOrders, getOrderDetails, createOrder, deleteOrder, cancelOrder };
+module.exports = { getOrders, getOrderDetails, createOrder, deleteOrder, cancelOrder, getCurrentOrder };

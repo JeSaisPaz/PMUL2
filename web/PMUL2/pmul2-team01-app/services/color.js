@@ -3,7 +3,16 @@ const fs = require('fs');
 const path = require('path');
 
 const JSON_PATH = path.join(__dirname, '../colorbook/colorbook.json');
-const colors = require(JSON_PATH);
+
+function loadColorsFromJson() {
+    try {
+        const data = fs.readFileSync(JSON_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (err) {
+        console.error("Error reading JSON:", err);
+        return [];
+    }
+}
 
 async function getColors() {
     return prisma.cOLOR.findMany();
@@ -19,21 +28,16 @@ async function updateColors(color){
 }
 
 async function initColors() {
-    await Promise.all(
-        colors.map(color =>
-            prisma.cOLOR.upsert({
-                where: { name: color.name },
-                update: color,
-                create: color,
-            })
-        )
-    );
+    const colors = loadColorsFromJson(); // Lecture dynamique
+    await prisma.cOLOR.deleteMany({});
+    await prisma.cOLOR.createMany({ data: colors });
 }
 
-async function saveAsJson(color){
+//Sauvegarder la base de données vers le fichier JSON
+async function saveAsJson() {
     const allColors = await getColors();
     const jsonContent = JSON.stringify(allColors, null, 2);   
     fs.writeFileSync(JSON_PATH, jsonContent, 'utf8');
 }
 
-module.exports = { getColors, updateColors, initColors, saveAsJson };
+module.exports = { getColors, updateColors, initColors, saveAsJson, loadColorsFromJson };

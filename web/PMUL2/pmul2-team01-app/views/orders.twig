@@ -10,11 +10,11 @@
         <table id="ordersTable" class="table table-striped border" width="100%">
             <thead>
                 <tr>
-                    <th>Created at</th>
-                    <th>ID</th>
-                    <th>Updated at</th>
-                    <th>Completed at</th>
-                    <th>Status</th>
+                    <th class="all">Created at</th>
+                    <th class="all">ID</th>
+                    <th class="min-tablet">Updated at</th>
+                    <th class="min-tablet">Completed at</th>
+                    <th class="min-tablet">Status</th>
                     <th data-orderable="false" class="all">Actions</th>
                 </tr>
             </thead>
@@ -29,26 +29,38 @@ $(document).ready(function() {
     const table = $('#ordersTable').DataTable({
         ajax: { 
             url: '/api/orders', 
-            dataSrc: '' 
+            dataSrc: ''
         },
         responsive: true,
         autoWidth: false,
         columns: [
             { 
-                data: 'createdAt', 
-                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>' 
+                data: 'createdAt',
+                type: 'date',
+                render: (date, type) => {
+                    if (type === 'sort' || type === 'type') return date;
+                    return date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>';
+                }
             },
             { 
                 data: 'id',
                 render: (id) => `<a href="/orders/${id}" class="fw-bold">#${id}</a>`
             },
             { 
-                data: 'updatedAt', 
-                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>' 
+                data: 'updatedAt',
+                type: 'date',
+                render: (date, type) => {
+                    if (type === 'sort' || type === 'type') return date;
+                    return date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>';
+                }
             },
             { 
-                data: 'completedAt', 
-                render: (date) => date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>' 
+                data: 'completedAt',
+                type: 'date',
+                render: (date, type) => {
+                    if (type === 'sort' || type === 'type') return date;
+                    return date ? new Date(date).toLocaleString('fr-FR') : '<span class="text-muted">—</span>';
+                }
             },
             {
                 data: 'status',

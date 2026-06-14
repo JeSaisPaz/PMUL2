@@ -8,7 +8,7 @@
  * Date: 20/04/2026
  * License: MIT (We love open source around here.)
  */
-
+ 
 #ifndef PMUL2_LIB_H
 #define PMUL2_LIB_H
 
@@ -18,31 +18,18 @@
 
 class Pmul2Lib {
     public:
-        // constructeur
         Pmul2Lib(Stream &serialPort);
 
-        // version de la lib
-        void version();
-
-        // ecriture vers le Pi/backend
-        void sendOrderDone();
-        void sendBusy();
-        void sendReady();
         void sendScanNeeded();
-        void sendPong();
         void sendScanResult(uint16_t itemId, ItemStatus status);
-                         void sendSensorStatus(uint8_t ir1, uint8_t ir2, uint8_t ir3, uint8_t ir4, uint8_t ir5);
-        // envoie une commande saisie au keypad
+        void sendSensorStatus(uint8_t ir1, uint8_t ir2, uint8_t ir3, uint8_t ir4, uint8_t ir5);
         void sendLocalOrder(uint8_t lineCount, const uint8_t* colors, const uint8_t* qtys);
 
-        // lecture depuis le Pi/backendcurrentItem
-        bool readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId,
-                          uint8_t& hue, uint8_t& saturation, uint8_t& value, uint8_t& team);
-        // recoit la liste des couleurs actives (max 4)
+        void pollAll();
+        bool readItemInfo(uint16_t& itemId, ItemDecision& decision, uint8_t& orderId);
         bool readColorList(uint8_t* colors, uint8_t& count);
-        // recoit le nombre de commandes completes
         bool readCompletedCount(uint16_t& count);
-        bool handlePing();
+        bool readCurrentOrder(uint8_t& orderId, uint8_t* quantities);
 
     private:
         Stream* _serial;
