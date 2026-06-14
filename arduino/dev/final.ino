@@ -20,9 +20,9 @@ bool statesIR[] = {0, 0, 0, 0, 0};
 Servo servoScan; // pin 11
 Servo servoStock; // pin 10
 Servo servoOrder; // pin 9
-#define SERVO_SCAN_ON 0 
-#define SERVO_SCAN_OFF 20
-#define SERVO_PUSH 0 //Ajout d'un angle pour push la boite mais donc on dois repositioner le bras pour qu'il soit à 90° quand il est à 0°
+#define SERVO_SCAN_ON 40 
+#define SERVO_SCAN_OFF 0
+#define SERVO_PUSH 0 
 #define SERVO_ON 45   
 #define SERVO_OFF 90
 
@@ -45,7 +45,7 @@ char keys[ROWS][COLS] = {
                           {'7','8','9','C'},
                           {'*','0','#','D'}
                         };
-uint8_t rowPins[ROWS] = {31, 33, 35, 37}, colPins[COLS] = {39, 41, 43, 45}; 
+uint8_t rowPins[ROWS] = {31, 33, 35, 37}, colPins[COLS] = {43, 45, 47, 49}; 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 char key = 0;
 
@@ -284,7 +284,7 @@ void orderMenu(){
 // Interruptions
 void switchSystem(){
   unsigned long now = millis();
-  if(now - lastBtn1 > 200){
+  if(now - lastBtn1 > 1000){
     lastBtn1 = now; 
     maintenance = !maintenance;
     needRedisplay = true;
@@ -293,7 +293,7 @@ void switchSystem(){
 
 void switchDisplay(){
   unsigned long now = millis();
-  if(now - lastBtn2 > 200 && !maintenance){
+  if(now - lastBtn2 > 500 && !maintenance){
     lastBtn2 = now;
     displayMode = !displayMode;
     needRedisplay = true;
